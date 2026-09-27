@@ -1,0 +1,8 @@
+{
+  "labels": [
+    { "name": "automation", "color": "0366d6", "description": "Automated maintenance or generated changes" },
+    { "name": "bug", "color": "d73a4a", "description": "Something is not working as expected" },
+    { "name": "dependencies", "color": "0366d6", "description": "Dependency or tooling update" },
+    { "name": "security", "color": "b60205", "description": "Security-sensitive change or finding" }
+  ]
+}
