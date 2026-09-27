@@ -1,0 +1,3 @@
+[tools]
+# Node 24.15.0 includes npm 11.12.1.
+node = "24.15.0"

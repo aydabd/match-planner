@@ -1,0 +1,26 @@
+{
+	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
+	"extends": ["config:recommended"],
+	"enabledManagers": ["npm", "mise", "github-actions", "renovate-config"],
+	"lockFileMaintenance": {
+		"enabled": true
+	},
+	"packageRules": [
+		{
+			"description": "Keep npm dependencies exact",
+			"matchManagers": ["npm"],
+			"rangeStrategy": "pin"
+		},
+		{
+			"description": "Keep mise tools exact while allowing updates",
+			"matchManagers": ["mise"],
+			"rangeStrategy": "pin",
+			"updatePinnedDependencies": true
+		},
+		{
+			"description": "Keep GitHub Actions pinned to immutable commits",
+			"matchManagers": ["github-actions"],
+			"pinDigests": true
+		}
+	]
+}
