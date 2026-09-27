@@ -1,0 +1,30 @@
+name: Commit Policy
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: commit-policy-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  signed-off-by:
+    name: Signed-off-by trailers
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { fetch-depth: 0, persist-credentials: false }
+      - name: Verify pull request commits
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PULL_REQUEST: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          gh api --paginate --slurp "/repos/$REPOSITORY/pulls/$PULL_REQUEST/commits?per_page=100" \
+            | jq -e 'flatten | length > 0 and all(.[].commit.message; test("(?m)^Signed-off-by: .+ <[^>]+>\\n?$"))' >/dev/null
+          echo "All pull request commits include Signed-off-by."
