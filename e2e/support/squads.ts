@@ -21,13 +21,13 @@ export const MINIMUM_SQUAD = SQUAD.slice(0, 6);
 
 /** Pitch lists read top to bottom: attack, midfield, defence. */
 export const KICKOFF = {
-	pitch: ["Alva", "Dino", "Ebba", "Filip", "Bo", "Cleo"],
+	pitch: ["Cleo", "Bo", "Ebba", "Filip", "Alva", "Dino"],
 	bench: ["Greta", "Hugo"],
 };
 
 export const SECOND_SWAP = {
-	comingIn: ["Hugo", "Greta"],
+	comingIn: ["Greta", "Hugo"],
 	goingOut: ["Ebba", "Filip"],
-	pitch: ["Greta", "Alva", "Bo", "Cleo", "Hugo", "Dino"],
+	pitch: ["Hugo", "Alva", "Cleo", "Dino", "Bo", "Greta"],
 	bench: ["Ebba", "Filip"],
 };

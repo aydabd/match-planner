@@ -96,20 +96,155 @@ export function canAssignZone(
 	return true;
 }
 
+/** Whether an active player may stand in a zone without breaking the zone rule. */
+function canPlay(state: SchedulerState, id: string, zoneId: string): boolean {
+	const player = state.players[id] as PlayerState;
+	return canAssignZone(player, zoneId, state.format);
+}
+
+/** A seat on the pitch: one place in one zone. */
+type Seats = readonly string[];
+
+/**
+ * Seats interleaved across the lines (back, midfield, attack, back, ...), so
+ * players next to each other in join order end up in different lines. When
+ * playtime is tied and the last players in join order rest, the rest is then
+ * spread over the pitch instead of emptying one line, and fresh substitutes
+ * are spread over every line too. Without this a line can end up with no
+ * one left who may relieve it.
+ */
+function seatsOf(format: FormatConfig): Seats {
+	const left = new Map(format.zones.map((zone) => [zone.id, zone.count]));
+	const seats: string[] = [];
+	while (seats.length < outfieldCount(format)) {
+		for (const zone of format.zones) {
+			const count = left.get(zone.id) ?? 0;
+			if (count > 0) {
+				seats.push(zone.id);
+				left.set(zone.id, count - 1);
+			}
+		}
+	}
+	return seats;
+}
+
+/**
+ * Largest number of `playerIds` that can be seated at once, each in a zone
+ * they are allowed to play (bipartite matching with augmenting paths).
+ */
+function maxSeated(
+	state: SchedulerState,
+	playerIds: readonly string[],
+	seats: Seats,
+): number {
+	const seatOwner: (number | undefined)[] = seats.map(() => undefined);
+	const eligible = playerIds.map((id) =>
+		seats.map((zoneId) => canPlay(state, id, zoneId)),
+	);
+	const tryPlace = (p: number, visited: boolean[]): boolean => {
+		for (let s = 0; s < seats.length; s++) {
+			if (!at(at(eligible, p), s) || at(visited, s)) continue;
+			visited[s] = true;
+			const owner = seatOwner[s];
+			if (owner === undefined || tryPlace(owner, visited)) {
+				seatOwner[s] = p;
+				return true;
+			}
+		}
+		return false;
+	};
+	let seated = 0;
+	for (let p = 0; p < playerIds.length; p++) {
+		if (
+			tryPlace(
+				p,
+				seats.map(() => false),
+			)
+		)
+			seated++;
+	}
+	return seated;
+}
+
+/** Read an index that is always in range (the arrays below are pre-sized). */
+function at<T>(values: readonly T[], index: number): T {
+	return values[index] as T;
+}
+
+/**
+ * Minimum-cost perfect assignment of n players to n seats (Hungarian
+ * algorithm, O(n^3)). `cost[p][s]` is Infinity where player p may not take
+ * seat s; the caller guarantees a finite assignment exists. Returns the seat
+ * index for each player.
+ */
+function assignSeats(cost: readonly (readonly number[])[]): number[] {
+	const n = cost.length;
+	// 1-indexed potentials and matching, as in the classic formulation;
+	// index 0 is a virtual start player/seat.
+	const u = new Array<number>(n + 1).fill(0);
+	const v = new Array<number>(n + 1).fill(0);
+	const playerOfSeat = new Array<number>(n + 1).fill(0);
+	const way = new Array<number>(n + 1).fill(0);
+	const costAt = (p: number, s: number) => at(at(cost, p - 1), s - 1);
+
+	for (let p = 1; p <= n; p++) {
+		playerOfSeat[0] = p;
+		let s0 = 0;
+		const minv = new Array<number>(n + 1).fill(Infinity);
+		const used = new Array<boolean>(n + 1).fill(false);
+		do {
+			used[s0] = true;
+			const p0 = at(playerOfSeat, s0);
+			let delta = Infinity;
+			let s1 = 0;
+			for (let s = 1; s <= n; s++) {
+				if (at(used, s)) continue;
+				const reduced = costAt(p0, s) - at(u, p0) - at(v, s);
+				if (reduced < at(minv, s)) {
+					minv[s] = reduced;
+					way[s] = s0;
+				}
+				if (at(minv, s) < delta) {
+					delta = at(minv, s);
+					s1 = s;
+				}
+			}
+			for (let s = 0; s <= n; s++) {
+				if (at(used, s)) {
+					const ps = at(playerOfSeat, s);
+					u[ps] = at(u, ps) + delta;
+					v[s] = at(v, s) - delta;
+				} else {
+					minv[s] = at(minv, s) - delta;
+				}
+			}
+			s0 = s1;
+		} while (at(playerOfSeat, s0) !== 0);
+		do {
+			const s1 = at(way, s0);
+			playerOfSeat[s0] = at(playerOfSeat, s1);
+			s0 = s1;
+		} while (s0 !== 0);
+	}
+
+	const seatOfPlayer = new Array<number>(n).fill(0);
+	for (let s = 1; s <= n; s++) seatOfPlayer[at(playerOfSeat, s) - 1] = s - 1;
+	return seatOfPlayer;
+}
+
 /**
  * Generate the next rotation from the current state, WITHOUT mutating it.
  * Safe to call repeatedly for a "what happens next" preview.
  *
- * Algorithm (single greedy pass, scarcest zone first):
- * for each zone, ordered by fewest seats first, pick the eligible
- * (adjacency-respecting) active players who have spent the least time in
- * that zone, then the least total time, then join order as a stable
- * tiebreak. Whoever is left after every zone is filled rests. Because
- * scarce zones are filled first from the players who have played there
- * least, and everyone still eligible for nothing yet gets first refusal
- * on the zones they need, the players left resting are - as an emergent
- * property, not a separate rule - close to those with the most total
- * playtime so far.
+ * Two steps, both exact rather than greedy, so no formation can paint the
+ * team into a corner:
+ * 1. Who plays: go through active players from least to most playtime (join
+ *    order breaks ties) and take each one whose addition still leaves a
+ *    valid lineup, i.e. everyone chosen can be seated in a zone they are
+ *    allowed to play (bipartite matching). The rest rest.
+ * 2. Where they play: an optimal assignment of the chosen players to seats
+ *    that respects the zone rule and puts each player where they have spent
+ *    the least time, so players alternate between their allowed zones.
  */
 export function generateRotation(state: SchedulerState): RotationAssignment {
 	const active = state.order.filter((id) => !state.players[id]?.unavailable);
@@ -120,45 +255,50 @@ export function generateRotation(state: SchedulerState): RotationAssignment {
 		);
 	}
 
-	const remaining = new Set(active);
-	const zones: Record<string, string[]> = {};
-	for (const zone of state.format.zones) zones[zone.id] = [];
-
-	const zonesByScarcity = [...state.format.zones].sort(
-		(a, b) => a.count - b.count,
+	const seats = seatsOf(state.format);
+	const playtime = (id: string) =>
+		(state.players[id] as PlayerState).totalSeconds;
+	const joinOrder = (a: string, b: string) =>
+		state.order.indexOf(a) - state.order.indexOf(b);
+	const byPlaytime = [...active].sort(
+		(a, b) => playtime(a) - playtime(b) || joinOrder(a, b),
 	);
-
-	for (const zone of zonesByScarcity) {
-		const eligible = [...remaining].filter((id) => {
-			const player = state.players[id];
-			return (
-				player !== undefined && canAssignZone(player, zone.id, state.format)
-			);
-		});
-		if (eligible.length < zone.count) {
-			throw new SchedulingError(
-				`Kan inte fylla zonen "${zone.label}" rattvist just nu - for fa spelare kan sta dar utan att bryta ` +
-					`regeln om att aldrig byta mellan icke-angransande zoner. Justera truppen eller gor ett manuellt byte.`,
-			);
+	const chosen: string[] = [];
+	for (const id of byPlaytime) {
+		if (chosen.length === need) break;
+		if (maxSeated(state, [...chosen, id], seats) === chosen.length + 1) {
+			chosen.push(id);
 		}
-		eligible.sort((a, b) => {
-			const playerA = state.players[a];
-			const playerB = state.players[b];
-			if (!playerA || !playerB) return 0;
-			const za = zoneSeconds(playerA, zone.id);
-			const zb = zoneSeconds(playerB, zone.id);
-			if (za !== zb) return za - zb;
-			const ta = state.players[a]?.totalSeconds;
-			const tb = state.players[b]?.totalSeconds;
-			if (ta !== undefined && tb !== undefined && ta !== tb) return ta - tb;
-			return state.order.indexOf(a) - state.order.indexOf(b);
-		});
-		const chosen = eligible.slice(0, zone.count);
-		zones[zone.id] = chosen;
-		for (const id of chosen) remaining.delete(id);
+	}
+	if (chosen.length < need) {
+		throw new SchedulingError(
+			"Kan inte ställa upp laget rättvist just nu - för få spelare kan spela de platser som är kvar utan att byta mellan icke-angränsande zoner. Justera truppen eller gör ett manuellt byte.",
+		);
 	}
 
-	return { zones, bench: [...remaining] };
+	// Keep lineups in join order so the pitch reads the same way each time.
+	chosen.sort(joinOrder);
+	// Ties (e.g. at kickoff, when nobody has played) go to the seat matching
+	// the player's place in join order; the tie-break is far below one second.
+	const tieBreak = 1 / (seats.length * seats.length + 1);
+	const cost = chosen.map((id, p) =>
+		seats.map((zoneId, s) =>
+			canPlay(state, id, zoneId)
+				? zoneSeconds(state.players[id] as PlayerState, zoneId) +
+					Math.abs(p - s) * tieBreak
+				: Infinity,
+		),
+	);
+	const seatOfPlayer = assignSeats(cost);
+
+	const zones: Record<string, string[]> = {};
+	for (const zone of state.format.zones) zones[zone.id] = [];
+	chosen.forEach((id, p) => {
+		const zoneId = at(seats, at(seatOfPlayer, p));
+		(zones[zoneId] as string[]).push(id);
+	});
+	const playing = new Set(chosen);
+	return { zones, bench: active.filter((id) => !playing.has(id)) };
 }
 
 /**
