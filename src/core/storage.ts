@@ -33,6 +33,13 @@ export function serializeRoster(
 }
 
 /** The normalised id for a format id (e.g. "7v7" -> "7v7:2-3-1"), or null if unknown. */
+/** Whole minutes within LIMITS.rotationMinutes, as the setup screen allows. */
+function isAllowedRotation(seconds: number): boolean {
+	const minutes = seconds / 60;
+	const { min, max } = LIMITS.rotationMinutes;
+	return Number.isInteger(minutes) && minutes >= min && minutes <= max;
+}
+
 function canonicalFormatId(formatId: string): string | null {
 	try {
 		return getFormat(formatId).id;
@@ -100,8 +107,7 @@ export function parseRosterFile(
 
 	if (
 		typeof obj.rotationSeconds !== "number" ||
-		!Number.isFinite(obj.rotationSeconds) ||
-		obj.rotationSeconds <= 0
+		!isAllowedRotation(obj.rotationSeconds)
 	) {
 		throw new StorageError("rotationSeconds maste vara ett positivt tal.");
 	}
