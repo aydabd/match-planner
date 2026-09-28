@@ -3,7 +3,12 @@ import { matchFileName, matchFileToJson } from "../core/matchFile.js";
 import type { StoredReport } from "../core/report.js";
 import { loadMatchFiles } from "./matchFileStorage.js";
 import { loadReports } from "./reportStorage.js";
-import { reportAsText, reportDetails, zoneBreakdown } from "./reportText.js";
+import {
+	reportAsText,
+	reportDetails,
+	restSummary,
+	zoneBreakdown,
+} from "./reportText.js";
 import { TEXT } from "./text.js";
 
 function byId(id: string): HTMLElement {
@@ -91,6 +96,7 @@ export function createReportView(callbacks: {
 					TEXT.report.periodColumn(i + 1),
 				),
 				"Fördelning",
+				"Vila",
 			],
 			report.players.map((p) => [
 				[p.name, TEXT.report.status(p.status)].filter(Boolean).join(" · "),
@@ -99,6 +105,14 @@ export function createReportView(callbacks: {
 					formatTime(p.periodSeconds[i] ?? 0),
 				),
 				zoneBreakdown(p.zoneSeconds),
+				[
+					restSummary(p.rests),
+					...new Set(
+						p.rests.flatMap((r) =>
+							r.flag ? [TEXT.report.restFlag(r.flag)] : [],
+						),
+					),
+				].join(" · "),
 			]),
 		);
 
@@ -115,13 +129,24 @@ export function createReportView(callbacks: {
 					);
 		table(
 			byId("reportSwaps"),
-			["Byte", "Period", "Planerat", "Gjort", "Avvikelse", ""],
+			[
+				"Byte",
+				"Period",
+				"Planerat",
+				"Gjort",
+				"Avvikelse",
+				"Vilat före byte",
+				"",
+			],
 			report.swaps.map((s) => [
 				TEXT.match.substitution(s.inName, s.outName),
 				String(s.period),
 				formatTime(s.plannedAt),
 				formatTime(s.at),
 				TEXT.report.delay(s.delaySeconds),
+				s.inRestedSeconds === null
+					? "–"
+					: `${s.inName}: ${formatTime(s.inRestedSeconds)}`,
 				TEXT.report.lateFlag(s.delaySeconds),
 			]),
 			(i) =>

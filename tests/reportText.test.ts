@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { StoredReport } from "../src/core/report.js";
 import { buildReport } from "../src/core/report.js";
-import { reportAsText, zoneBreakdown } from "../src/ui/reportText.js";
+import {
+	reportAsText,
+	restSummary,
+	zoneBreakdown,
+} from "../src/ui/reportText.js";
 import { TEXT } from "../src/ui/text.js";
 
 describe("report in Swedish", () => {
@@ -26,6 +30,27 @@ describe("report in Swedish", () => {
 		],
 	] as const)("%o", (item, sentence) => {
 		expect(TEXT.report.feedback(item, () => "Ines")).toBe(sentence);
+	});
+
+	it.each([
+		[
+			{ code: "shortRest", playerId: "i", seconds: 75 },
+			"Ines vilade bara 1 min 15 s innan hen kom in igen.",
+		],
+		[
+			{ code: "longRest", playerId: "i", seconds: 1500 },
+			"Ines satt på bänken i 25 minuter i sträck.",
+		],
+	] as const)("%o", (item, sentence) => {
+		expect(TEXT.report.feedback(item, () => "Ines")).toBe(sentence);
+	});
+
+	it("summarises rests", () => {
+		expect(restSummary([])).toBe("Ingen vila");
+		expect(restSummary([{ seconds: 400 }])).toBe("1 vila, 06:40");
+		expect(restSummary([{ seconds: 400 }, { seconds: 130 }])).toBe(
+			"2 vilor, kortast 02:10, längst 06:40",
+		);
 	});
 
 	it("describes early, on time and late swaps", () => {
@@ -63,6 +88,7 @@ describe("report in Swedish", () => {
 				],
 				players: [{ id: "a", name: "Ada" }],
 				endedAt: 600,
+				rotationSeconds: 300,
 			}),
 		};
 		expect(reportAsText(stored)).toBe(
@@ -74,7 +100,7 @@ describe("report in Swedish", () => {
 				"- Speltiden var jämn: skillnaden mellan mest och minst var 0 sekunder.",
 				"",
 				"Speltid",
-				"Ada: 10:00 (Period 1 10:00)",
+				"Ada: 10:00 (Period 1 10:00). Ingen vila",
 				"",
 				"Byten",
 				"Inga byten gjordes.",

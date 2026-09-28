@@ -32,6 +32,7 @@ import {
 	newMatchFile,
 	parseMatchFile,
 } from "../core/matchFile.js";
+import { POLICY } from "../core/policy.js";
 import { buildReport, type StoredReport } from "../core/report.js";
 import {
 	applyElapsed,
@@ -48,7 +49,12 @@ import {
 	type SubstitutionChain,
 	substitutionChains,
 } from "../core/substitutions.js";
-import { recordLineup, type TimelineEvent } from "../core/timeline.js";
+import {
+	type Rest,
+	recordLineup,
+	restsOf,
+	type TimelineEvent,
+} from "../core/timeline.js";
 import type {
 	FormatConfig,
 	RotationAssignment,
@@ -107,6 +113,8 @@ interface Els {
 	backToSetupBtn: HTMLButtonElement;
 	endMatchBtn: HTMLButtonElement;
 	clockNotice: HTMLElement;
+	restNotices: HTMLElement;
+	restLimits: HTMLElement;
 	reportBtn: HTMLButtonElement;
 }
 
@@ -151,6 +159,8 @@ function getEls(): Els {
 		backToSetupBtn: byId("backToSetupBtn"),
 		endMatchBtn: byId("endMatchBtn"),
 		clockNotice: byId("clockNotice"),
+		restNotices: byId("restNotices"),
+		restLimits: byId("restLimits"),
 		reportBtn: byId("reportBtn"),
 	};
 }
@@ -218,6 +228,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 	const els = getEls();
 	let live: LiveMatch | null = null;
 	let caughtUpTimer: ReturnType<typeof setTimeout> | null = null;
+	let restCache: { key: string; rests: Record<string, Rest[]> } | null = null;
 
 	function nameOf(id: string): string {
 		return live?.playerNames.get(id) ?? id;
@@ -263,7 +274,30 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		return el;
 	}
 
-	function benchChip(id: string, idx: number): HTMLElement {
+	/** Every player's rests so far, from the timeline. */
+	function currentRests(): Record<string, Rest[]> {
+		if (!live) return {};
+		// Rendering asks twice per tick; the answer only changes when the
+		// second, the timeline or the squad does.
+		const key = `${now()}:${live.timeline.length}:${live.schedulerState.order.length}`;
+		if (restCache?.key !== key) {
+			restCache = {
+				key,
+				rests: restsOf(live.timeline, live.schedulerState.order, now()),
+			};
+		}
+		return restCache.rests;
+	}
+
+	function longRestSeconds(): number {
+		return live ? POLICY.longRestIntervals * live.plan.rotationSeconds : 0;
+	}
+
+	function benchChip(
+		id: string,
+		idx: number,
+		rests: Record<string, Rest[]>,
+	): HTMLElement {
 		const wrap = document.createElement("button");
 		wrap.type = "button";
 		wrap.className = "bench-chip";
@@ -284,6 +318,15 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 				formatTime(activeTemp.remainingSeconds),
 			);
 			wrap.appendChild(cd);
+		}
+		// How long the player has been resting, and whether that is too long.
+		const ongoing = rests[id]?.find((r) => r.endedAt === null);
+		if (ongoing) {
+			const rest = document.createElement("span");
+			rest.className = "bench-rest";
+			if (ongoing.seconds > longRestSeconds()) rest.classList.add("is-long");
+			rest.textContent = TEXT.rest.resting(formatTime(ongoing.seconds));
+			wrap.appendChild(rest);
 		}
 		wrap.addEventListener("click", () => onBenchClick(idx));
 		return wrap;
@@ -429,9 +472,50 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			els.benchList.appendChild(empty);
 			return;
 		}
+		const rests = currentRests();
 		for (const [idx, id] of live.currentAssignment.bench.entries()) {
-			els.benchList.appendChild(benchChip(id, idx));
+			els.benchList.appendChild(benchChip(id, idx, rests));
 		}
+	}
+
+	/**
+	 * Point out rests that are too long (still going on) or were too short
+	 * (the player just came on). Rebuilt only when the wording changes, so
+	 * the live region does not repeat itself every second.
+	 */
+	function renderRestNotices(): void {
+		if (!live) return;
+		const rests = currentRests();
+		const limit = longRestSeconds();
+		const notices: string[] = [];
+		for (const id of live.schedulerState.order) {
+			const own = rests[id] ?? [];
+			const ongoing = own.find((r) => r.endedAt === null);
+			if (ongoing && ongoing.seconds > limit) {
+				notices.push(TEXT.rest.longNotice(nameOf(id), limit));
+			}
+			const finished = own.filter((r) => r.endedAt !== null);
+			const latest = finished[finished.length - 1];
+			if (
+				latest?.endedAt != null &&
+				latest.seconds < POLICY.shortRestSeconds &&
+				now() - latest.endedAt <= LIMITS.restNoticeSeconds
+			) {
+				notices.push(
+					TEXT.rest.shortNotice(nameOf(id), formatTime(latest.seconds)),
+				);
+			}
+		}
+		const key = JSON.stringify(notices);
+		if (els.restNotices.dataset.key === key) return;
+		els.restNotices.dataset.key = key;
+		els.restNotices.replaceChildren(
+			...notices.map((text) => {
+				const li = document.createElement("li");
+				li.textContent = text;
+				return li;
+			}),
+		);
 	}
 
 	/** Build a paragraph from plain text and bold (player name) parts, without innerHTML. */
@@ -856,6 +940,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		renderPitch();
 		renderBreakKeeper();
 		renderBench();
+		renderRestNotices();
 		renderSwapPanel();
 		renderAlertBanner();
 		renderPreview();
@@ -1011,6 +1096,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 					name: nameOf(id),
 				})),
 				endedAt: now(),
+				rotationSeconds: live.plan.rotationSeconds,
 			}),
 		};
 	}
@@ -1438,6 +1524,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 				live.rotationIndex = 0;
 				live.clock = NEW_CLOCK;
 				live.timeline = [];
+				restCache = null;
 				live.pendingSwap = null;
 				live.currentAssignment = cloneAssignment(
 					generateRotationSafe(live.schedulerState),
@@ -1453,11 +1540,16 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 
 	function loadLive(next: LiveMatch): void {
 		live = next;
+		restCache = null;
 		els.formatLabel.textContent = TEXT.match.formatLabel(
 			live.format.label,
 			Math.round(live.schedulerState.rotationSeconds / 60),
 		);
 		els.lateArrivalPanel.classList.remove("show");
+		els.restLimits.textContent = TEXT.rest.limits(
+			POLICY.shortRestSeconds,
+			longRestSeconds(),
+		);
 		refreshClock();
 		render();
 	}

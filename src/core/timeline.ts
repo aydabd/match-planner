@@ -172,3 +172,93 @@ export function secondsPlayedByPeriod(
 	}
 	return result;
 }
+
+/** One stretch on the bench: from coming off the pitch to going on again. */
+export interface Rest {
+	/** Seconds since kickoff when the rest began. */
+	startedAt: number;
+	/** When the player came on; null while the rest goes on. */
+	endedAt: number | null;
+	/** Seconds of play the player rested (breaks between periods do not count). */
+	seconds: number;
+}
+
+/**
+ * Every rest of every player, from the timeline. A rest starts when a player
+ * leaves the pitch (or at kickoff, or on arriving late) and ends when they go
+ * on again. Time counts like playtime does: only while a period is on. A
+ * player who is out for the match has no rest; a rest that is still going on
+ * at `now` has no end. Like secondsPlayed, it never disagrees with the
+ * timeline.
+ */
+export function restsOf(
+	timeline: readonly TimelineEvent[],
+	playerIds: readonly string[],
+	now: number,
+): Record<string, Rest[]> {
+	const late = new Set(
+		timeline.flatMap((e) => (e.type === "lateArrival" ? [e.playerId] : [])),
+	);
+	const present = new Set(playerIds.filter((id) => !late.has(id)));
+	const rests: Record<string, Rest[]> = Object.fromEntries(
+		playerIds.map((id) => [id, []]),
+	);
+	const open = new Map<string, Rest>();
+	let lineup: LineupEvent | null = null;
+	let from: number | null = null;
+
+	const onPitch = (id: string): boolean =>
+		lineup !== null &&
+		(lineup.keeperId === id ||
+			Object.values(lineup.zones).some((ids) => ids.includes(id)));
+
+	const credit = (until: number) => {
+		if (!lineup || from === null || until <= from) return;
+		for (const rest of open.values()) rest.seconds += until - from;
+	};
+
+	/** After the lineup changed at `at`: end rests of players now on, start rests of players now off. */
+	const settle = (at: number) => {
+		for (const id of present) {
+			const current = open.get(id);
+			if (onPitch(id)) {
+				if (current) {
+					current.endedAt = at;
+					if (current.seconds > 0) rests[id]?.push(current);
+					open.delete(id);
+				}
+			} else if (!current) {
+				open.set(id, { startedAt: at, endedAt: null, seconds: 0 });
+			}
+		}
+	};
+
+	for (const event of timeline) {
+		if (event.type === "periodStart") {
+			from = event.at;
+		} else if (event.type === "periodEnd") {
+			credit(event.at);
+			from = null;
+		} else if (event.type === "lineup") {
+			credit(event.at);
+			lineup = event;
+			if (from !== null) from = event.at;
+			settle(event.at);
+		} else if (event.type === "lateArrival") {
+			credit(event.at);
+			if (from !== null) from = event.at;
+			present.add(event.playerId);
+			if (lineup) settle(event.at);
+		} else if (event.type === "outForMatch") {
+			credit(event.at);
+			if (from !== null) from = event.at;
+			present.delete(event.playerId);
+			open.delete(event.playerId);
+		}
+	}
+	credit(now);
+	for (const [id, rest] of open) {
+		if (rest.seconds > 0) rests[id]?.push(rest);
+	}
+	return rests;
+}

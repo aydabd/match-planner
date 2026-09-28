@@ -94,6 +94,10 @@ export const POLICY = {
 	lateSwapSeconds: 30,
 	/** A swap this late (seconds) is flagged as seriously late. */
 	veryLateSwapSeconds: 60,
+	/** A rest shorter than this (seconds) is flagged: back on almost at once. */
+	shortRestSeconds: 120,
+	/** A rest longer than this many swap intervals is flagged. */
+	longRestIntervals: 2,
 	/** A player this far below the team average (seconds) is pointed out. */
 	playtimeGapSeconds: 120,
 } as const;
@@ -190,6 +194,11 @@ export const RULES = [
 		id: "neighbouringLines",
 		origin: "decision",
 		sources: ["svffPlayerDevelopment"],
+	},
+	{
+		id: "restTime",
+		origin: "decision",
+		sources: ["rfGuidelines", "svffPlayFormats"],
 	},
 	{
 		id: "swapTiming",
