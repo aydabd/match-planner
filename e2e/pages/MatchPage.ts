@@ -19,6 +19,8 @@ export class MatchPage {
 
 	// Lineup
 	readonly pitchPlayers: Locator;
+	/** Line names on the pitch, attack at the top. */
+	readonly zoneLabels: Locator;
 	readonly benchPlayers: Locator;
 	readonly swapPanel: Locator;
 	readonly nextIn: Locator;
@@ -49,6 +51,7 @@ export class MatchPage {
 		this.pitch = this.root.locator("#pitch");
 		this.bench = this.root.locator("#benchList");
 		this.pitchPlayers = this.pitch.getByRole("button");
+		this.zoneLabels = this.pitch.locator(".zone-label");
 		this.benchPlayers = this.bench.locator(".bench-name");
 		this.swapPanel = this.root.locator("#swapPanel");
 		this.nextIn = this.root.locator(".next-in li");
@@ -77,6 +80,11 @@ export class MatchPage {
 	}
 
 	// ---------- lineup ----------
+
+	/** The pitch area, e.g. to check that every player fits inside it. */
+	get pitchArea(): Locator {
+		return this.pitch;
+	}
 
 	pitchPlayer(name: string): Locator {
 		return this.pitch.getByRole("button", { name, exact: true });
