@@ -146,7 +146,6 @@
           <button type="button" id="clearAllDataBtn" class="btn btn-danger-outline">Rensa all sparad data</button>
         </div>
       </details>
-      <footer class="footer">MatchPlanner v<span data-app-version></span></footer>
     </section>
 
     <!-- ============ MATCH VIEW ============ -->
@@ -250,7 +249,7 @@
         </div>
       </div>
 
-      <footer class="footer">Spelare flyttas aldrig direkt mellan försvar och anfall. v<span data-app-version></span></footer>
+      <p class="footer">Spelare flyttas aldrig direkt mellan försvar och anfall.</p>
     </section>
 
     <!-- ============ REPORT VIEW ============ -->
@@ -287,7 +286,6 @@
         </div>
         <p class="hint" id="reportShareStatus" role="status"></p>
       </section>
-      <footer class="footer">MatchPlanner v<span data-app-version></span></footer>
     </section>
 
     <!-- ============ HISTORY VIEW ============ -->
@@ -312,7 +310,6 @@
         <p class="hint" id="historyCount"></p>
       </section>
       <div id="historyResults" class="policy-rules"></div>
-      <footer class="footer">MatchPlanner v<span data-app-version></span></footer>
     </section>
 
     <!-- ============ POLICY VIEW ============ -->
@@ -331,9 +328,13 @@
         <div id="policySources"></div>
         <p class="hint">Sidan fungerar utan nät. Länkarna öppnas när du är uppkopplad.</p>
       </section>
-      <footer class="footer">MatchPlanner v<span data-app-version></span></footer>
     </section>
 
+  <footer class="footer app-footer" id="appFooter">
+    <span>MatchPlanner v<span data-app-version></span></span>
+    <span data-copyright></span>
+    <span>MIT-licens</span>
+  </footer>
   </div>
 
   <script type="module" src="/src/main.ts"></script>

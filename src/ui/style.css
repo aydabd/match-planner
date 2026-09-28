@@ -1294,3 +1294,10 @@ button:disabled {
 .rest-notices ul:empty {
 	display: none;
 }
+
+.app-footer {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 4px 12px;
+}
