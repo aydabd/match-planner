@@ -26,6 +26,7 @@ import {
 	swapDueAt,
 	tick as tickClock,
 } from "../core/matchClock.js";
+import { buildReport, type StoredReport } from "../core/report.js";
 import {
 	applyElapsed,
 	createSchedulerState,
@@ -47,7 +48,9 @@ import type {
 	RotationAssignment,
 	SchedulerState,
 } from "../core/types.js";
+import { loadCoachName } from "./coachName.js";
 import { confirmWithSecondTap } from "./confirmButton.js";
+import { saveReport } from "./reportStorage.js";
 import {
 	clearSession,
 	loadSession,
@@ -95,6 +98,8 @@ interface Els {
 	addLateBtn: HTMLButtonElement;
 	lateArrivalPanel: HTMLElement;
 	backToSetupBtn: HTMLButtonElement;
+	endMatchBtn: HTMLButtonElement;
+	reportBtn: HTMLButtonElement;
 }
 
 function getEls(): Els {
@@ -136,11 +141,23 @@ function getEls(): Els {
 		addLateBtn: byId("addLateBtn"),
 		lateArrivalPanel: byId("lateArrivalPanel"),
 		backToSetupBtn: byId("backToSetupBtn"),
+		endMatchBtn: byId("endMatchBtn"),
+		reportBtn: byId("reportBtn"),
 	};
 }
 
 export interface MatchCallbacks {
 	onExitToSetup: () => void;
+	/** The match is over (or the coach asks again): show its report. */
+	onShowReport: (report: StoredReport) => void;
+}
+
+/** A new id for a match; unique across devices so match files never clash. */
+function newMatchId(): string {
+	return (
+		globalThis.crypto?.randomUUID?.() ??
+		`m-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+	);
 }
 
 /**
@@ -149,6 +166,7 @@ export interface MatchCallbacks {
  * match after returning to setup never re-attaches duplicate handlers.
  */
 interface LiveMatch {
+	matchId: string;
 	schedulerState: SchedulerState;
 	playerNames: Map<string, string>;
 	format: FormatConfig;
@@ -197,6 +215,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		if (!live) return;
 		const session: MatchSession = {
 			schemaVersion: 2,
+			matchId: live.matchId,
 			formatId: live.format.id,
 			plan: live.plan,
 			clock: live.clock,
@@ -903,7 +922,9 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		live.clock = result.clock;
 		// A rest that ended changed the lineup; record it from this second.
 		if (restEnded) noteLineup();
+		let matchEnded = false;
 		for (const event of result.events) {
+			if (event.type === "matchEnded") matchEnded = true;
 			if (event.type === "periodEnded") {
 				live.timeline.push({
 					type: "periodEnd",
@@ -918,6 +939,53 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		else prepareSwapWarning();
 		refreshClock();
 		render();
+		if (matchEnded) finishMatch();
+	}
+
+	/** The report from the timeline so far, as it would be saved. */
+	function currentReport(): StoredReport | null {
+		if (!live) return null;
+		return {
+			schemaVersion: 1,
+			matchId: live.matchId,
+			savedAt: new Date().toISOString(),
+			createdBy: loadCoachName(),
+			appVersion: __APP_VERSION__,
+			formatLabel: live.format.label,
+			match: live.match,
+			report: buildReport({
+				timeline: live.timeline,
+				players: live.schedulerState.order.map((id) => ({
+					id,
+					name: nameOf(id),
+				})),
+				endedAt: now(),
+			}),
+		};
+	}
+
+	/** The match is over: keep its report on this device and show it. */
+	function finishMatch(): void {
+		const stored = currentReport();
+		if (!stored) return;
+		saveReport(stored);
+		callbacks.onShowReport(stored);
+	}
+
+	/** End the match now, in the middle of a period or during a break. */
+	function endMatch(): void {
+		if (!live) return;
+		const { phase, period } = live.clock;
+		if (phase !== "playing" && phase !== "periodBreak") return;
+		if (phase === "playing") {
+			stopTimer();
+			live.timeline.push({ type: "periodEnd", at: now(), period });
+		}
+		live.pendingSwap = null;
+		live.clock = { ...live.clock, phase: "finished" };
+		refreshClock();
+		render();
+		finishMatch();
 	}
 
 	/** Timer, period and buttons, all from the match state in one place. */
@@ -961,6 +1029,9 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 				: TEXT.match.continueClock;
 		els.pauseBtn.disabled = !live.running;
 		els.newTeamBtn.classList.toggle("show", due);
+		els.endMatchBtn.disabled =
+			clock.phase === "beforeKickoff" || clock.phase === "finished";
+		els.reportBtn.hidden = clock.phase !== "finished";
 		els.nextPeriodBtn.disabled = clock.phase !== "periodBreak";
 		els.nextPeriodBtn.textContent = TEXT.match.startPeriod(clock.period + 1);
 	}
@@ -1167,12 +1238,23 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		for (const item of els.matchMenu.querySelectorAll<HTMLButtonElement>(
 			".menu-item",
 		)) {
-			if (item === els.resetBtn) continue;
+			if (item === els.resetBtn || item === els.endMatchBtn) continue;
 			item.addEventListener("click", () => {
 				els.matchMenu.open = false;
 			});
 		}
 
+		els.reportBtn.addEventListener("click", () => {
+			const stored = currentReport();
+			if (stored) callbacks.onShowReport(stored);
+		});
+		confirmWithSecondTap(els.endMatchBtn, {
+			confirmLabel: TEXT.match.confirmEnd,
+			onConfirm: () => {
+				els.matchMenu.open = false;
+				endMatch();
+			},
+		});
 		els.startBtn.addEventListener("click", startClock);
 		els.pauseBtn.addEventListener("click", pauseClock);
 		els.testBtn.addEventListener("click", testByte);
@@ -1252,6 +1334,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 				els.matchMenu.open = false;
 				clearSession();
 				stopTimer();
+				live.matchId = newMatchId();
 				resetPlayers(live.schedulerState);
 				live.rotationIndex = 0;
 				live.clock = NEW_CLOCK;
@@ -1292,6 +1375,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			roster.startingKeeperId,
 		);
 		loadLive({
+			matchId: newMatchId(),
 			schedulerState,
 			playerNames,
 			format,
@@ -1329,6 +1413,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		};
 		const playerNames = new Map(Object.entries(session.playerNames));
 		loadLive({
+			matchId: session.matchId ?? newMatchId(),
 			schedulerState,
 			playerNames,
 			format,

@@ -1237,3 +1237,39 @@ button:disabled {
 	margin: 0;
 	padding-left: 18px;
 }
+
+/* ---------- match report ---------- */
+.report-feedback {
+	margin: 0;
+	padding-left: 18px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.report-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	align-items: flex-start;
+}
+.report-table {
+	border-collapse: collapse;
+	width: 100%;
+	font-variant-numeric: tabular-nums;
+}
+.report-table th,
+.report-table td {
+	text-align: left;
+	padding: 6px 10px 6px 0;
+	border-bottom: 1px solid var(--line);
+	vertical-align: top;
+}
+.report-table thead th {
+	color: var(--ink-2);
+	font-size: 0.8125rem;
+}
+.report-table tr.is-late th,
+.report-table tr.is-late td {
+	color: var(--red-text);
+	font-weight: 600;
+}

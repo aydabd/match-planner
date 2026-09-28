@@ -139,3 +139,36 @@ export function swapDelays(timeline: readonly TimelineEvent[]) {
 			delaySeconds: e.at - e.plannedAt,
 		}));
 }
+
+/**
+ * Seconds each player played in each period, from the timeline. Index 0 is
+ * period 1. Cutting the timeline after a period's end and subtracting the
+ * earlier cut keeps one source of truth: the periods always add up to
+ * secondsPlayed.
+ */
+export function secondsPlayedByPeriod(
+	timeline: readonly TimelineEvent[],
+	now: number,
+): Record<string, number>[] {
+	const periods = Math.max(
+		0,
+		...timeline.map((e) => (e.type === "periodStart" ? e.period : 0)),
+	);
+	const result: Record<string, number>[] = [];
+	let before: Record<string, PlayedSeconds> = {};
+	for (let period = 1; period <= periods; period++) {
+		const end = timeline.findIndex(
+			(e) => e.type === "periodEnd" && e.period === period,
+		);
+		const upTo = end === -1 ? timeline : timeline.slice(0, end + 1);
+		const cumulative = secondsPlayed(upTo, now);
+		const seconds: Record<string, number> = {};
+		for (const [id, played] of Object.entries(cumulative)) {
+			const gained = played.total - (before[id]?.total ?? 0);
+			if (gained > 0) seconds[id] = gained;
+		}
+		result.push(seconds);
+		before = cumulative;
+	}
+	return result;
+}

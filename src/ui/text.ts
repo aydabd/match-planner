@@ -1,6 +1,7 @@
 import type { FormationProblem } from "../core/formations.js";
 import { LIMITS } from "../core/limits.js";
 import { POLICY, type RuleId } from "../core/policy.js";
+import type { Feedback, PlayerStatus } from "../core/report.js";
 import type { SchedulingProblem } from "../core/scheduler.js";
 import type { SquadFileProblem } from "../core/storage.js";
 
@@ -18,6 +19,22 @@ const ZONE_NAMES: Readonly<Record<string, string>> = {
  * problem codes and data; this is the only place that turns them into
  * sentences. Static labels stay in index.html, which is the page template.
  */
+/** Seconds in plain words: "45 sekunder", "4 minuter", "4 min 20 s". */
+function words(seconds: number): string {
+	const total = Math.round(Math.abs(seconds));
+	if (total < 60) return `${total} ${total === 1 ? "sekund" : "sekunder"}`;
+	const minutes = Math.floor(total / 60);
+	const rest = total % 60;
+	if (rest === 0) return `${minutes} ${minutes === 1 ? "minut" : "minuter"}`;
+	return `${minutes} min ${rest} s`;
+}
+
+/** "45 sekunder sen", "10 sekunder tidig", "i tid". */
+function delay(seconds: number): string {
+	if (Math.round(seconds) === 0) return "i tid";
+	return `${words(seconds)} ${seconds > 0 ? "sen" : "tidig"}`;
+}
+
 export const TEXT = {
 	setup: {
 		emptySquad: "Inga spelare än. Lägg till dem som är med idag.",
@@ -137,7 +154,82 @@ export const TEXT = {
 		} satisfies Record<RuleId, { title: string; text: string }>,
 	},
 
+	report: {
+		subtitle: (parts: readonly string[]) => parts.join(" · "),
+		unnamedMatch: "Match",
+		listItem: (when: string, opponent: string) => `${when} · ${opponent}`,
+		periodColumn: (period: number) => `Period ${period}`,
+		status(status: PlayerStatus): string {
+			switch (status) {
+				case "played":
+					return "";
+				case "outForMatch":
+					return "Ute resten av matchen";
+				case "lateArrival":
+					return "Kom sent";
+			}
+		},
+		playtimeSummary: (average: string, spread: string) =>
+			`Snitt ${average}, skillnad mellan mest och minst ${spread}. Räknat på de som kunde spela hela matchen.`,
+		noSwaps: "Inga byten gjordes.",
+		swapSummary: (
+			count: number,
+			average: number,
+			max: number,
+			late: number,
+			veryLate: number,
+		) =>
+			`${count} byten. I snitt ${delay(average)}, längst ${delay(max)}. ${late} över ${POLICY.lateSwapSeconds} s och ${veryLate} över ${POLICY.veryLateSwapSeconds} s sena.`,
+		delay,
+		lateFlag(delaySeconds: number): string {
+			if (delaySeconds > POLICY.veryLateSwapSeconds) return "Mycket sen";
+			if (delaySeconds > POLICY.lateSwapSeconds) return "Sen";
+			return "";
+		},
+		feedback(item: Feedback, nameOf: (id: string) => string): string {
+			switch (item.code) {
+				case "noSwaps":
+					return "Inga byten gjordes under matchen.";
+				case "swapsOnTime":
+					return "Byten gjordes i tid.";
+				case "swapsLate":
+					return item.period === null
+						? `Byten var i snitt ${words(item.averageSeconds)} sena.`
+						: `Byten var i snitt ${words(item.averageSeconds)} sena i period ${item.period}.`;
+				case "evenPlaytime":
+					return `Speltiden var jämn: skillnaden mellan mest och minst var ${words(item.spreadSeconds)}.`;
+				case "playerBelowAverage":
+					return `${nameOf(item.playerId)} spelade ${words(item.belowSeconds)} mindre än lagets snitt.`;
+			}
+		},
+		copy: "Kopiera som text",
+		copied: "Rapporten är kopierad.",
+		copyFailed: "Det gick inte att kopiera. Spara som fil istället.",
+		textReport(lines: {
+			title: string;
+			details: readonly string[];
+			feedback: readonly string[];
+			players: readonly string[];
+			swaps: readonly string[];
+		}): string {
+			return [
+				lines.title,
+				...lines.details,
+				"",
+				"Sammanfattning",
+				...lines.feedback.map((line) => `- ${line}`),
+				"",
+				"Speltid",
+				...lines.players,
+				"",
+				"Byten",
+				...(lines.swaps.length === 0 ? [TEXT.report.noSwaps] : lines.swaps),
+			].join("\n");
+		},
+	},
+
 	match: {
+		confirmEnd: "Tryck igen för att avsluta",
 		formatLabel: (format: string, minutes: number) =>
 			`${format}, byte var ${minutes} min`,
 		fairness: (spread: string) => `Skillnad i speltid ${spread}`,

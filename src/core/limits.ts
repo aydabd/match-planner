@@ -22,6 +22,8 @@ export const LIMITS = {
 	tempSwapSeconds: [60, 120, 300],
 	/** How long before a due swap the coach sees who swaps with whom. */
 	headsUpSeconds: 30,
+	/** Match reports kept on this device; the oldest is dropped first. */
+	storedReports: 10,
 	/** How long "tap again to reset" stays armed, in seconds. */
 	resetConfirmSeconds: 3,
 } as const;

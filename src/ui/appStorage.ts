@@ -13,6 +13,8 @@ export const STORAGE_KEYS = {
 	session: "matchplanner:session:v1",
 	/** The coach's name, recorded in files they save. */
 	coachName: "matchplanner:coach:v1",
+	/** Reports of the last finished matches, newest first. */
+	reports: "matchplanner:reports:v1",
 } as const;
 
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];

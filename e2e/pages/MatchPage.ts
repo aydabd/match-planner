@@ -22,6 +22,7 @@ export class MatchPage {
 	readonly pauseButton: Locator;
 	readonly swapInNewTeamButton: Locator;
 	readonly nextPeriodButton: Locator;
+	readonly showReportButton: Locator;
 	/** The player in goal (shown below the outfield lines). */
 	readonly keeper: Locator;
 	readonly nextPeriodKeeper: Locator;
@@ -88,6 +89,9 @@ export class MatchPage {
 		this.swapAnnouncement = this.root.locator("#swapAnnouncer");
 		this.outOfMatch = this.root.getByRole("alert");
 
+		this.showReportButton = this.root.getByRole("button", {
+			name: "Visa matchrapport",
+		});
 		this.menu = this.root.locator("#matchMenu");
 	}
 
@@ -205,6 +209,14 @@ export class MatchPage {
 		await this.chooseFromMenu("Nollställ matchen");
 		await this.menu
 			.getByRole("button", { name: "Tryck igen för att nollställa" })
+			.click();
+	}
+
+	/** Ending the match needs two taps, like reset. */
+	async endMatch(): Promise<void> {
+		await this.chooseFromMenu("Avsluta matchen");
+		await this.menu
+			.getByRole("button", { name: "Tryck igen för att avsluta" })
 			.click();
 	}
 

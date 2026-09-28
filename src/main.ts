@@ -1,6 +1,7 @@
 import "./ui/style.css";
 import { createMatchView } from "./ui/match.js";
 import { createPolicyView } from "./ui/policy.js";
+import { createReportView } from "./ui/report.js";
 import { createRosterView } from "./ui/roster.js";
 import { clearSession } from "./ui/sessionStorage.js";
 
@@ -8,23 +9,23 @@ for (const el of document.querySelectorAll("[data-app-version]")) {
 	el.textContent = __APP_VERSION__;
 }
 
-const setupViewElement = document.getElementById("setupView");
-const matchViewElement = document.getElementById("matchView");
-
-if (!setupViewElement || !matchViewElement) {
-	throw new Error("Required application views are missing from the document");
+function byId(id: string): HTMLElement {
+	const el = document.getElementById(id);
+	if (!el)
+		throw new Error(`Required element #${id} is missing from the document`);
+	return el;
 }
 
-const setupView = setupViewElement;
-const matchView = matchViewElement;
-const policyView = document.getElementById("policyView");
-if (!policyView)
-	throw new Error("The policy view is missing from the document");
+const setupView = byId("setupView");
+const matchView = byId("matchView");
+const policyView = byId("policyView");
+const reportView = byId("reportView");
 
 function showSetup(): void {
 	clearSession();
 	matchView.classList.add("hidden");
 	setupView.classList.remove("hidden");
+	report.refreshList();
 }
 
 function showMatch(): void {
@@ -32,8 +33,8 @@ function showMatch(): void {
 	matchView.classList.remove("hidden");
 }
 
-// The page that explains where the rules come from opens over whichever
-// screen is showing and returns to it; a running match keeps its clock.
+// Pages that open over whichever screen is showing and return to it: the
+// policy page and the match report. A running match keeps its clock.
 /** What had focus when a page opened over a screen, to give focus back on close. */
 const openers = new WeakMap<HTMLElement, HTMLElement>();
 
@@ -56,48 +57,60 @@ function restoreFocus(page: HTMLElement, back: HTMLElement): void {
 	target.focus();
 }
 
-function showPolicy(): void {
-	if (document.activeElement instanceof HTMLElement && policyView) {
-		openers.set(policyView, document.activeElement);
+function openOver(page: HTMLElement): void {
+	if (document.activeElement instanceof HTMLElement) {
+		openers.set(page, document.activeElement);
 	}
 	// Remembered on the page itself, so no state lives at module level.
-	if (policyView)
-		policyView.dataset.returnTo = matchView.classList.contains("hidden")
-			? "setupView"
-			: "matchView";
+	page.dataset.returnTo = matchView.classList.contains("hidden")
+		? "setupView"
+		: "matchView";
 	setupView.classList.add("hidden");
 	matchView.classList.add("hidden");
-	policyView?.classList.remove("hidden");
+	page.classList.remove("hidden");
 	window.scrollTo(0, 0);
-	document.getElementById("policyTitle")?.focus();
+	page.querySelector<HTMLElement>("h1")?.focus();
 }
 
-function closePolicy(): void {
-	policyView?.classList.add("hidden");
-	const back =
-		policyView?.dataset.returnTo === "matchView" ? matchView : setupView;
+function closePage(page: HTMLElement): void {
+	page.classList.add("hidden");
+	const back = page.dataset.returnTo === "matchView" ? matchView : setupView;
 	back.classList.remove("hidden");
-	if (policyView) restoreFocus(policyView, back);
+	restoreFocus(page, back);
 }
 
 createPolicyView();
-document
-	.getElementById("policyFromSetupBtn")
-	?.addEventListener("click", showPolicy);
-document
-	.getElementById("policyFromMatchBtn")
-	?.addEventListener("click", showPolicy);
-document
-	.getElementById("policyBackBtn")
-	?.addEventListener("click", closePolicy);
+for (const [button, page] of [
+	["policyFromSetupBtn", policyView],
+	["policyFromMatchBtn", policyView],
+] as const) {
+	byId(button).addEventListener("click", () => openOver(page));
+}
+byId("policyBackBtn").addEventListener("click", () => closePage(policyView));
+byId("reportBackBtn").addEventListener("click", () => closePage(reportView));
 
-const match = createMatchView({ onExitToSetup: showSetup });
+const report = createReportView({
+	onOpen: (stored) => {
+		report.show(stored);
+		openOver(reportView);
+	},
+});
+
+const match = createMatchView({
+	onExitToSetup: showSetup,
+	onShowReport: (stored) => {
+		report.show(stored);
+		report.refreshList();
+		openOver(reportView);
+	},
+});
 createRosterView({
 	onStartMatch: (roster) => {
 		match.start(roster);
 		showMatch();
 	},
 });
+report.refreshList();
 
 // If a match was already in progress when the page was reloaded, resume it
 // straight away instead of dropping the coach back at the setup screen.
