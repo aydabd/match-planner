@@ -1,4 +1,5 @@
 import { getFormat } from "../core/formations.js";
+import { LIMITS } from "../core/limits.js";
 import {
 	clockStatus,
 	cloneAssignment,
@@ -295,17 +296,11 @@ function renderSwapPanel(): void {
 		);
 		const row = document.createElement("div");
 		row.className = "row";
-		(
-			[
-				["1 min", 60],
-				["2 min", 120],
-				["5 min", 300],
-			] as const
-		).forEach(([label, secs]) => {
+		LIMITS.tempSwapSeconds.forEach((secs) => {
 			const b = document.createElement("button");
 			b.type = "button";
 			b.className = "btn-chip";
-			b.textContent = label;
+			b.textContent = `${secs / 60} min`;
 			b.addEventListener("click", () => commitTempSwap(secs));
 			row.appendChild(b);
 		});
@@ -735,7 +730,7 @@ export function initMatchView(callbacks: MatchCallbacks): void {
 		input.type = "text";
 		input.setAttribute("aria-label", "Namn på spelaren som kom sent");
 		input.placeholder = "Namn på spelaren som just kom";
-		input.maxLength = 40;
+		input.maxLength = LIMITS.playerNameLength;
 		input.required = true;
 		const btn = document.createElement("button");
 		btn.type = "submit";

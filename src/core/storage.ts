@@ -1,4 +1,5 @@
 import { getFormat } from "./formations.js";
+import { LIMITS } from "./limits.js";
 import type { Player } from "./types.js";
 
 /** Bump this and add a migration branch in parseRosterFile if the shape ever changes. */
@@ -17,9 +18,6 @@ export class StorageError extends Error {
 		this.name = "StorageError";
 	}
 }
-
-const MAX_NAME_LENGTH = 40;
-const MAX_PLAYERS = 30;
 
 export function serializeRoster(
 	formatId: string,
@@ -114,8 +112,8 @@ export function parseRosterFile(
 	if (obj.players.length === 0 && !options.allowEmptySquad) {
 		throw new StorageError("Truppen ar tom.");
 	}
-	if (obj.players.length > MAX_PLAYERS) {
-		throw new StorageError(`For manga spelare (max ${MAX_PLAYERS}).`);
+	if (obj.players.length > LIMITS.squadSize) {
+		throw new StorageError(`For manga spelare (max ${LIMITS.squadSize}).`);
 	}
 
 	const seenIds = new Set<string>();
@@ -136,7 +134,7 @@ export function parseRosterFile(
 			throw new StorageError(`Dubblett-id "${p.id}" i truppen.`);
 		}
 		seenIds.add(p.id);
-		const name = p.name.trim().slice(0, MAX_NAME_LENGTH);
+		const name = p.name.trim().slice(0, LIMITS.playerNameLength);
 		return { id: p.id, name };
 	});
 

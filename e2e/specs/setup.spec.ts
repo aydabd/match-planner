@@ -58,6 +58,32 @@ test.describe("Setting up a match", () => {
 		await expect(setup.players).toHaveInputValues(["Bosse", "Cleo"]);
 	});
 
+	test("the squad stops at 30 players, so it can always be shared", async ({
+		setup,
+	}) => {
+		const thirty = Array.from({ length: 30 }, (_, i) => `Spelare ${i + 1}`);
+
+		await setup.addPlayers(thirty);
+
+		await expect(setup.players).toHaveCount(30);
+		await expect(setup.squadFullMessage).toHaveText(
+			"Truppen är full (högst 30 spelare).",
+		);
+		await expect(setup.newPlayerName).toBeDisabled();
+
+		await setup.removePlayer("Spelare 30");
+		await expect(setup.newPlayerName).toBeEnabled();
+		await expect(setup.squadFullMessage).toBeHidden();
+	});
+
+	test("minutes between swaps stay within 1 to 30", async ({ setup }) => {
+		await setup.setMinutesBetweenSwaps(45);
+		await expect(setup.minutesBetweenSwaps).toHaveValue("30");
+
+		await setup.setMinutesBetweenSwaps(0);
+		await expect(setup.minutesBetweenSwaps).toHaveValue("1");
+	});
+
 	test("the squad and settings are kept after a reload", async ({
 		setup,
 		page,

@@ -10,11 +10,12 @@ export class SetupPage {
 	readonly minutesBetweenSwaps: Locator;
 	readonly squadCount: Locator;
 	readonly players: Locator;
+	readonly newPlayerName: Locator;
+	readonly squadFullMessage: Locator;
 	readonly emptySquadMessage: Locator;
 	readonly startButton: Locator;
 	readonly squadFileMessage: Locator;
 
-	private readonly nameInput: Locator;
 	private readonly squadFileSection: Locator;
 
 	constructor(private readonly page: Page) {
@@ -31,7 +32,8 @@ export class SetupPage {
 		this.emptySquadMessage = this.root.getByText("Inga spelare än");
 		this.startButton = this.root.locator("#startMatchBtn");
 		this.squadFileMessage = this.root.locator("#importError");
-		this.nameInput = this.root.getByLabel("Spelarens namn");
+		this.newPlayerName = this.root.getByLabel("Spelarens namn");
+		this.squadFullMessage = this.root.locator("#squadFullMessage");
 		this.squadFileSection = this.root.getByRole("group").filter({
 			hasText: "Spara eller hämta en trupp",
 		});
@@ -44,8 +46,8 @@ export class SetupPage {
 
 	async addPlayers(names: readonly string[]): Promise<void> {
 		for (const name of names) {
-			await this.nameInput.fill(name);
-			await this.nameInput.press("Enter");
+			await this.newPlayerName.fill(name);
+			await this.newPlayerName.press("Enter");
 		}
 	}
 
