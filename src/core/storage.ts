@@ -1,4 +1,4 @@
-import { FORMATS } from "./formations.js";
+import { getFormat } from "./formations.js";
 import type { Player } from "./types.js";
 
 /** Bump this and add a migration branch in parseRosterFile if the shape ever changes. */
@@ -34,6 +34,15 @@ export function serializeRoster(
 	};
 }
 
+function isKnownFormat(formatId: string): boolean {
+	try {
+		getFormat(formatId);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 export function rosterToJson(roster: RosterFile): string {
 	return JSON.stringify(roster, null, 2);
 }
@@ -56,9 +65,9 @@ export function parseRosterFile(data: unknown): RosterFile {
 		);
 	}
 
-	if (typeof obj.formatId !== "string" || !FORMATS[obj.formatId]) {
+	if (typeof obj.formatId !== "string" || !isKnownFormat(obj.formatId)) {
 		throw new StorageError(
-			`Okant formatId "${String(obj.formatId)}". Tillgangliga: ${Object.keys(FORMATS).join(", ")}.`,
+			`Okänt formatId "${String(obj.formatId)}". Använd lagstorlek och formation, till exempel 7v7:2-3-1.`,
 		);
 	}
 

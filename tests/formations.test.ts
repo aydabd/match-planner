@@ -1,49 +1,180 @@
 import { describe, expect, it } from "vitest";
-import { FORMATS, getFormat, outfieldCount } from "../src/core/formations.js";
+import {
+	buildFormat,
+	FORMATS,
+	getFormat,
+	outfieldCount,
+	parseFormation,
+	TEAM_SIZES,
+	type TeamSizeId,
+} from "../src/core/formations.js";
 
-describe("formations", () => {
-	it("every registered format has a non-empty zone list", () => {
-		for (const format of Object.values(FORMATS)) {
-			expect(format.zones.length).toBeGreaterThan(0);
-		}
-	});
+describe("team sizes", () => {
+	it.each([
+		["5v5", 4],
+		["7v7", 6],
+		["9v9", 8],
+		["11v11", 10],
+	] as const)(
+		"%s has %i outfield players plus a goalkeeper",
+		(size, outfield) => {
+			expect(TEAM_SIZES[size].outfield).toBe(outfield);
+		},
+	);
 
-	it("zone adjacency references only zones that exist in the same format", () => {
-		for (const format of Object.values(FORMATS)) {
-			const ids = new Set(format.zones.map((z) => z.id));
-			for (const zone of format.zones) {
-				for (const adj of zone.adjacent) {
-					expect(
-						ids.has(adj),
-						`${format.id}: zone "${zone.id}" references unknown adjacent zone "${adj}"`,
-					).toBe(true);
-				}
+	it("offers quick-pick formations that fit each team size", () => {
+		for (const [size, config] of Object.entries(TEAM_SIZES)) {
+			expect(config.presets.length).toBeGreaterThan(0);
+			for (const formation of config.presets) {
+				expect(
+					parseFormation(formation, size as TeamSizeId),
+					`${size} ${formation}`,
+				).toMatchObject({ ok: true });
 			}
 		}
 	});
+});
 
-	it("adjacency is symmetric (if A lists B, B lists A)", () => {
+describe("parseFormation", () => {
+	it("reads lines from defence to attack", () => {
+		expect(parseFormation("4-2-1-2-1", "11v11")).toEqual({
+			ok: true,
+			formation: "4-2-1-2-1",
+			lines: [4, 2, 1, 2, 1],
+		});
+	});
+
+	it("accepts spaces and other dash characters, and normalises them", () => {
+		expect(parseFormation(" 4 - 3 – 3 ", "11v11")).toEqual({
+			ok: true,
+			formation: "4-3-3",
+			lines: [4, 3, 3],
+		});
+	});
+
+	it.each([
+		["", "Skriv formationen som siffror med bindestreck, till exempel 2-3-1."],
+		[
+			"abc",
+			"Skriv formationen som siffror med bindestreck, till exempel 2-3-1.",
+		],
+		[
+			"2--3-1",
+			"Skriv formationen som siffror med bindestreck, till exempel 2-3-1.",
+		],
+		["6", "En formation har 2 till 5 led."],
+		["1-1-1-1-1-1", "En formation har 2 till 5 led."],
+		["2-0-4", "Varje led behöver minst en spelare."],
+		["2-3-2", "Formationen har 7 utespelare, men 7v7 behöver 6."],
+		["2-2-1", "Formationen har 5 utespelare, men 7v7 behöver 6."],
+	])("rejects %j with a clear message", (text, error) => {
+		expect(parseFormation(text, "7v7")).toEqual({ ok: false, error });
+	});
+});
+
+describe("buildFormat", () => {
+	it("turns each line into a pitch zone, back to front", () => {
+		const format = buildFormat("9v9", "3-3-2");
+		expect(format.id).toBe("9v9:3-3-2");
+		expect(format.label).toBe("9v9 (3-3-2)");
+		expect(format.zones.map((z) => [z.id, z.label, z.count])).toEqual([
+			["back", "Back", 3],
+			["mid", "Mittfält", 3],
+			["fwd", "Anfall", 2],
+		]);
+	});
+
+	it.each([
+		["2-2", ["Back", "Anfall"]],
+		["1-2-1", ["Back", "Mittfält", "Anfall"]],
+	] as const)("names the lines of a 5v5 %s", (formation, labels) => {
+		expect(buildFormat("5v5", formation).zones.map((z) => z.label)).toEqual(
+			labels,
+		);
+	});
+
+	it.each([
+		["4-2-3-1", ["Back", "Defensivt mittfält", "Offensivt mittfält", "Anfall"]],
+		[
+			"4-2-1-2-1",
+			[
+				"Back",
+				"Defensivt mittfält",
+				"Mittfält",
+				"Offensivt mittfält",
+				"Anfall",
+			],
+		],
+	] as const)("names the lines of an 11v11 %s", (formation, labels) => {
+		expect(buildFormat("11v11", formation).zones.map((z) => z.label)).toEqual(
+			labels,
+		);
+	});
+
+	it("makes only neighbouring lines adjacent", () => {
+		const format = buildFormat("11v11", "4-2-1-2-1");
+		expect(
+			Object.fromEntries(format.zones.map((z) => [z.id, z.adjacent])),
+		).toEqual({
+			back: ["dmid"],
+			dmid: ["back", "mid"],
+			mid: ["dmid", "amid"],
+			amid: ["mid", "fwd"],
+			fwd: ["amid"],
+		});
+	});
+
+	it("has as many seats as the team size has outfield players", () => {
+		expect(outfieldCount(buildFormat("11v11", "4-2-1-2-1"))).toBe(10);
+	});
+
+	it("refuses an invalid formation", () => {
+		expect(() => buildFormat("7v7", "2-3-2")).toThrow(
+			"Formationen har 7 utespelare, men 7v7 behöver 6.",
+		);
+	});
+});
+
+describe("getFormat", () => {
+	it("builds any valid size and formation from its id", () => {
+		expect(getFormat("11v11:4-2-1-2-1")).toEqual(
+			buildFormat("11v11", "4-2-1-2-1"),
+		);
+	});
+
+	it("still accepts the original 7v7 id as 7v7 (2-3-1)", () => {
+		expect(getFormat("7v7")).toEqual(buildFormat("7v7", "2-3-1"));
+	});
+
+	it.each(["13v13", "13v13:2-3-1", "7v7:2-3-2", "7v7:", "nonsense"])(
+		"throws a helpful error for %j",
+		(id) => {
+			expect(() => getFormat(id)).toThrow(/Okänt format/);
+		},
+	);
+});
+
+describe("quick-pick formats", () => {
+	it("lists every preset for every team size, smallest first", () => {
+		expect(Object.keys(FORMATS)).toEqual(
+			Object.entries(TEAM_SIZES).flatMap(([size, config]) =>
+				config.presets.map((formation) => `${size}:${formation}`),
+			),
+		);
+		expect(Object.keys(FORMATS)[0]).toMatch(/^5v5:/);
+	});
+
+	it("keeps adjacency symmetric in every preset", () => {
 		for (const format of Object.values(FORMATS)) {
 			const byId = new Map(format.zones.map((z) => [z.id, z]));
 			for (const zone of format.zones) {
 				for (const adj of zone.adjacent) {
-					const other = byId.get(adj);
-					expect(other).toBeDefined();
-					if (!other) continue;
 					expect(
-						other.adjacent.includes(zone.id),
-						`${format.id}: "${zone.id}"->"${adj}" is not symmetric`,
-					).toBe(true);
+						byId.get(adj)?.adjacent,
+						`${format.id}: "${zone.id}"->"${adj}"`,
+					).toContain(zone.id);
 				}
 			}
 		}
-	});
-
-	it("7v7 has 6 outfield slots (2 back + 3 mid + 1 fwd)", () => {
-		expect(outfieldCount(getFormat("7v7"))).toBe(6);
-	});
-
-	it("getFormat throws a helpful error for an unknown id", () => {
-		expect(() => getFormat("13v13")).toThrow(/Okant format/);
 	});
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getFormat, outfieldCount } from "../src/core/formations.js";
+import { FORMATS, getFormat, outfieldCount } from "../src/core/formations.js";
 import {
 	addPlayer,
 	applyElapsed,
@@ -267,4 +267,22 @@ describe("any formation - full-match simulation", () => {
 
 		expect(generateRotation(state).bench).toEqual(["p1", "p2"]);
 	});
+});
+
+describe("quick-pick formats", () => {
+	it.each(Object.keys(FORMATS))(
+		"%s plays a full match with two substitutes",
+		(formatId) => {
+			const format = getFormat(formatId);
+			const state = createSchedulerState(
+				format,
+				600,
+				ids(outfieldCount(format) + 2),
+			);
+			expect(() => simulate(state, 6)).not.toThrow();
+			expect(fairnessSpread(state)).toBeLessThanOrEqual(
+				2 * state.rotationSeconds,
+			);
+		},
+	);
 });

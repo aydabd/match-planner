@@ -55,7 +55,8 @@ export function initRosterView(callbacks: RosterViewCallbacks): void {
 	}
 
 	function render(): void {
-		formatSelect.value = draft.formatId;
+		// Older squads saved "7v7"; show the quick pick it stands for.
+		formatSelect.value = getFormat(draft.formatId).id;
 		rotationInput.value = String(Math.round(draft.rotationSeconds / 60));
 
 		playerList.innerHTML = "";
@@ -155,7 +156,7 @@ export function initRosterView(callbacks: RosterViewCallbacks): void {
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement("a");
 		a.href = url;
-		a.download = `trupp-${draft.formatId}.json`;
+		a.download = `trupp-${draft.formatId.replace(":", "-")}.json`;
 		a.click();
 		URL.revokeObjectURL(url);
 	});

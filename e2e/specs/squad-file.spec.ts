@@ -11,7 +11,7 @@ test.describe("Saving and loading a squad file", () => {
 		await setup.open();
 		await setup.addPlayers(SQUAD);
 		const download = await setup.saveSquadToFile();
-		expect(download.suggestedFilename()).toBe("trupp-7v7.json");
+		expect(download.suggestedFilename()).toBe("trupp-7v7-2-3-1.json");
 		const contents = await readFile(await download.path(), "utf8");
 
 		// A second, independent browser context stands in for another phone.
@@ -20,7 +20,10 @@ test.describe("Saving and loading a squad file", () => {
 		await otherSetup.open();
 		await expect(otherSetup.emptySquadMessage).toBeVisible();
 
-		await otherSetup.loadSquadFromFile({ name: "trupp-7v7.json", contents });
+		await otherSetup.loadSquadFromFile({
+			name: "trupp-7v7-2-3-1.json",
+			contents,
+		});
 
 		await expect(otherSetup.players).toHaveInputValues(SQUAD);
 		await expect(otherSetup.squadFileMessage).toBeHidden();

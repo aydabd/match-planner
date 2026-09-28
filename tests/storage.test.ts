@@ -45,11 +45,35 @@ describe("parseRosterFile - rejects malformed or hostile input", () => {
 		).toThrow(StorageError);
 	});
 
+	it.each(["7v7", "9v9:3-3-2", "11v11:4-2-1-2-1"])(
+		"accepts the format %s, including custom formations",
+		(formatId) => {
+			const roster = parseRosterFile({
+				schemaVersion: 1,
+				formatId,
+				rotationSeconds: 600,
+				players: validPlayers,
+			});
+			expect(roster.formatId).toBe(formatId);
+		},
+	);
+
 	it("rejects an unregistered formatId", () => {
 		expect(() =>
 			parseRosterFile({
 				schemaVersion: 1,
 				formatId: "13v13",
+				rotationSeconds: 600,
+				players: validPlayers,
+			}),
+		).toThrow(/formatId/);
+	});
+
+	it("rejects a formation that does not fit the team size", () => {
+		expect(() =>
+			parseRosterFile({
+				schemaVersion: 1,
+				formatId: "7v7:2-3-2",
 				rotationSeconds: 600,
 				players: validPlayers,
 			}),

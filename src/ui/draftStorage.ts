@@ -8,7 +8,7 @@ import {
 /** The squad being set up on the setup screen, kept across reloads. */
 const DRAFT_KEY = "matchplanner:draft:v1";
 
-/** Load the saved draft, or an empty 7v7 squad if there is none or it is unreadable. */
+/** Load the saved draft, or an empty 7v7 (2-3-1) squad if there is none or it is unreadable. */
 export function loadDraft(): RosterFile {
 	try {
 		const raw = localStorage.getItem(DRAFT_KEY);
@@ -16,7 +16,7 @@ export function loadDraft(): RosterFile {
 	} catch {
 		// fall through to a fresh default below
 	}
-	return serializeRoster("7v7", 600, []);
+	return serializeRoster("7v7:2-3-1", 600, []);
 }
 
 export function saveDraft(roster: RosterFile): void {
