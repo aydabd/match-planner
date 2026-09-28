@@ -222,6 +222,13 @@ function renderPitch(): void {
 function renderBench(): void {
 	if (!live || !els) return;
 	els.benchList.innerHTML = "";
+	if (live.currentAssignment.bench.length === 0) {
+		const empty = document.createElement("p");
+		empty.className = "empty-state";
+		empty.textContent = "Ingen på bänken just nu.";
+		els.benchList.appendChild(empty);
+		return;
+	}
 	for (const [idx, id] of live.currentAssignment.bench.entries()) {
 		els.benchList.appendChild(benchChip(id, idx));
 	}
@@ -459,8 +466,17 @@ function renderPreview(): void {
 		row.appendChild(tag);
 		(next.zones[zone.id] ?? []).forEach((id) => {
 			const c = document.createElement("span");
-			c.className = `chip-ghost${currentOnPitch.has(id) ? "" : " is-new"}`;
+			c.className = "chip-ghost";
 			c.textContent = nameOf(id);
+			if (comingIn.includes(id)) {
+				// Colour marks incoming players visually; the hidden text says it
+				// for screen readers, so the legend isn't colour-only.
+				c.classList.add("is-new");
+				const sr = document.createElement("span");
+				sr.className = "visually-hidden";
+				sr.textContent = " (kommer in)";
+				c.appendChild(sr);
+			}
 			row.appendChild(c);
 		});
 		lineup.appendChild(row);
@@ -827,6 +843,7 @@ export function initMatchView(callbacks: MatchCallbacks): void {
 			resetArmed = false;
 			els.resetBtn.textContent = "Nollställ matchen";
 			els.resetBtn.classList.remove("confirming");
+			els.matchMenu.open = false;
 			clearSession();
 			stopClock();
 			for (const id of live.schedulerState.order) {

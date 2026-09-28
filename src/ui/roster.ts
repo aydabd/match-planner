@@ -79,7 +79,13 @@ export function initRosterView(callbacks: RosterViewCallbacks): void {
 		rotationInput.value = String(Math.round(draft.rotationSeconds / 60));
 
 		playerList.innerHTML = "";
-		draft.players.forEach((player) => {
+		if (draft.players.length === 0) {
+			const empty = document.createElement("p");
+			empty.className = "empty-state";
+			empty.textContent = "Inga spelare än. Lägg till dem som är med idag.";
+			playerList.appendChild(empty);
+		}
+		draft.players.forEach((player, idx) => {
 			const row = document.createElement("div");
 			row.className = "player-row";
 
@@ -87,10 +93,7 @@ export function initRosterView(callbacks: RosterViewCallbacks): void {
 			input.type = "text";
 			input.value = player.name;
 			input.maxLength = 40;
-			input.setAttribute(
-				"aria-label",
-				`Namn, spelare ${draft.players.indexOf(player) + 1}`,
-			);
+			input.setAttribute("aria-label", `Namn, spelare ${idx + 1}`);
 			input.addEventListener("change", () => {
 				const trimmed = input.value.trim();
 				if (trimmed) updatePlayer(player.id, trimmed);

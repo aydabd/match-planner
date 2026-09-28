@@ -274,18 +274,19 @@ input[type="text"] {
 	counter-reset: player;
 	border-top: 1px solid var(--line);
 }
-.player-list:empty {
+.player-list:has(> .empty-state) {
 	border-top: none;
 }
-.player-list:empty::before {
-	content: attr(data-empty);
-	display: block;
+.empty-state {
+	margin: 0;
+	color: var(--ink-2);
+	font-size: 0.9375rem;
+}
+.player-list > .empty-state {
 	padding: 20px 12px;
 	text-align: center;
-	color: var(--ink-2);
 	background: var(--surface-2);
 	border-radius: var(--radius);
-	font-size: 0.9375rem;
 }
 .player-row {
 	display: flex;
@@ -864,6 +865,13 @@ button:disabled {
 	outline: 3px solid #0f2a1c;
 	outline-offset: 2px;
 }
+/* Chips are buttons now; lift instead of the global darken-on-hover so
+   white name chips don't look greyed out. */
+.chip:not(:disabled):hover,
+.bench-chip:not(:disabled):hover {
+	filter: none;
+	box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+}
 .chip:active {
 	transform: scale(0.96);
 }
@@ -873,11 +881,6 @@ button:disabled {
 	display: flex;
 	gap: 8px;
 	flex-wrap: wrap;
-}
-.bench-list:empty::before {
-	content: "Ingen på bänken just nu.";
-	color: var(--ink-2);
-	font-size: 0.9375rem;
 }
 .bench-chip {
 	background: var(--surface);
