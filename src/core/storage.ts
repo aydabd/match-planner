@@ -34,17 +34,33 @@ export function serializeRoster(
 	};
 }
 
-function isKnownFormat(formatId: string): boolean {
+/** The normalised id for a format id (e.g. "7v7" -> "7v7:2-3-1"), or null if unknown. */
+function canonicalFormatId(formatId: string): string | null {
 	try {
-		getFormat(formatId);
-		return true;
+		return getFormat(formatId).id;
 	} catch {
-		return false;
+		return null;
 	}
 }
 
 export function rosterToJson(roster: RosterFile): string {
 	return JSON.stringify(roster, null, 2);
+}
+
+/**
+ * The file a coach saves to share the whole team setup (team size,
+ * formation, minutes between swaps and names) with another coach. Always
+ * written with the normalised format id, named e.g. trupp-9v9-3-3-2.json.
+ */
+export function squadFile(roster: RosterFile): {
+	fileName: string;
+	json: string;
+} {
+	const formatId = canonicalFormatId(roster.formatId) ?? roster.formatId;
+	return {
+		fileName: `trupp-${formatId.replace(":", "-")}.json`,
+		json: rosterToJson({ ...roster, formatId }),
+	};
 }
 
 /**
@@ -76,7 +92,9 @@ export function parseRosterFile(
 		);
 	}
 
-	if (typeof obj.formatId !== "string" || !isKnownFormat(obj.formatId)) {
+	const formatId =
+		typeof obj.formatId === "string" ? canonicalFormatId(obj.formatId) : null;
+	if (formatId === null) {
 		throw new StorageError(
 			`Okänt formatId "${String(obj.formatId)}". Använd lagstorlek och formation, till exempel 7v7:2-3-1.`,
 		);
@@ -124,7 +142,7 @@ export function parseRosterFile(
 
 	return {
 		schemaVersion: 1,
-		formatId: obj.formatId,
+		formatId,
 		rotationSeconds: obj.rotationSeconds,
 		players,
 	};

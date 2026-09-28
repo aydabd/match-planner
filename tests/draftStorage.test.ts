@@ -13,10 +13,10 @@ describe("squad draft storage", () => {
 		expect(loadDraft()).toEqual(EMPTY_DRAFT);
 	});
 
-	it("still loads a squad saved with the original 7v7 id", () => {
-		const draft = serializeRoster("7v7", 600, [{ id: "p1", name: "Alva" }]);
-		saveDraft(draft);
-		expect(loadDraft()).toEqual(draft);
+	it("still loads a squad saved with the original 7v7 id, as 7v7 (2-3-1)", () => {
+		const players = [{ id: "p1", name: "Alva" }];
+		saveDraft(serializeRoster("7v7", 600, players));
+		expect(loadDraft()).toEqual(serializeRoster("7v7:2-3-1", 600, players));
 	});
 
 	it("keeps the chosen format and minutes before any player is added", () => {

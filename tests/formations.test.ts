@@ -149,12 +149,18 @@ describe("getFormat", () => {
 		expect(getFormat("7v7")).toEqual(buildFormat("7v7", "2-3-1"));
 	});
 
-	it.each(["13v13", "13v13:2-3-1", "7v7:2-3-2", "7v7:", "nonsense"])(
-		"throws a helpful error for %j",
-		(id) => {
-			expect(() => getFormat(id)).toThrow(/Okänt format/);
-		},
-	);
+	it.each([
+		"13v13",
+		"13v13:2-3-1",
+		"7v7:2-3-2",
+		"7v7:",
+		"nonsense",
+		"7v7:2-3-1:evil",
+		"7v7:2 - 3 - 1",
+		"7v7:2–3–1",
+	])("throws a helpful error for %j", (id) => {
+		expect(() => getFormat(id)).toThrow(/Okänt format/);
+	});
 });
 
 describe("default format", () => {

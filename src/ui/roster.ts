@@ -2,8 +2,8 @@ import { FORMATS, getFormat, outfieldCount } from "../core/formations.js";
 import {
 	parseRosterFile,
 	type RosterFile,
-	rosterToJson,
 	StorageError,
+	squadFile,
 } from "../core/storage.js";
 import type { Player } from "../core/types.js";
 import { loadDraft, saveDraft } from "./draftStorage.js";
@@ -151,12 +151,12 @@ export function initRosterView(callbacks: RosterViewCallbacks): void {
 	});
 
 	exportBtn.addEventListener("click", () => {
-		const json = rosterToJson(draft);
+		const { fileName, json } = squadFile(draft);
 		const blob = new Blob([json], { type: "application/json" });
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement("a");
 		a.href = url;
-		a.download = `trupp-${draft.formatId.replace(":", "-")}.json`;
+		a.download = fileName;
 		a.click();
 		URL.revokeObjectURL(url);
 	});

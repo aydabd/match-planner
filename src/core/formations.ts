@@ -168,14 +168,20 @@ const LEGACY_IDS: Record<string, string> = { "7v7": "7v7:2-3-1" };
 
 /**
  * Resolve a format id such as "9v9:3-3-2" (any valid formation, not just
- * the quick picks). The original id "7v7" still means 7v7 (2-3-1), so saved
- * squads, squad files and matches in progress keep loading.
+ * the quick picks). Ids must be exactly "size:formation" in normalised form
+ * (as buildFormat writes them); the only exception is the original "7v7",
+ * which still means 7v7 (2-3-1) so saved squads, squad files and matches in
+ * progress keep loading.
  */
 export function getFormat(id: string): FormatConfig {
 	const resolved = LEGACY_IDS[id] ?? id;
-	const [size = "", formation = ""] = resolved.split(":");
-	if (isTeamSize(size) && parseFormation(formation, size).ok) {
-		return buildFormat(size, formation);
+	const parts = resolved.split(":");
+	const [size = "", formation = ""] = parts;
+	if (parts.length === 2 && isTeamSize(size)) {
+		const parsed = parseFormation(formation, size);
+		if (parsed.ok && parsed.formation === formation) {
+			return buildFormat(size, formation);
+		}
 	}
 	throw new Error(
 		`Okänt format: "${id}". Använd lagstorlek och formation, till exempel 7v7:2-3-1.`,
