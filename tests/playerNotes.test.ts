@@ -120,6 +120,21 @@ describe("PlayerNotesFile - parsing and round trip", () => {
 			},
 		],
 		[
+			"a development date that Date.parse would accept but isn't YYYY-MM-DD",
+			{
+				schemaVersion: 1,
+				players: [
+					{
+						key: "a",
+						availability: [],
+						development: [
+							{ date: "September 5, 2026", area: "physical", note: "x" },
+						],
+					},
+				],
+			},
+		],
+		[
 			"a development area that is not recognised",
 			{
 				schemaVersion: 1,

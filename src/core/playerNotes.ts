@@ -93,6 +93,12 @@ const DEVELOPMENT_AREAS: readonly DevelopmentArea[] = [
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	typeof value === "object" && value !== null && !Array.isArray(value);
 
+// Same strict format as storage.ts's isValidDate/DATE, minus the optional
+// time and the empty-string case (a development note's date is required).
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+const isValidDate = (value: string): boolean =>
+	DATE.test(value) && !Number.isNaN(Date.parse(value));
+
 const note = (value: unknown): string | undefined => {
 	if (value === undefined) return undefined;
 	if (typeof value !== "string") throw new Error("not a string");
@@ -135,7 +141,7 @@ function parseDevelopment(raw: unknown): DevelopmentEntry {
 			code: "development",
 		});
 	if (!isRecord(raw)) throw fail();
-	if (typeof raw.date !== "string" || Number.isNaN(Date.parse(raw.date))) {
+	if (typeof raw.date !== "string" || !isValidDate(raw.date)) {
 		throw fail();
 	}
 	if (!DEVELOPMENT_AREAS.includes(raw.area as DevelopmentArea)) throw fail();
