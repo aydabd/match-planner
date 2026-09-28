@@ -47,7 +47,7 @@ required check names. Then apply the branch ruleset with the bootstrap helper:
 "$BOOTSTRAP/setup-ruleset.sh" \
   --owner "$OWNER" --repo "$REPO" \
   --ruleset-file "$PWD/.github/rulesets/branch-main.json" \
-  --required-status-checks "Check,Signed-off-by trailers"
+  --required-status-checks "Check,E2E,Signed-off-by trailers"
 ```
 
 Apply `.github/rulesets/tags-semver.json` as a second tag-targeting ruleset using the GitHub
@@ -59,7 +59,7 @@ gh api --method POST "repos/$OWNER/$REPO/rulesets" \
 ```
 
 Verify that both rulesets are active and that the main-branch ruleset requires signed commits,
-one approving review, resolved threads, linear history, squash merges, `Check`, and
+one approving review, resolved threads, linear history, squash merges, `Check`, `E2E`, and
 `Signed-off-by trailers`. Keep a maintainer bypass only for repository recovery.
 
 ## GitHub Pages
