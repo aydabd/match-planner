@@ -58,9 +58,15 @@ export function createDriveAuth(clientId: string, scope: string): DriveAuth {
 				script.src = GIS_SRC;
 				script.async = true;
 				script.addEventListener("load", () => resolve());
-				script.addEventListener("error", () =>
-					reject(new Error("Kunde inte läsa in Google-inloggningen.")),
-				);
+				script.addEventListener("error", () => {
+					// Don't cache the failure: a later call (another tap on
+					// "Koppla Google Drive") should try loading the script again,
+					// not keep replaying this one rejection for the rest of the
+					// page's life.
+					gisReady = null;
+					script.remove();
+					reject(new Error("Kunde inte läsa in Google-inloggningen."));
+				});
 				document.head.append(script);
 			});
 		}

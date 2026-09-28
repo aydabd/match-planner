@@ -159,6 +159,42 @@ const MATCH = matchFileToJson(
 test.use({ serviceWorkers: "block" });
 
 test.describe("Google Drive backup and restore", () => {
+	test("retries loading Google sign-in after a failed attempt", async ({
+		setup,
+		history,
+		page,
+	}) => {
+		let scriptRequests = 0;
+		await page
+			.context()
+			.route("https://accounts.google.com/gsi/client", async (route) => {
+				scriptRequests++;
+				if (scriptRequests === 1) {
+					await route.abort();
+					return;
+				}
+				await route.fulfill({
+					contentType: "application/javascript",
+					headers: CORS_HEADERS,
+					body: GIS_SCRIPT,
+				});
+			});
+
+		await setup.open();
+		await history.open();
+
+		await history.driveConnectButton.click();
+		await expect(history.driveStatus).toHaveText(
+			"Inloggningen misslyckades eller avbröts.",
+		);
+
+		// A second tap must load the script again, not replay the same
+		// cached failure for the rest of the page's life.
+		await history.driveConnectButton.click();
+		await expect(history.driveStatus).toHaveText("Kopplad till Google Drive.");
+		expect(scriptRequests).toBe(2);
+	});
+
 	test("backs up on one phone and restores on another", async ({
 		browser,
 		history,

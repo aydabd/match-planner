@@ -56,11 +56,6 @@ function table(
 	return el;
 }
 
-/**
- * The season history screen: import match files, then per player starts,
- * minutes, minutes per position and month by month. Every number comes from
- * core/history.ts, which computes it from the match files' timelines.
- */
 /** Wires the "backup to Google Drive" card; hidden when no client id is set. */
 function setUpDriveBackup(refresh: () => void): void {
 	const card = byId("historyBackupCard");
@@ -117,6 +112,11 @@ function setUpDriveBackup(refresh: () => void): void {
 	});
 }
 
+/**
+ * The season history screen: import match files, then per player starts,
+ * minutes, minutes per position and month by month. Every number comes from
+ * core/history.ts, which computes it from the match files' timelines.
+ */
 export function createHistoryView(): { refresh: () => void } {
 	const messages = byId("historyMessages");
 	const input = byId("historyImportInput") as HTMLInputElement;
