@@ -18,6 +18,7 @@ import {
 	lineupChanged,
 	type MatchClock,
 	type MatchPlan,
+	matchSecond,
 	NEW_CLOCK,
 	periodStatus,
 	rotationStatus,
@@ -34,6 +35,12 @@ import {
 	setUnavailable,
 } from "../core/scheduler.js";
 import type { MatchDetails, RosterFile } from "../core/storage.js";
+import {
+	applyChain,
+	type SubstitutionChain,
+	substitutionChains,
+} from "../core/substitutions.js";
+import { recordLineup, type TimelineEvent } from "../core/timeline.js";
 import type {
 	FormatConfig,
 	RotationAssignment,
@@ -45,6 +52,7 @@ import {
 	loadSession,
 	type MatchSession,
 	type MutableAssignment,
+	type PendingSwap,
 	saveSession,
 	type TempSwap,
 } from "./sessionStorage.js";
@@ -149,6 +157,10 @@ interface LiveMatch {
 	goalkeepers: string[];
 	/** Who is in goal next period, as chosen during a break. */
 	nextKeeperId: string | null;
+	/** Everything that happened; lineup snapshots give minutes per line. */
+	timeline: TimelineEvent[];
+	/** The next lineup, fixed when the swap warning starts. */
+	pendingSwap: PendingSwap | null;
 	/** The interval is ticking (the coach has not paused). */
 	running: boolean;
 	timerHandle: ReturnType<typeof setInterval> | null;
@@ -191,6 +203,8 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			schedulerOrder: live.schedulerState.order,
 			keeperId: live.schedulerState.keeperId,
 			goalkeepers: live.goalkeepers,
+			timeline: live.timeline,
+			pendingSwap: live.pendingSwap,
 			rotationIndex: live.rotationIndex,
 			currentAssignment: live.currentAssignment,
 			tempSwaps: live.tempSwaps,
@@ -343,7 +357,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		if (!live) return;
 		const next = els.keeperPanelSelect.value;
 		if (!next) return;
-		if (!changeKeeper(live.schedulerState, live.currentAssignment, next)) {
+		if (!switchKeeper(next)) {
 			// Nobody may take the new keeper's seat: say so, keep the panel open.
 			els.keeperPanelText.textContent = TEXT.match.keeperChangeBlocked(
 				nameOf(next),
@@ -555,8 +569,77 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		return col;
 	}
 
+	/** The warning before a swap: one row per substitution, each with Klart. */
+	function renderSwapWarning(): void {
+		if (!live?.pendingSwap) return;
+		const { remainingSeconds, due } = rotationStatus(live.clock, live.plan);
+		const status = document.createElement("p");
+		status.className = "swap-warning-status";
+		status.textContent = due
+			? TEXT.match.swapNow
+			: TEXT.match.swapIn(formatTime(remainingSeconds));
+		els.previewBody.appendChild(status);
+
+		const chains = pendingChains();
+		if (chains.length === 0) {
+			const same = document.createElement("p");
+			same.className = "preview-none";
+			same.textContent = TEXT.match.sameTeam;
+			els.previewBody.appendChild(same);
+			return;
+		}
+		const list = document.createElement("ul");
+		list.className = "swap-list";
+		for (const chain of chains) {
+			const item = document.createElement("li");
+			item.className = "swap-item";
+			const text = document.createElement("div");
+			const main = document.createElement("span");
+			main.className = "swap-title";
+			main.textContent = TEXT.match.substitution(
+				nameOf(chain.inId),
+				nameOf(chain.outId),
+			);
+			text.appendChild(main);
+			for (const move of chain.moves) {
+				const line = document.createElement("span");
+				line.className = "swap-move";
+				line.textContent = TEXT.match.moves(
+					nameOf(move.playerId),
+					TEXT.match.zoneName(move.to),
+				);
+				text.appendChild(line);
+			}
+			const done = document.createElement("button");
+			done.type = "button";
+			done.className = "btn btn-primary";
+			done.textContent = TEXT.match.done;
+			done.setAttribute(
+				"aria-label",
+				TEXT.match.doneLabel(nameOf(chain.inId), nameOf(chain.outId)),
+			);
+			done.addEventListener("click", () => {
+				confirmChain(chain);
+				refreshClock();
+				render();
+			});
+			item.append(text, done);
+			list.appendChild(item);
+		}
+		els.previewBody.appendChild(list);
+	}
+
 	function renderPreview(): void {
 		if (!live) return;
+		els.previewBody.parentElement?.classList.toggle(
+			"heads-up",
+			live.pendingSwap !== null,
+		);
+		if (live.pendingSwap) {
+			els.previewBody.innerHTML = "";
+			renderSwapWarning();
+			return;
+		}
 		// Keep the full-lineup disclosure open across clock ticks.
 		const wasOpen =
 			els.previewBody.querySelector<HTMLDetailsElement>(".next-lineup")?.open ??
@@ -750,12 +833,25 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		if (swap) live.tempSwaps.push(swap);
 		live.selected = null;
 		live.pendingBenchIdx = null;
+		noteLineup();
 		render();
 	}
 
 	function markUnavailable(zoneId: string, idx: number): void {
 		if (!live) return;
+		const playerId = live.currentAssignment.zones[zoneId]?.[idx];
 		takeOutForMatch(live.schedulerState, live.currentAssignment, zoneId, idx);
+		if (playerId !== undefined) {
+			live.timeline.push({
+				type: "outForMatch",
+				at: now(),
+				period: live.clock.period,
+				playerId,
+			});
+		}
+		// The planned swap may include the player; plan it again.
+		live.pendingSwap = null;
+		noteLineup();
 		live.selected = null;
 		live.pendingBenchIdx = null;
 		render();
@@ -771,8 +867,21 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		live.tempSwaps = tickTempSwaps(live.currentAssignment, live.tempSwaps, 1);
 		const result = tickClock(live.clock, live.plan);
 		live.clock = result.clock;
+		// A rest that ended changed the lineup; record it from this second.
+		noteLineup();
+		for (const event of result.events) {
+			if (event.type === "periodEnded") {
+				live.timeline.push({
+					type: "periodEnd",
+					at: now(),
+					period: event.period,
+				});
+				live.pendingSwap = null;
+			}
+		}
 		// A period end stops the clock; the coach starts the next period.
 		if (live.clock.phase !== "playing") stopTimer();
+		else prepareSwapWarning();
 		refreshClock();
 		render();
 	}
@@ -824,8 +933,13 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 
 	function startClock(): void {
 		if (!live || live.running) return;
+		const kickingOff = live.clock.phase === "beforeKickoff";
 		live.clock = kickoff(live.clock);
 		if (live.clock.phase !== "playing") return;
+		if (kickingOff) {
+			live.timeline.push({ type: "periodStart", at: now(), period: 1 });
+			noteLineup();
+		}
 		live.running = true;
 		live.timerHandle = setInterval(tick, 1000);
 		refreshClock();
@@ -851,7 +965,9 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			rotationElapsed: Math.max(0, live.plan.rotationSeconds - 2),
 		};
 		startClock();
+		prepareSwapWarning();
 		refreshClock();
+		render();
 	}
 
 	/** Put the scheduler's next lineup on; the swap timer starts again. */
@@ -864,14 +980,110 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		live.tempSwaps = [];
 		live.selected = null;
 		live.pendingBenchIdx = null;
+		live.pendingSwap = null;
 		live.clock = lineupChanged(live.clock);
+		noteLineup();
+	}
+
+	// ---------------- swaps and the timeline ----------------
+
+	/** Seconds since kickoff: the time stamp for timeline events. */
+	function now(): number {
+		return live ? matchSecond(live.clock, live.plan) : 0;
+	}
+
+	/** Record the lineup if it changed (recordLineup skips duplicates). */
+	function noteLineup(): void {
+		if (!live || live.clock.phase === "beforeKickoff") return;
+		recordLineup(
+			live.timeline,
+			now(),
+			live.currentAssignment,
+			live.schedulerState.keeperId,
+		);
+	}
+
+	/**
+	 * Change who is in goal and record it. During play the lineup adjusts
+	 * (changeKeeper); right before a new lineup (period break) only the keeper
+	 * is chosen (assignKeeper). Returns false if the change was refused.
+	 */
+	function switchKeeper(
+		toId: string,
+		options: { beforeNextLineup?: boolean } = {},
+	): boolean {
+		if (!live) return false;
+		const fromId = live.schedulerState.keeperId;
+		const changed = options.beforeNextLineup
+			? assignKeeper(live.schedulerState, toId)
+			: changeKeeper(live.schedulerState, live.currentAssignment, toId);
+		if (!changed || live.schedulerState.keeperId === fromId) return false;
+		live.timeline.push({
+			type: "keeperChange",
+			at: now(),
+			period: live.clock.period,
+			fromId,
+			toId,
+		});
+		live.pendingSwap = null;
+		noteLineup();
+		return true;
+	}
+
+	/**
+	 * From LIMITS.headsUpSeconds before a swap is due, fix the next lineup so
+	 * the coach can call players over and make the swaps one at a time.
+	 */
+	function prepareSwapWarning(): void {
+		if (!live || live.pendingSwap || live.clock.phase !== "playing") return;
+		const { remainingSeconds } = rotationStatus(live.clock, live.plan);
+		if (remainingSeconds > LIMITS.headsUpSeconds) return;
+		live.pendingSwap = {
+			plannedAt: now() + remainingSeconds,
+			next: cloneAssignment(generateRotationSafe(live.schedulerState)),
+		};
+	}
+
+	function pendingChains(): SubstitutionChain[] {
+		if (!live?.pendingSwap) return [];
+		return substitutionChains(live.currentAssignment, live.pendingSwap.next);
+	}
+
+	/** Make one substitution now; minutes change hands from this second. */
+	function confirmChain(chain: SubstitutionChain): void {
+		if (!live?.pendingSwap) return;
+		applyChain(live.currentAssignment, chain);
+		live.timeline.push({
+			type: "substitution",
+			at: now(),
+			plannedAt: live.pendingSwap.plannedAt,
+			period: live.clock.period,
+			...chain,
+		});
+		noteLineup();
+		if (pendingChains().length === 0) finishSwap();
+	}
+
+	/** All substitutions made: the planned lineup is on, swap timer restarts. */
+	function finishSwap(): void {
+		if (!live?.pendingSwap) return;
+		live.currentAssignment = cloneAssignment(live.pendingSwap.next);
+		live.rotationIndex += 1;
+		live.tempSwaps = [];
+		live.selected = null;
+		live.pendingBenchIdx = null;
+		live.pendingSwap = null;
+		live.clock = lineupChanged(live.clock);
+		noteLineup();
 	}
 
 	function advanceRotation(): void {
 		if (!live) return;
 		const swap = () => {
 			if (!live) return;
-			putNextLineupOn();
+			prepareSwapWarning();
+			for (const chain of pendingChains()) confirmChain(chain);
+			finishSwap();
 			refreshClock();
 			render();
 			els.pitch.classList.remove("fade-out");
@@ -897,11 +1109,16 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			chosen !== live.schedulerState.keeperId
 		) {
 			// The next lineup is built after this, so just choose the keeper.
-			assignKeeper(live.schedulerState, chosen);
+			switchKeeper(chosen, { beforeNextLineup: true });
 		}
 		live.nextKeeperId = null;
-		putNextLineupOn();
 		live.clock = startNextPeriod(live.clock, live.plan);
+		live.timeline.push({
+			type: "periodStart",
+			at: now(),
+			period: live.clock.period,
+		});
+		putNextLineupOn();
 		startClock();
 		refreshClock();
 		render();
@@ -942,6 +1159,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			live.tempSwaps = [];
 			live.selected = null;
 			live.pendingBenchIdx = null;
+			noteLineup();
 			render();
 		});
 		els.backToSetupBtn.addEventListener("click", () =>
@@ -974,10 +1192,18 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 				if (!live) return;
 				const name = input.value.trim();
 				if (!name) return;
-				const id = `late-${Date.now()}`;
+				// Unique even for two arrivals in the same millisecond.
+				const id = `late-${Date.now()}-${live.schedulerState.order.length}`;
 				live.playerNames.set(id, name);
 				schedulerAddPlayer(live.schedulerState, id);
 				live.currentAssignment.bench.push(id);
+				live.timeline.push({
+					type: "lateArrival",
+					at: now(),
+					period: live.clock.period,
+					playerId: id,
+				});
+				live.pendingSwap = null;
 				els.lateArrivalPanel.classList.remove("show");
 				render();
 			});
@@ -995,6 +1221,8 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 				resetPlayers(live.schedulerState);
 				live.rotationIndex = 0;
 				live.clock = NEW_CLOCK;
+				live.timeline = [];
+				live.pendingSwap = null;
 				live.currentAssignment = cloneAssignment(
 					generateRotationSafe(live.schedulerState),
 				);
@@ -1042,6 +1270,8 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			clock: NEW_CLOCK,
 			match: roster.match,
 			goalkeepers: roster.players.filter((p) => p.goalkeeper).map((p) => p.id),
+			timeline: [],
+			pendingSwap: null,
 			nextKeeperId: null,
 			running: false,
 			timerHandle: null,
@@ -1073,6 +1303,8 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			clock: session.clock,
 			match: session.match,
 			goalkeepers: session.goalkeepers ?? [],
+			timeline: session.timeline ?? [],
+			pendingSwap: session.pendingSwap ?? null,
 			nextKeeperId: null,
 			running: false,
 			timerHandle: null,

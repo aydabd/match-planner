@@ -30,4 +30,7 @@ export const SECOND_SWAP = {
 	goingOut: ["Ebba", "Filip"],
 	pitch: ["Hugo", "Alva", "Cleo", "Dino", "Bo", "Greta"],
 	bench: ["Ebba", "Filip"],
+	/** The swap warning: one substitution per player coming on. */
+	substitutions: ["Greta in för Ebba", "Hugo in för Filip"],
+	moves: ["Alva flyttar till Mittfält", "Cleo flyttar till Mittfält"],
 };

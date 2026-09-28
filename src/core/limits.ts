@@ -20,6 +20,8 @@ export const LIMITS = {
 	squadSize: 30,
 	/** Rest lengths offered for a temporary swap, in seconds. */
 	tempSwapSeconds: [60, 120, 300],
+	/** How long before a due swap the coach sees who swaps with whom. */
+	headsUpSeconds: 30,
 	/** How long "tap again to reset" stays armed, in seconds. */
 	resetConfirmSeconds: 3,
 } as const;
