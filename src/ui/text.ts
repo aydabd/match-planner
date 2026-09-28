@@ -299,6 +299,8 @@ export const TEXT = {
 	},
 
 	match: {
+		caughtUp: (time: string) =>
+			`Klockan fortsatte medan sidan var borta och har räknat in ${time}.`,
 		confirmEnd: "Tryck igen för att avsluta",
 		formatLabel: (format: string, minutes: number) =>
 			`${format}, byte var ${minutes} min`,

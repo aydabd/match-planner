@@ -106,6 +106,7 @@ interface Els {
 	lateArrivalPanel: HTMLElement;
 	backToSetupBtn: HTMLButtonElement;
 	endMatchBtn: HTMLButtonElement;
+	clockNotice: HTMLElement;
 	reportBtn: HTMLButtonElement;
 }
 
@@ -149,6 +150,7 @@ function getEls(): Els {
 		lateArrivalPanel: byId("lateArrivalPanel"),
 		backToSetupBtn: byId("backToSetupBtn"),
 		endMatchBtn: byId("endMatchBtn"),
+		clockNotice: byId("clockNotice"),
 		reportBtn: byId("reportBtn"),
 	};
 }
@@ -191,6 +193,8 @@ interface LiveMatch {
 	pendingSwap: PendingSwap | null;
 	/** The interval is ticking (the coach has not paused). */
 	running: boolean;
+	/** Wall-clock time (ms) up to which the clock has counted. */
+	lastTickMs: number;
 	timerHandle: ReturnType<typeof setInterval> | null;
 	currentAssignment: MutableAssignment;
 	tempSwaps: TempSwap[];
@@ -213,6 +217,7 @@ export interface MatchView {
 export function createMatchView(callbacks: MatchCallbacks): MatchView {
 	const els = getEls();
 	let live: LiveMatch | null = null;
+	let caughtUpTimer: ReturnType<typeof setTimeout> | null = null;
 
 	function nameOf(id: string): string {
 		return live?.playerNames.get(id) ?? id;
@@ -222,6 +227,8 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		if (!live) return;
 		const session: MatchSession = {
 			schemaVersion: 2,
+			running: live.running,
+			lastTickMs: live.lastTickMs,
 			matchId: live.matchId,
 			formatId: live.format.id,
 			plan: live.plan,
@@ -919,8 +926,31 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 	// The rules live in core/matchClock.ts; here we only tick it once a second
 	// while the match is running and show its state.
 
+	/**
+	 * The clock follows the device's wall clock, not the number of timer
+	 * callbacks: a phone that pauses timers while the screen is locked, or a
+	 * page that was reloaded, catches up the seconds it missed. The seconds
+	 * are counted one by one, so swaps, rests, period ends and the timeline
+	 * come out exactly as if the page had stayed open.
+	 */
 	function tick(): void {
-		if (live?.clock.phase !== "playing") return;
+		if (live?.running !== true || live.clock.phase !== "playing") return;
+		const passed = Math.floor((Date.now() - live.lastTickMs) / 1000);
+		if (passed < 0) {
+			// The device clock went backwards: start again from now and count
+			// just the one second this timer call stands for.
+			live.lastTickMs = Date.now() - 1000;
+			countSeconds(1, { show: true });
+			return;
+		}
+		// Less than a whole second since the last count (a timer that fired a
+		// hair early, or right after catching up): nothing to add yet.
+		if (passed >= 1) countSeconds(passed, { show: true });
+	}
+
+	/** One second of play; true if it ended the match. */
+	function step(): boolean {
+		if (live?.clock.phase !== "playing") return false;
 		applyElapsed(live.schedulerState, live.currentAssignment, 1);
 		const restsBefore = live.tempSwaps.length;
 		live.tempSwaps = tickTempSwaps(live.currentAssignment, live.tempSwaps, 1);
@@ -941,12 +971,26 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 				live.pendingSwap = null;
 			}
 		}
+		if (live.clock.phase === "playing") prepareSwapWarning();
+		return matchEnded;
+	}
+
+	/** Count `seconds` of play; returns how many were counted (a period end stops early). */
+	function countSeconds(seconds: number, options: { show: boolean }): number {
+		if (!live) return 0;
+		live.lastTickMs += seconds * 1000;
+		let matchEnded = false;
+		let counted = 0;
+		while (counted < seconds && live.clock.phase === "playing") {
+			matchEnded = step() || matchEnded;
+			counted++;
+		}
 		// A period end stops the clock; the coach starts the next period.
 		if (live.clock.phase !== "playing") stopTimer();
-		else prepareSwapWarning();
 		refreshClock();
 		render();
-		if (matchEnded) finishMatch();
+		if (matchEnded) finishMatch(options);
+		return counted;
 	}
 
 	/** The report from the timeline so far, as it would be saved. */
@@ -1004,7 +1048,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 	 * (for the season history) and show the report. A match file that would
 	 * not pass the same checks as an imported one is not kept.
 	 */
-	function finishMatch(): void {
+	function finishMatch(options: { show: boolean } = { show: true }): void {
 		const stored = currentReport();
 		if (!stored) return;
 		saveReport(stored);
@@ -1016,7 +1060,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 				// Nothing to add to the history from a match that never kicked off.
 			}
 		}
-		callbacks.onShowReport(stored);
+		if (options.show) callbacks.onShowReport(stored);
 	}
 
 	/** End the match now, in the middle of a period or during a break. */
@@ -1093,8 +1137,10 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			noteLineup();
 		}
 		live.running = true;
+		live.lastTickMs = Date.now();
 		live.timerHandle = setInterval(tick, 1000);
 		refreshClock();
+		persist();
 	}
 
 	function stopTimer(): void {
@@ -1108,6 +1154,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		if (!live?.running) return;
 		stopTimer();
 		refreshClock();
+		persist();
 	}
 
 	function testByte(): void {
@@ -1291,6 +1338,11 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			});
 		}
 
+		// Back on the page after the screen was locked or the tab was hidden:
+		// count what the timers missed right away.
+		document.addEventListener("visibilitychange", () => {
+			if (!document.hidden) tick();
+		});
 		els.reportBtn.addEventListener("click", () => {
 			const stored = currentReport();
 			if (stored) callbacks.onShowReport(stored);
@@ -1439,6 +1491,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			pendingSwap: null,
 			nextKeeperId: null,
 			running: false,
+			lastTickMs: Date.now(),
 			timerHandle: null,
 			currentAssignment: cloneAssignment(generateRotationSafe(schedulerState)),
 			tempSwaps: [],
@@ -1473,6 +1526,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			pendingSwap: session.pendingSwap ?? null,
 			nextKeeperId: null,
 			running: false,
+			lastTickMs: session.lastTickMs ?? Date.now(),
 			timerHandle: null,
 			currentAssignment:
 				session.currentAssignment ??
@@ -1481,7 +1535,39 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			selected: null,
 			pendingBenchIdx: null,
 		});
+		continueRunningClock(session);
 		return true;
+	}
+
+	/**
+	 * A match that was running when the page went away keeps running: the
+	 * seconds since it was last saved are counted, and the clock carries on.
+	 * A match the coach paused stays paused, whatever time has passed.
+	 */
+	function continueRunningClock(session: MatchSession): void {
+		if (!live || session.running !== true) return;
+		if (live.clock.phase !== "playing") return;
+		const away = Math.max(0, Math.floor((Date.now() - live.lastTickMs) / 1000));
+		live.running = true;
+		live.timerHandle = setInterval(tick, 1000);
+		if (away >= 1) {
+			const counted = countSeconds(away, { show: false });
+			if (counted > 0) showCaughtUp(counted);
+		} else {
+			refreshClock();
+			persist();
+		}
+	}
+
+	/** Tell the coach how much time the clock caught up, for a moment. */
+	function showCaughtUp(seconds: number): void {
+		els.clockNotice.textContent = TEXT.match.caughtUp(formatTime(seconds));
+		// A newer notice must not be cleared by an older timer.
+		if (caughtUpTimer !== null) clearTimeout(caughtUpTimer);
+		caughtUpTimer = setTimeout(() => {
+			els.clockNotice.textContent = "";
+			caughtUpTimer = null;
+		}, 20_000);
 	}
 
 	wire();
