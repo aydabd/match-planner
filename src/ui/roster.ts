@@ -170,6 +170,8 @@ export function initRosterView(callbacks: RosterViewCallbacks): void {
 			const text = await file.text();
 			const imported = parseRosterFile(JSON.parse(text));
 			draft = imported;
+			formationValid = true;
+			formationPicker.reset(draft.formatId);
 			importError.textContent = "";
 			importError.classList.remove("error");
 			persist();

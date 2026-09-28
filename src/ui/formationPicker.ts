@@ -16,6 +16,11 @@ export interface FormationPickerCallbacks {
 export interface FormationPicker {
 	/** Show the choice for this format id (the draft's last valid format). */
 	render: (formatId: string) => void;
+	/**
+	 * Replace whatever the coach was choosing with this format, e.g. after
+	 * loading a squad file: a half-typed custom formation is dropped.
+	 */
+	reset: (formatId: string) => void;
 }
 
 /** A pill-style radio button: the native input keeps keyboard and screen-reader support. */
@@ -116,6 +121,16 @@ export function initFormationPicker(
 		}
 	}
 
+	function reset(formatId: string): void {
+		const current = formatChoice(formatId);
+		customMode = current.custom;
+		customInput.value = current.custom ? current.formation : "";
+		customMessage.textContent = "";
+		customMessage.classList.remove("error");
+		renderedKey = "";
+		render(formatId);
+	}
+
 	sizeChoices.addEventListener("change", (event) => {
 		const value = (event.target as HTMLInputElement).value as TeamSizeId;
 		customMode = false;
@@ -140,5 +155,5 @@ export function initFormationPicker(
 
 	customInput.addEventListener("input", showCustomResult);
 
-	return { render };
+	return { render, reset };
 }
