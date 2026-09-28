@@ -1,3 +1,4 @@
+import { getFormat } from "../core/formations.js";
 import type { MatchClock, MatchPlan } from "../core/matchClock.js";
 import { type MatchDetails, newRoster } from "../core/storage.js";
 import type {
@@ -69,6 +70,50 @@ function fromVersion1(v1: Record<string, unknown>): MatchSession | null {
 	};
 }
 
+const PHASES: readonly string[] = [
+	"beforeKickoff",
+	"playing",
+	"periodBreak",
+	"finished",
+];
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+	typeof value === "object" && value !== null && !Array.isArray(value);
+
+const isCount = (value: unknown): boolean =>
+	typeof value === "number" && Number.isInteger(value) && value >= 0;
+
+/**
+ * Whether a saved version 2 match has everything resume() reads. A damaged
+ * one is dropped (the coach lands on setup) instead of crashing the app.
+ */
+function isResumable(s: Record<string, unknown>): boolean {
+	if (s.schemaVersion !== 2 || typeof s.formatId !== "string") return false;
+	try {
+		getFormat(s.formatId);
+	} catch {
+		return false;
+	}
+	const { plan, clock } = s;
+	return (
+		isRecord(plan) &&
+		isCount(plan.periods) &&
+		isCount(plan.periodSeconds) &&
+		isCount(plan.rotationSeconds) &&
+		isRecord(clock) &&
+		PHASES.includes(String(clock.phase)) &&
+		isCount(clock.period) &&
+		isCount(clock.periodElapsed) &&
+		isCount(clock.rotationElapsed) &&
+		isRecord(s.match) &&
+		isRecord(s.playerNames) &&
+		isRecord(s.schedulerPlayers) &&
+		Array.isArray(s.schedulerOrder) &&
+		isCount(s.rotationIndex) &&
+		Array.isArray(s.tempSwaps)
+	);
+}
+
 export function loadSession(): MatchSession | null {
 	const raw = readItem(STORAGE_KEYS.session);
 	if (!raw) return null;
@@ -77,15 +122,7 @@ export function loadSession(): MatchSession | null {
 		if (typeof parsed !== "object" || parsed === null) return null;
 		const session = parsed as Record<string, unknown>;
 		if (session.schemaVersion === 1) return fromVersion1(session);
-		if (
-			session.schemaVersion !== 2 ||
-			typeof session.plan !== "object" ||
-			session.plan === null ||
-			typeof session.clock !== "object" ||
-			session.clock === null
-		)
-			return null;
-		return parsed as MatchSession;
+		return isResumable(session) ? (parsed as MatchSession) : null;
 	} catch {
 		return null;
 	}

@@ -106,6 +106,30 @@ describe("match session storage", () => {
 			JSON.stringify({ schemaVersion: 2, formatId: "7v7:2-3-1" }),
 		],
 		["a missing schema version", JSON.stringify({ formatId: "7v7" })],
+		[
+			"a version 2 session without a format",
+			JSON.stringify({ ...session(), formatId: undefined }),
+		],
+		[
+			"a version 2 session with an unknown format",
+			JSON.stringify(session({ formatId: "13v13:1-1" })),
+		],
+		[
+			"a version 2 session whose plan has no swap interval",
+			JSON.stringify(
+				session({ plan: { periods: 3, periodSeconds: 1200 } as never }),
+			),
+		],
+		[
+			"a version 2 session whose clock has an unknown phase",
+			JSON.stringify(
+				session({ clock: { ...session().clock, phase: "halftime" as never } }),
+			),
+		],
+		[
+			"a version 2 session without its players",
+			JSON.stringify({ ...session(), schedulerOrder: undefined }),
+		],
 	])("ignores %s instead of crashing", (_, raw) => {
 		storage().setItem(KEY, raw);
 		expect(loadSession()).toBeNull();
