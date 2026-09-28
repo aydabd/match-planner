@@ -47,7 +47,7 @@
           <div class="field-grid">
             <div class="field">
               <label class="field-label" for="rotationMinutesInput">Minuter mellan byten</label>
-              <input id="rotationMinutesInput" type="number" inputmode="numeric" min="1" max="30" value="10" aria-describedby="rotationMinutesHelp" />
+              <input id="rotationMinutesInput" type="number" inputmode="numeric" aria-describedby="rotationMinutesHelp" />
               <span class="field-help" id="rotationMinutesHelp">Hela laget roteras så här ofta.</span>
             </div>
           </div>
@@ -60,9 +60,10 @@
           </div>
           <form id="addPlayerForm" class="add-player-form">
             <label class="visually-hidden" for="newPlayerName">Spelarens namn</label>
-            <input id="newPlayerName" type="text" placeholder="Spelarens namn" maxlength="40" autocomplete="off" required />
-            <button type="submit" class="btn btn-primary">Lägg till</button>
+            <input id="newPlayerName" type="text" placeholder="Spelarens namn" autocomplete="off" required />
+            <button type="submit" class="btn btn-primary" id="addPlayerBtn">Lägg till</button>
           </form>
+          <p class="hint" id="squadFullMessage" role="status"></p>
           <div id="playerList" class="player-list"></div>
         </li>
       </ol>

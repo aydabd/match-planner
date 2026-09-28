@@ -1,4 +1,5 @@
 import { getFormat, outfieldCount } from "../core/formations.js";
+import { LIMITS, rotationMinutesFrom } from "../core/limits.js";
 import {
 	parseRosterFile,
 	type RosterFile,
@@ -34,6 +35,17 @@ export function initRosterView(callbacks: RosterViewCallbacks): void {
 	const nameInput = document.getElementById(
 		"newPlayerName",
 	) as HTMLInputElement;
+	const addPlayerBtn = document.getElementById(
+		"addPlayerBtn",
+	) as HTMLButtonElement;
+	const squadFullMessage = document.getElementById(
+		"squadFullMessage",
+	) as HTMLElement;
+
+	// Limits come from core/limits.ts, never from numbers written in the HTML.
+	rotationInput.min = String(LIMITS.rotationMinutes.min);
+	rotationInput.max = String(LIMITS.rotationMinutes.max);
+	nameInput.maxLength = LIMITS.playerNameLength;
 	const exportBtn = document.getElementById("exportBtn") as HTMLButtonElement;
 	const importInput = document.getElementById(
 		"importInput",
@@ -77,7 +89,7 @@ export function initRosterView(callbacks: RosterViewCallbacks): void {
 			const input = document.createElement("input");
 			input.type = "text";
 			input.value = player.name;
-			input.maxLength = 40;
+			input.maxLength = LIMITS.playerNameLength;
 			input.setAttribute("aria-label", `Namn, spelare ${idx + 1}`);
 			input.addEventListener("change", () => {
 				const trimmed = input.value.trim();
@@ -99,6 +111,13 @@ export function initRosterView(callbacks: RosterViewCallbacks): void {
 
 		const format = getFormat(draft.formatId);
 		squadCount.textContent = `${draft.players.length} av minst ${outfieldCount(format)}`;
+
+		const squadFull = draft.players.length >= LIMITS.squadSize;
+		nameInput.disabled = squadFull;
+		addPlayerBtn.disabled = squadFull;
+		squadFullMessage.textContent = squadFull
+			? `Truppen är full (högst ${LIMITS.squadSize} spelare).`
+			: "";
 
 		const missing = outfieldCount(format) - draft.players.length;
 		startBtn.disabled = !formationValid || missing > 0;
@@ -134,9 +153,9 @@ export function initRosterView(callbacks: RosterViewCallbacks): void {
 	}
 
 	rotationInput.addEventListener("change", () => {
-		const minutes = Math.max(
-			1,
-			Math.min(30, Number(rotationInput.value) || 10),
+		const minutes = rotationMinutesFrom(
+			rotationInput.value,
+			Math.round(draft.rotationSeconds / 60),
 		);
 		draft = { ...draft, rotationSeconds: minutes * 60 };
 		persist();
@@ -145,7 +164,7 @@ export function initRosterView(callbacks: RosterViewCallbacks): void {
 	addForm.addEventListener("submit", (e) => {
 		e.preventDefault();
 		const name = nameInput.value.trim();
-		if (!name) return;
+		if (!name || draft.players.length >= LIMITS.squadSize) return;
 		addPlayer(name);
 		nameInput.value = "";
 		nameInput.focus();
