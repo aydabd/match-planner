@@ -96,7 +96,9 @@ describe("zone names in Swedish", () => {
 describe("text lives in the UI", () => {
 	it("core modules contain no Swedish user-facing text", () => {
 		const offenders = readdirSync(join("src", "core"))
-			.filter((file) => file.endsWith(".ts"))
+			// policy.ts holds document titles and verbatim quotes: source data,
+			// not app text. The app's explanations of them are in TEXT.policy.
+			.filter((file) => file.endsWith(".ts") && file !== "policy.ts")
 			.flatMap((file) =>
 				readFileSync(join("src", "core", file), "utf8")
 					.split("\n")

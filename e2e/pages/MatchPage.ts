@@ -192,6 +192,10 @@ export class MatchPage {
 		await input.press("Enter");
 	}
 
+	async openPolicyPage(): Promise<void> {
+		await this.chooseFromMenu("Varför fungerar det så här?");
+	}
+
 	async editSquad(): Promise<void> {
 		await this.chooseFromMenu("Ändra trupp eller format");
 	}
