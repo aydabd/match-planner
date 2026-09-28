@@ -1,4 +1,4 @@
-import { FORMATS } from "./formations.js";
+import { getFormat } from "./formations.js";
 import type { Player } from "./types.js";
 
 /** Bump this and add a migration branch in parseRosterFile if the shape ever changes. */
@@ -34,8 +34,33 @@ export function serializeRoster(
 	};
 }
 
+/** The normalised id for a format id (e.g. "7v7" -> "7v7:2-3-1"), or null if unknown. */
+function canonicalFormatId(formatId: string): string | null {
+	try {
+		return getFormat(formatId).id;
+	} catch {
+		return null;
+	}
+}
+
 export function rosterToJson(roster: RosterFile): string {
 	return JSON.stringify(roster, null, 2);
+}
+
+/**
+ * The file a coach saves to share the whole team setup (team size,
+ * formation, minutes between swaps and names) with another coach. Always
+ * written with the normalised format id, named e.g. trupp-9v9-3-3-2.json.
+ */
+export function squadFile(roster: RosterFile): {
+	fileName: string;
+	json: string;
+} {
+	const formatId = canonicalFormatId(roster.formatId) ?? roster.formatId;
+	return {
+		fileName: `trupp-${formatId.replace(":", "-")}.json`,
+		json: rosterToJson({ ...roster, formatId }),
+	};
 }
 
 /**
@@ -44,7 +69,18 @@ export function rosterToJson(roster: RosterFile): string {
  * this is the one place untrusted JSON enters the app, so every field
  * is checked before anything downstream (scheduler, DOM rendering) sees it.
  */
-export function parseRosterFile(data: unknown): RosterFile {
+export interface ParseOptions {
+	/**
+	 * The setup screen's own draft may have no players yet; a squad file
+	 * someone shares must not.
+	 */
+	allowEmptySquad?: boolean;
+}
+
+export function parseRosterFile(
+	data: unknown,
+	options: ParseOptions = {},
+): RosterFile {
 	if (typeof data !== "object" || data === null) {
 		throw new StorageError("Filen ar inte ett giltigt JSON-objekt.");
 	}
@@ -56,9 +92,11 @@ export function parseRosterFile(data: unknown): RosterFile {
 		);
 	}
 
-	if (typeof obj.formatId !== "string" || !FORMATS[obj.formatId]) {
+	const formatId =
+		typeof obj.formatId === "string" ? canonicalFormatId(obj.formatId) : null;
+	if (formatId === null) {
 		throw new StorageError(
-			`Okant formatId "${String(obj.formatId)}". Tillgangliga: ${Object.keys(FORMATS).join(", ")}.`,
+			`Okänt formatId "${String(obj.formatId)}". Använd lagstorlek och formation, till exempel 7v7:2-3-1.`,
 		);
 	}
 
@@ -73,7 +111,7 @@ export function parseRosterFile(data: unknown): RosterFile {
 	if (!Array.isArray(obj.players)) {
 		throw new StorageError("players maste vara en lista.");
 	}
-	if (obj.players.length === 0) {
+	if (obj.players.length === 0 && !options.allowEmptySquad) {
 		throw new StorageError("Truppen ar tom.");
 	}
 	if (obj.players.length > MAX_PLAYERS) {
@@ -104,7 +142,7 @@ export function parseRosterFile(data: unknown): RosterFile {
 
 	return {
 		schemaVersion: 1,
-		formatId: obj.formatId,
+		formatId,
 		rotationSeconds: obj.rotationSeconds,
 		players,
 	};
