@@ -168,12 +168,17 @@ describe("full-match simulation - property tests", () => {
 
 /** A back-to-front line-up such as 4-3-3, built inline so this file needs no presets. */
 function formation(...lines: number[]): FormatConfig {
-	const names = {
-		2: ["back", "fwd"],
-		3: ["back", "mid", "fwd"],
-		4: ["back", "dmid", "amid", "fwd"],
-		5: ["back", "dmid", "mid", "amid", "fwd"],
-	}[lines.length] as string[];
+	const names = (
+		{
+			2: ["back", "fwd"],
+			3: ["back", "mid", "fwd"],
+			4: ["back", "dmid", "amid", "fwd"],
+			5: ["back", "dmid", "mid", "amid", "fwd"],
+		} as Record<number, string[]>
+	)[lines.length];
+	if (!names) {
+		throw new Error(`formation() supports 2-5 lines, got ${lines.length}`);
+	}
 	return {
 		id: lines.join("-"),
 		label: lines.join("-"),
@@ -241,6 +246,20 @@ describe("any formation - full-match simulation", () => {
 			);
 		},
 	);
+
+	it("ignores ids in the order that have no player record (e.g. a corrupted saved match)", () => {
+		const state = createSchedulerState(formation(2, 3, 1), 600, ids(7));
+		state.order.push("ghost");
+
+		const assignment = generateRotation(state);
+
+		const everyone = [
+			...Object.values(assignment.zones).flat(),
+			...assignment.bench,
+		];
+		expect(everyone).not.toContain("ghost");
+		expect(everyone).toHaveLength(7);
+	});
 
 	it("rests the players who have played the most", () => {
 		const state = createSchedulerState(formation(2, 3, 1), 600, ids(8));

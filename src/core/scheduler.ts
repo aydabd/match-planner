@@ -96,10 +96,25 @@ export function canAssignZone(
 	return true;
 }
 
-/** Whether an active player may stand in a zone without breaking the zone rule. */
+/**
+ * Whether an active player may stand in a zone without breaking the zone
+ * rule. Only called for ids from activePlayers, which all have a record.
+ */
 function canPlay(state: SchedulerState, id: string, zoneId: string): boolean {
 	const player = state.players[id] as PlayerState;
 	return canAssignZone(player, zoneId, state.format);
+}
+
+/**
+ * Players who can be picked: they have a record and are not ruled out. An
+ * id without a record (e.g. from a corrupted saved match) is ignored rather
+ * than crashing the rotation.
+ */
+function activePlayers(state: SchedulerState): string[] {
+	return state.order.filter((id) => {
+		const player = state.players[id];
+		return player !== undefined && !player.unavailable;
+	});
 }
 
 /** A seat on the pitch: one place in one zone. */
@@ -247,7 +262,7 @@ function assignSeats(cost: readonly (readonly number[])[]): number[] {
  *    the least time, so players alternate between their allowed zones.
  */
 export function generateRotation(state: SchedulerState): RotationAssignment {
-	const active = state.order.filter((id) => !state.players[id]?.unavailable);
+	const active = activePlayers(state);
 	const need = outfieldCount(state.format);
 	if (active.length < need) {
 		throw new SchedulingError(
