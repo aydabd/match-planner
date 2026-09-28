@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 import { getFormat, TEAM_SIZES } from "../src/core/formations.js";
 import {
 	POLICY,
+	POLICY_OVERLAYS,
+	policyFor,
+	REGIONS,
 	RULES,
 	SOURCES,
 	sourcesByPublisher,
@@ -87,6 +90,27 @@ describe("policy: the code uses the policy values", () => {
 		];
 		expect(POLICY.zonesMustBeAdjacent).toBe(true);
 		expect(canAssignZone(player([back]), fwd, format)).toBe(false);
+	});
+});
+
+describe("policy: regions", () => {
+	it("resolves the national region to POLICY unchanged", () => {
+		expect(policyFor("national")).toEqual(POLICY);
+	});
+
+	it("has a label for every region", () => {
+		for (const region of Object.keys(REGIONS)) {
+			expect(REGIONS[region as keyof typeof REGIONS].label).not.toBe("");
+		}
+	});
+
+	it("merges a region's overlay onto the national baseline without mutating POLICY", () => {
+		// Skåne has no overlay today: its own page confirms the national match
+		// formats apply from season 2026 (see the "matchFormats" rule). This
+		// guards that policyFor keeps returning the national values until a
+		// region genuinely publishes a different, quoted number.
+		expect(POLICY_OVERLAYS.skane ?? {}).toEqual({});
+		expect(policyFor("skane")).toEqual(POLICY);
 	});
 });
 

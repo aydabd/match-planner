@@ -73,6 +73,20 @@ export const SOURCES = {
 
 export type SourceId = keyof typeof SOURCES;
 
+/**
+ * Distrikt/landsting whose own federation may publish recommended values that
+ * differ from the national baseline below. A squad file records which region
+ * it was built under (src/core/storage.ts); the algorithm and screens still
+ * read the national POLICY directly until a region's overlay actually
+ * changes a value (see POLICY_OVERLAYS).
+ */
+export const REGIONS = {
+	national: { label: "Sverige (RF/SvFF)" },
+	skane: { label: "Skåne (Skånebollen)" },
+} as const;
+
+export type RegionId = keyof typeof REGIONS;
+
 /** The values the code applies. Rules below describe where each one comes from. */
 export const POLICY = {
 	/** Most different lines one player may stand in during a match. */
@@ -101,6 +115,29 @@ export const POLICY = {
 	/** A player this far below the team average (seconds) is pointed out. */
 	playtimeGapSeconds: 120,
 } as const;
+
+/**
+ * Only the values a region's own document currently states differently than
+ * the national POLICY above — never repeat a value that doesn't actually
+ * differ (a rule stays a single source of truth, per AGENTS.md). An overlay
+ * that touches "formats" must give the whole formats object: only whole
+ * top-level POLICY keys are merged, there is no deep merge.
+ *
+ * Skånebollen's own page (see the "matchFormats" rule below) confirms the
+ * national match formats apply in Skåne from season 2026, so there is
+ * nothing to override today. Add a region here only once its federation
+ * publishes a genuinely different, quotable number.
+ */
+export const POLICY_OVERLAYS: Partial<
+	Record<RegionId, Partial<typeof POLICY>>
+> = {};
+
+/** POLICY as it applies in `region`: the national baseline with that
+ * region's overlay, if any, merged on top. */
+export function policyFor(region: RegionId): typeof POLICY {
+	const overlay = POLICY_OVERLAYS[region];
+	return overlay ? { ...POLICY, ...overlay } : POLICY;
+}
 
 interface PolicyRule {
 	/** What the rule is about. */
