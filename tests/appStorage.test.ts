@@ -2,7 +2,9 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
+	cacheName,
 	clearAppData,
+	isOwnCache,
 	readItem,
 	removeItem,
 	STORAGE_KEYS,
@@ -65,5 +67,21 @@ describe("single place for browser storage", () => {
 				/\blocalStorage\b/.test(withoutComments(readFileSync(file, "utf8"))),
 			);
 		expect(offenders).toEqual([]);
+	});
+});
+
+describe("offline cache names", () => {
+	it("are named after the app version", () => {
+		expect(cacheName("0.4.0")).toBe("matchplanner-v0.4.0");
+	});
+
+	it.each([
+		["matchplanner-v0.4.0", true],
+		["matchplanner-v0.3.1", true],
+		["fotbollsbyten-v1", true],
+		["another-app-cache", false],
+		["matchplanner", false],
+	])("%s belongs to this app: %s", (name, own) => {
+		expect(isOwnCache(name)).toBe(own);
 	});
 });

@@ -44,3 +44,24 @@ export function removeItem(key: StorageKey): void {
 export function clearAppData(): void {
 	for (const key of Object.values(STORAGE_KEYS)) removeItem(key);
 }
+
+/** Prefix of the offline caches this app's service worker creates. */
+export const CACHE_PREFIX = "matchplanner-v";
+/** The cache name used before caches were named after the app version. */
+export const LEGACY_CACHE_NAMES: readonly string[] = ["fotbollsbyten-v1"];
+
+/** The offline cache for one app version, e.g. "matchplanner-v0.4.0". */
+export function cacheName(version: string): string {
+	return `${CACHE_PREFIX}${version}`;
+}
+
+/**
+ * Whether a cache belongs to this app. Every aydabd.github.io site shares one
+ * browser origin, so only these may ever be deleted.
+ */
+export function isOwnCache(name: string): boolean {
+	return (
+		(name.startsWith(CACHE_PREFIX) && name.length > CACHE_PREFIX.length) ||
+		LEGACY_CACHE_NAMES.includes(name)
+	);
+}

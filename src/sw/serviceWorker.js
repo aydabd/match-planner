@@ -1,7 +1,14 @@
-// Minimal cache-first service worker. Bump CACHE_NAME on every deploy that
-// changes cached files so old clients pick up the new version instead of
-// being stuck on a stale cache.
-const CACHE_NAME = "fotbollsbyten-v1";
+// Minimal cache-first service worker. The build (vite.config.ts) writes this
+// file to sw.js with the cache named after the app version, so every release
+// installs a fresh cache and the activate step removes the old one.
+const CACHE_NAME = "__CACHE_NAME__";
+// Every aydabd.github.io site shares one origin, so only this app's caches may
+// be deleted. Same rule as isOwnCache in src/ui/appStorage.ts (values injected).
+const CACHE_PREFIX = "__CACHE_PREFIX__";
+const LEGACY_CACHES = __LEGACY_CACHES__;
+const isOwnCache = (name) =>
+	(name.startsWith(CACHE_PREFIX) && name.length > CACHE_PREFIX.length) ||
+	LEGACY_CACHES.includes(name);
 
 self.addEventListener("install", (event) => {
 	self.skipWaiting();
@@ -20,7 +27,9 @@ self.addEventListener("activate", (event) => {
 			.keys()
 			.then((keys) =>
 				Promise.all(
-					keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)),
+					keys
+						.filter((k) => k !== CACHE_NAME && isOwnCache(k))
+						.map((k) => caches.delete(k)),
 				),
 			)
 			.then(() => self.clients.claim()),
