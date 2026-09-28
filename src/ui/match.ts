@@ -803,6 +803,10 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 				live.tempSwaps = [];
 				live.selected = null;
 				live.pendingBenchIdx = null;
+				// stopClock() ran while the swap may have been due, which disables
+				// Start; the match is back at 00:00, so it can start again.
+				els.startBtn.disabled = false;
+				els.pauseBtn.disabled = true;
 				els.newTeamBtn.classList.remove("show");
 				updateTimerDisplay();
 				render();
