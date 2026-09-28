@@ -15,33 +15,51 @@ export interface TeamSize {
 	readonly squadSizeHint: readonly [min: number, max: number];
 	/** Suggested rotation length in seconds, used only as a UI default. */
 	readonly defaultRotationSeconds: number;
+	/** Default number of periods in a match. */
+	readonly periods: number;
+	/** Default length of each period, in minutes. */
+	readonly periodMinutes: number;
 	/** Common formations offered as quick picks, most common first. */
 	readonly presets: readonly string[];
 }
 
+/**
+ * Team sizes with their defaults. Match length: 11v11 is 2 x 40 min, as SvFF
+ * sets for 15-year-olds. The smaller formats vary by age and district; their
+ * periods are starting points the coach can change, to be checked against
+ * the SvFF and Skånebollen match rules in #23.
+ */
 export const TEAM_SIZES = {
 	"5v5": {
 		outfield: 4,
 		squadSizeHint: [5, 8],
 		defaultRotationSeconds: 300,
+		periods: 3,
+		periodMinutes: 15,
 		presets: ["1-2-1", "2-1-1", "2-2"],
 	},
 	"7v7": {
 		outfield: 6,
 		squadSizeHint: [8, 11],
 		defaultRotationSeconds: 600,
+		periods: 3,
+		periodMinutes: 20,
 		presets: ["2-3-1", "3-2-1", "2-1-2-1"],
 	},
 	"9v9": {
 		outfield: 8,
 		squadSizeHint: [10, 14],
 		defaultRotationSeconds: 600,
+		periods: 3,
+		periodMinutes: 25,
 		presets: ["3-3-2", "3-2-3", "3-4-1"],
 	},
 	"11v11": {
 		outfield: 10,
 		squadSizeHint: [12, 18],
 		defaultRotationSeconds: 600,
+		periods: 2,
+		periodMinutes: 40,
 		presets: ["4-4-2", "4-3-3", "4-2-3-1"],
 	},
 } as const satisfies Record<string, TeamSize>;

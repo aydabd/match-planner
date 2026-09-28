@@ -6,6 +6,10 @@
 export const LIMITS = {
 	/** Allowed minutes between whole-team swaps. */
 	rotationMinutes: { min: 1, max: 30 },
+	/** Allowed number of periods in a match. */
+	periods: { min: 1, max: 4 },
+	/** Allowed minutes per period. */
+	periodMinutes: { min: 5, max: 45 },
 	/** Longest player name kept, in characters. */
 	playerNameLength: 40,
 	/** Most players in one squad, on the setup screen and in squad files. */
