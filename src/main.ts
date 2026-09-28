@@ -1,7 +1,7 @@
 import "./ui/style.css";
-import { resumeMatch, startMatch } from "./ui/match.js";
-import { initRosterView } from "./ui/roster.js";
-import { clearSession, loadSession } from "./ui/sessionStorage.js";
+import { createMatchView } from "./ui/match.js";
+import { createRosterView } from "./ui/roster.js";
+import { clearSession } from "./ui/sessionStorage.js";
 
 for (const el of document.querySelectorAll("[data-app-version]")) {
 	el.textContent = __APP_VERSION__;
@@ -28,19 +28,17 @@ function showMatch(): void {
 	matchView.classList.remove("hidden");
 }
 
-initRosterView({
+const match = createMatchView({ onExitToSetup: showSetup });
+createRosterView({
 	onStartMatch: (roster) => {
-		startMatch(roster, { onExitToSetup: showSetup });
+		match.start(roster);
 		showMatch();
 	},
 });
 
 // If a match was already in progress when the page was reloaded, resume it
 // straight away instead of dropping the coach back at the setup screen.
-if (loadSession()) {
-	const resumed = resumeMatch({ onExitToSetup: showSetup });
-	if (resumed) showMatch();
-}
+if (match.resume()) showMatch();
 
 if ("serviceWorker" in navigator) {
 	window.addEventListener("load", () => {
