@@ -9,6 +9,7 @@ import {
 import type { Player } from "../core/types.js";
 import { loadDraft, saveDraft } from "./draftStorage.js";
 import { initFormationPicker } from "./formationPicker.js";
+import { TEXT } from "./text.js";
 
 let draft: RosterFile = loadDraft();
 let nextIdCounter = 1;
@@ -79,7 +80,7 @@ export function initRosterView(callbacks: RosterViewCallbacks): void {
 		if (draft.players.length === 0) {
 			const empty = document.createElement("p");
 			empty.className = "empty-state";
-			empty.textContent = "Inga spelare än. Lägg till dem som är med idag.";
+			empty.textContent = TEXT.setup.emptySquad;
 			playerList.appendChild(empty);
 		}
 		draft.players.forEach((player, idx) => {
@@ -90,7 +91,7 @@ export function initRosterView(callbacks: RosterViewCallbacks): void {
 			input.type = "text";
 			input.value = player.name;
 			input.maxLength = LIMITS.playerNameLength;
-			input.setAttribute("aria-label", `Namn, spelare ${idx + 1}`);
+			input.setAttribute("aria-label", TEXT.setup.playerNameLabel(idx + 1));
 			input.addEventListener("change", () => {
 				const trimmed = input.value.trim();
 				if (trimmed) updatePlayer(player.id, trimmed);
@@ -101,7 +102,10 @@ export function initRosterView(callbacks: RosterViewCallbacks): void {
 			removeBtn.type = "button";
 			removeBtn.className = "remove-btn";
 			removeBtn.textContent = "✕";
-			removeBtn.setAttribute("aria-label", `Ta bort ${player.name}`);
+			removeBtn.setAttribute(
+				"aria-label",
+				TEXT.setup.removePlayer(player.name),
+			);
 			removeBtn.addEventListener("click", () => removePlayer(player.id));
 
 			row.appendChild(input);
@@ -110,22 +114,25 @@ export function initRosterView(callbacks: RosterViewCallbacks): void {
 		});
 
 		const format = getFormat(draft.formatId);
-		squadCount.textContent = `${draft.players.length} av minst ${outfieldCount(format)}`;
+		squadCount.textContent = TEXT.setup.squadCount(
+			draft.players.length,
+			outfieldCount(format),
+		);
 
 		const squadFull = draft.players.length >= LIMITS.squadSize;
 		nameInput.disabled = squadFull;
 		addPlayerBtn.disabled = squadFull;
 		squadFullMessage.textContent = squadFull
-			? `Truppen är full (högst ${LIMITS.squadSize} spelare).`
+			? TEXT.setup.squadFull(LIMITS.squadSize)
 			: "";
 
 		const missing = outfieldCount(format) - draft.players.length;
 		startBtn.disabled = !formationValid || missing > 0;
 		startBtn.textContent = !formationValid
-			? "Välj en giltig formation för att starta"
+			? TEXT.setup.startNeedsFormation
 			: missing > 0
-				? `Lägg till ${missing} spelare till för att starta`
-				: `Starta match med ${draft.players.length} spelare`;
+				? TEXT.setup.startNeedsPlayers(missing)
+				: TEXT.setup.start(draft.players.length);
 	}
 
 	function persist(): void {
@@ -197,8 +204,8 @@ export function initRosterView(callbacks: RosterViewCallbacks): void {
 		} catch (err) {
 			const message =
 				err instanceof StorageError
-					? err.message
-					: "Filen kunde inte läsas. Välj en fil som sparats från MatchPlanner.";
+					? TEXT.squadFile.problem(err.problem)
+					: TEXT.squadFile.unreadable;
 			importError.textContent = message;
 			importError.classList.add("error");
 		}

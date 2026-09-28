@@ -13,8 +13,18 @@ import type {
  * scarce zone happens to be unavailable). The UI should show this to the
  * coach rather than silently breaking a rule.
  */
+export type SchedulingProblem =
+	| { code: "unknownPlayer" }
+	| { code: "unknownZone" }
+	| { code: "tooFewPlayers"; available: number; need: number }
+	| { code: "cannotFillLineup" };
+
+/** src/ui/text.ts turns the problem into a sentence; the message is for developers. */
 export class SchedulingError extends Error {
-	constructor(message: string) {
+	constructor(
+		message: string,
+		readonly problem: SchedulingProblem,
+	) {
 		super(message);
 		this.name = "SchedulingError";
 	}
@@ -51,13 +61,21 @@ export function setUnavailable(
 	unavailable: boolean,
 ): void {
 	const p = state.players[id];
-	if (!p) throw new SchedulingError(`Okand spelare: "${id}"`);
+	if (!p) {
+		throw new SchedulingError(`Unknown player "${id}"`, {
+			code: "unknownPlayer",
+		});
+	}
 	p.unavailable = unavailable;
 }
 
 function getZone(format: FormatConfig, zoneId: string): ZoneConfig {
 	const zone = format.zones.find((z) => z.id === zoneId);
-	if (!zone) throw new SchedulingError(`Okand zon: "${zoneId}"`);
+	if (!zone) {
+		throw new SchedulingError(`Unknown zone "${zoneId}"`, {
+			code: "unknownZone",
+		});
+	}
 	return zone;
 }
 
@@ -266,7 +284,8 @@ export function generateRotation(state: SchedulerState): RotationAssignment {
 	const need = outfieldCount(state.format);
 	if (active.length < need) {
 		throw new SchedulingError(
-			`For fa tillgangliga spelare (${active.length}) for formatet ${state.format.label} (behover minst ${need}).`,
+			`${active.length} available players, ${state.format.label} needs ${need}`,
+			{ code: "tooFewPlayers", available: active.length, need },
 		);
 	}
 
@@ -287,7 +306,8 @@ export function generateRotation(state: SchedulerState): RotationAssignment {
 	}
 	if (chosen.length < need) {
 		throw new SchedulingError(
-			"Kan inte ställa upp laget rättvist just nu - för få spelare kan spela de platser som är kvar utan att byta mellan icke-angränsande zoner. Justera truppen eller gör ett manuellt byte.",
+			"No lineup fills every seat without breaking the zone rule",
+			{ code: "cannotFillLineup" },
 		);
 	}
 

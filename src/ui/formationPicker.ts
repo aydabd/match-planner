@@ -5,6 +5,7 @@ import {
 	TEAM_SIZES,
 	type TeamSizeId,
 } from "../core/formations.js";
+import { TEXT } from "./text.js";
 
 const CUSTOM = "custom";
 
@@ -73,18 +74,23 @@ export function initFormationPicker(
 	function showCustomResult(): void {
 		const text = customInput.value;
 		if (text.trim() === "") {
-			customMessage.textContent = `Skriv hur ${TEAM_SIZES[size].outfield} utespelare står, från back till anfall.`;
+			customMessage.textContent = TEXT.formation.prompt(
+				TEAM_SIZES[size].outfield,
+			);
 			customMessage.classList.remove("error");
 			callbacks.onChange(null);
 			return;
 		}
 		const parsed = parseFormation(text, size);
 		if (parsed.ok) {
-			customMessage.textContent = `${parsed.formation}: ${parsed.lines.length} led.`;
+			customMessage.textContent = TEXT.formation.valid(
+				parsed.formation,
+				parsed.lines.length,
+			);
 			customMessage.classList.remove("error");
 			callbacks.onChange(`${size}:${parsed.formation}`);
 		} else {
-			customMessage.textContent = parsed.error;
+			customMessage.textContent = TEXT.formation.problem(parsed.problem);
 			customMessage.classList.add("error");
 			callbacks.onChange(null);
 		}
@@ -113,7 +119,7 @@ export function initFormationPicker(
 					!customMode && formation === current.formation,
 				),
 			),
-			choice("formation", CUSTOM, "Egen", customMode),
+			choice("formation", CUSTOM, TEXT.formation.custom, customMode),
 		);
 		customField.hidden = !customMode;
 		if (customMode && current.custom && customInput.value === "") {

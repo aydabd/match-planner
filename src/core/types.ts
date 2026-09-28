@@ -8,8 +8,6 @@
 export interface ZoneConfig {
 	/** Stable identifier, used as a map key. Never shown to the user. */
 	readonly id: string;
-	/** Human-readable label shown in the UI. */
-	readonly label: string;
 	/** How many players stand in this zone at once. */
 	readonly count: number;
 	/**

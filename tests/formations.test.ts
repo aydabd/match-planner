@@ -4,6 +4,7 @@ import {
 	DEFAULT_FORMAT,
 	DEFAULT_TEAM_SIZE,
 	FORMATS,
+	FormatError,
 	formatChoice,
 	getFormat,
 	outfieldCount,
@@ -56,22 +57,16 @@ describe("parseFormation", () => {
 	});
 
 	it.each([
-		["", "Skriv formationen som siffror med bindestreck, till exempel 2-3-1."],
-		[
-			"abc",
-			"Skriv formationen som siffror med bindestreck, till exempel 2-3-1.",
-		],
-		[
-			"2--3-1",
-			"Skriv formationen som siffror med bindestreck, till exempel 2-3-1.",
-		],
-		["6", "En formation har 2 till 5 led."],
-		["1-1-1-1-1-1", "En formation har 2 till 5 led."],
-		["2-0-4", "Varje led behöver minst en spelare."],
-		["2-3-2", "Formationen har 7 utespelare, men 7v7 behöver 6."],
-		["2-2-1", "Formationen har 5 utespelare, men 7v7 behöver 6."],
-	])("rejects %j with a clear message", (text, error) => {
-		expect(parseFormation(text, "7v7")).toEqual({ ok: false, error });
+		["", { code: "notNumbers" }],
+		["abc", { code: "notNumbers" }],
+		["2--3-1", { code: "notNumbers" }],
+		["6", { code: "lineCount", min: 2, max: 5 }],
+		["1-1-1-1-1-1", { code: "lineCount", min: 2, max: 5 }],
+		["2-0-4", { code: "emptyLine" }],
+		["2-3-2", { code: "playerCount", size: "7v7", got: 7, need: 6 }],
+		["2-2-1", { code: "playerCount", size: "7v7", got: 5, need: 6 }],
+	] as const)("rejects %j and says why", (text, problem) => {
+		expect(parseFormation(text, "7v7")).toEqual({ ok: false, problem });
 	});
 });
 
@@ -80,38 +75,20 @@ describe("buildFormat", () => {
 		const format = buildFormat("9v9", "3-3-2");
 		expect(format.id).toBe("9v9:3-3-2");
 		expect(format.label).toBe("9v9 (3-3-2)");
-		expect(format.zones.map((z) => [z.id, z.label, z.count])).toEqual([
-			["back", "Back", 3],
-			["mid", "Mittfält", 3],
-			["fwd", "Anfall", 2],
+		expect(format.zones.map((z) => [z.id, z.count])).toEqual([
+			["back", 3],
+			["mid", 3],
+			["fwd", 2],
 		]);
 	});
 
 	it.each([
-		["2-2", ["Back", "Anfall"]],
-		["1-2-1", ["Back", "Mittfält", "Anfall"]],
-	] as const)("names the lines of a 5v5 %s", (formation, labels) => {
-		expect(buildFormat("5v5", formation).zones.map((z) => z.label)).toEqual(
-			labels,
-		);
-	});
-
-	it.each([
-		["4-2-3-1", ["Back", "Defensivt mittfält", "Offensivt mittfält", "Anfall"]],
-		[
-			"4-2-1-2-1",
-			[
-				"Back",
-				"Defensivt mittfält",
-				"Mittfält",
-				"Offensivt mittfält",
-				"Anfall",
-			],
-		],
-	] as const)("names the lines of an 11v11 %s", (formation, labels) => {
-		expect(buildFormat("11v11", formation).zones.map((z) => z.label)).toEqual(
-			labels,
-		);
+		["5v5", "2-2", ["back", "fwd"]],
+		["5v5", "1-2-1", ["back", "mid", "fwd"]],
+		["11v11", "4-2-3-1", ["back", "dmid", "amid", "fwd"]],
+		["11v11", "4-2-1-2-1", ["back", "dmid", "mid", "amid", "fwd"]],
+	] as const)("names the zones of a %s %s by line", (size, formation, ids) => {
+		expect(buildFormat(size, formation).zones.map((z) => z.id)).toEqual(ids);
 	});
 
 	it("makes only neighbouring lines adjacent", () => {
@@ -132,9 +109,7 @@ describe("buildFormat", () => {
 	});
 
 	it("refuses an invalid formation", () => {
-		expect(() => buildFormat("7v7", "2-3-2")).toThrow(
-			"Formationen har 7 utespelare, men 7v7 behöver 6.",
-		);
+		expect(() => buildFormat("7v7", "2-3-2")).toThrow(FormatError);
 	});
 });
 
@@ -159,7 +134,7 @@ describe("getFormat", () => {
 		"7v7:2 - 3 - 1",
 		"7v7:2–3–1",
 	])("throws a helpful error for %j", (id) => {
-		expect(() => getFormat(id)).toThrow(/Okänt format/);
+		expect(() => getFormat(id)).toThrow(FormatError);
 	});
 });
 
