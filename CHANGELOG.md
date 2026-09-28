@@ -3,6 +3,14 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.3.1](https://github.com/aydabd/match-planner/compare/matchplanner-v0.3.0...matchplanner-v0.3.1) (2026-09-28)
+
+
+### Bug Fixes
+
+* **match:** restore temporary swaps correctly and unit-test match logic ([#16](https://github.com/aydabd/match-planner/issues/16)) ([ff67e52](https://github.com/aydabd/match-planner/commit/ff67e526bb56d886912258f5f6def482a3c6e5b7))
+* **ui:** rest countdown, dark-mode contrast and labels; add Playwright e2e tests ([#17](https://github.com/aydabd/match-planner/issues/17)) ([72576f4](https://github.com/aydabd/match-planner/commit/72576f4e40ca8647f5f0085f7f61acf175c5150a))
+
 ## [0.3.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.2.2...matchplanner-v0.3.0) (2026-09-28)
 
 
