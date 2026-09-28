@@ -64,6 +64,9 @@ test.describe("Saving and loading a squad file", () => {
 			coach: "Aydin",
 		});
 		await setup.addPlayers(TEAM_11);
+		await setup.markGoalkeeper("Spelare 1");
+		await setup.markGoalkeeper("Spelare 2");
+		await setup.startingKeeper.selectOption({ label: "Spelare 2" });
 		const download = await setup.saveSquadToFile();
 		expect(download.suggestedFilename()).toBe("trupp-11v11-4-2-1-2-1.json");
 		const contents = await readFile(await download.path(), "utf8");
@@ -95,6 +98,17 @@ test.describe("Saving and loading a squad file", () => {
 		await expect(other.setup.venue).toHaveValue("Klostergården");
 		await expect(other.setup.matchDate).toHaveValue("2026-10-04T10:30");
 		await expect(other.setup.players).toHaveInputValues(TEAM_11);
+		for (const keeper of ["Spelare 1", "Spelare 2"]) {
+			await expect(
+				other.setup.root.getByRole("checkbox", {
+					name: `Målvakt: ${keeper}`,
+					exact: true,
+				}),
+			).toBeChecked();
+		}
+		await expect(
+			other.setup.startingKeeper.locator("option:checked"),
+		).toHaveText("Spelare 2");
 
 		await other.setup.startMatch();
 
@@ -103,6 +117,7 @@ test.describe("Saving and loading a squad file", () => {
 		);
 		await expect(other.match.periodAndSwap).toHaveText("Period 1 av 2, byte 1");
 		await expect(other.match.pitchPlayers).toHaveCount(10);
+		await expect(other.match.keeper).toHaveText("Spelare 2");
 		await other.context.close();
 	});
 

@@ -303,6 +303,27 @@ h3 {
 	outline-offset: 2px;
 	box-shadow: 0 0 0 6px var(--focus-halo);
 }
+/* Keeper choices appear only when there is a keeper to change */
+.break-keeper[hidden],
+#startingKeeperField[hidden] {
+	display: none;
+}
+.player-row .keeper-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 0.8125rem;
+	font-weight: 600;
+	color: var(--ink-2);
+	min-height: 44px;
+	padding-inline: 4px;
+	cursor: pointer;
+}
+.keeper-toggle-box {
+	width: 20px;
+	height: 20px;
+	accent-color: var(--keeper);
+}
 .custom-formation {
 	margin-top: 4px;
 }

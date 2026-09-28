@@ -1,4 +1,5 @@
 import {
+	canAssignZone,
 	generateRotation,
 	SchedulingError,
 	setUnavailable,
@@ -184,4 +185,77 @@ export function resetPlayers(state: SchedulerState): void {
 		player.zonesPlayed = [];
 		player.unavailable = false;
 	}
+}
+
+/**
+ * Put another player in goal during play. The old keeper becomes an outfield
+ * player: if the new keeper came off the pitch, the old keeper takes that
+ * seat when the zone rule allows, otherwise the least-played bench player
+ * who may play there does and the old keeper goes to the bench. If nobody
+ * may take the seat, nothing changes and false is returned: the team never
+ * silently plays one short. Nobody ends up in two places.
+ */
+export function changeKeeper(
+	state: SchedulerState,
+	assignment: MutableAssignment,
+	newKeeperId: string,
+): boolean {
+	const oldKeeperId = state.keeperId;
+	const newKeeper = state.players[newKeeperId];
+	if (newKeeperId === oldKeeperId || !newKeeper || newKeeper.unavailable) {
+		return false;
+	}
+
+	const benchIdx = assignment.bench.indexOf(newKeeperId);
+	if (benchIdx !== -1) {
+		assignment.bench.splice(benchIdx, 1);
+		if (oldKeeperId !== null) assignment.bench.push(oldKeeperId);
+		state.keeperId = newKeeperId;
+		return true;
+	}
+
+	for (const [zoneId, zonePlayers] of Object.entries(assignment.zones)) {
+		const seat = zonePlayers.indexOf(newKeeperId);
+		if (seat === -1) continue;
+		const oldKeeper =
+			oldKeeperId !== null ? state.players[oldKeeperId] : undefined;
+		if (oldKeeper && canAssignZone(oldKeeper, zoneId, state.format)) {
+			zonePlayers[seat] = oldKeeper.id;
+			state.keeperId = newKeeperId;
+			return true;
+		}
+		const cover = assignment.bench
+			.filter((id) => {
+				const player = state.players[id];
+				return (
+					player !== undefined &&
+					!player.unavailable &&
+					canAssignZone(player, zoneId, state.format)
+				);
+			})
+			.sort(
+				(a, b) =>
+					(state.players[a]?.totalSeconds ?? 0) -
+					(state.players[b]?.totalSeconds ?? 0),
+			)[0];
+		if (cover === undefined) return false;
+		zonePlayers[seat] = cover;
+		assignment.bench = assignment.bench.filter((id) => id !== cover);
+		if (oldKeeperId !== null) assignment.bench.push(oldKeeperId);
+		state.keeperId = newKeeperId;
+		return true;
+	}
+	return false;
+}
+
+/**
+ * Choose who is in goal before the next lineup is built (at a period
+ * break), so the old keeper simply joins the rotation. Refuses a player who
+ * is unknown or out of the match.
+ */
+export function assignKeeper(state: SchedulerState, keeperId: string): boolean {
+	const player = state.players[keeperId];
+	if (!player || player.unavailable) return false;
+	state.keeperId = keeperId;
+	return true;
 }

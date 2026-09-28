@@ -28,6 +28,8 @@ export const TEXT = {
 		startNeedsPlayers: (missing: number) =>
 			`Lägg till ${missing} spelare till för att starta`,
 		start: (players: number) => `Starta match med ${players} spelare`,
+		keeperToggle: "Målvakt",
+		keeperToggleLabel: (name: string) => `Målvakt: ${name}`,
 		confirmStartOver: "Tryck igen för att tömma truppen",
 		confirmClearAll: "Tryck igen för att rensa allt",
 	},
@@ -72,6 +74,8 @@ export const TEXT = {
 					return "Filen har ett ogiltigt antal perioder eller en ogiltig periodlängd.";
 				case "matchDetails":
 					return "Filen har ogiltiga matchuppgifter (motståndare, plats, datum eller avsparkstid).";
+				case "startingKeeper":
+					return "Filen anger en startande målvakt som inte är markerad som målvakt i truppen.";
 				case "audit":
 					return "Filen har ogiltiga uppgifter om vem som sparade den och när.";
 				case "notObject":
@@ -119,6 +123,14 @@ export const TEXT = {
 		benchLine: "Bänk",
 		comingInHint: " (kommer in)",
 		comingInLegend: "Gula namn kommer in från bänken.",
+
+		// Goalkeeper
+		keeperLine: "Målvakt",
+		inGoal: "i mål",
+		keeperInGoal: (name: string) => `${name} står i mål. Vem ska ta över?`,
+		goalkeeperOption: (name: string) => `${name} (målvakt)`,
+		keeperChangeBlocked: (name: string) =>
+			`${name} kan inte gå i mål just nu: ingen på bänken får ta hens plats på planen. Välj någon annan eller vänta till nästa byte.`,
 
 		// Pitch, bench and playtime
 		zoneName(zoneId: string): string {

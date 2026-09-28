@@ -288,6 +288,7 @@ describe("squad file version 2", () => {
 				date: "2026-10-04",
 			},
 			players: PLAYERS,
+			startingKeeperId: "p1",
 			audit: AUDIT,
 			...overrides,
 		};
@@ -313,6 +314,7 @@ describe("squad file version 2", () => {
 			periodSeconds: 2400,
 			match: { opponent: "", venue: "", date: "" },
 			players: [{ id: "p1", name: "Alva", goalkeeper: false }],
+			startingKeeperId: null,
 		});
 	});
 
@@ -348,6 +350,16 @@ describe("squad file version 2", () => {
 			"an audit without a version",
 			{ audit: { ...AUDIT, appVersion: 3 } },
 			"audit",
+		],
+		[
+			"a starting keeper who is not in the squad",
+			{ startingKeeperId: "p9" },
+			"startingKeeper",
+		],
+		[
+			"a starting keeper who is not marked as goalkeeper",
+			{ startingKeeperId: "p2" },
+			"startingKeeper",
 		],
 		[
 			"a goalkeeper flag that is not true or false",
@@ -388,6 +400,7 @@ describe("newRoster", () => {
 			periodSeconds: 900,
 			match: { opponent: "", venue: "", date: "" },
 			players: [],
+			startingKeeperId: null,
 		});
 	});
 });
