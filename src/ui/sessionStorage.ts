@@ -26,6 +26,10 @@ export interface PendingSwap {
  */
 export interface MatchSession {
 	schemaVersion: 2;
+	/** The clock was running when this was saved; it is caught up on reload. */
+	running?: boolean;
+	/** Wall-clock time (ms since 1970) up to which the clock has counted. */
+	lastTickMs?: number;
 	/** Identifies this match in its report; absent in older saved matches. */
 	matchId?: string;
 	formatId: string;
