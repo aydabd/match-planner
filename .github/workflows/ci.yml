@@ -62,10 +62,12 @@ jobs:
           changed=$(git diff --name-only "$BASE_SHA...$HEAD_SHA")
           echo "Changed files:"
           echo "$changed"
+          # Markdown never changes behaviour, even inside src/ or e2e/.
+          code=$(echo "$changed" | grep -v '\.md$' || true)
           # App code, the e2e suite, build/runtime config and dependencies. Docs,
           # rulesets, unit tests, lint config and workflows cannot change app behaviour.
           pattern='^(src/|public/|e2e/|index\.html$|package(-lock)?\.json$|mise\.(toml|lock)$|(vite|playwright)\.config\.ts$|tsconfig\.json$)'
-          if echo "$changed" | grep -Eq "$pattern"; then
+          if echo "$code" | grep -Eq "$pattern"; then
             echo "e2e=true" >> "$GITHUB_OUTPUT"
           else
             echo "e2e=false" >> "$GITHUB_OUTPUT"
