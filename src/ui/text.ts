@@ -281,6 +281,22 @@ export const TEXT = {
 			return `${names[Number(number) - 1] ?? month} ${year}`;
 		},
 		saveMatchFile: "Spara matchfil",
+		drive: {
+			signedIn: "Kopplad till Google Drive.",
+			connecting: "Kopplar till Google Drive …",
+			backingUp: "Säkerhetskopierar …",
+			restoring: "Läser in från Google Drive …",
+			backedUp: (count: number) =>
+				count === 0
+					? "Allt var redan säkerhetskopierat."
+					: `${count} ${count === 1 ? "match" : "matcher"} säkerhetskopierades.`,
+			restored: (count: number) =>
+				count === 0
+					? "Inget nytt att läsa in."
+					: `${count} ${count === 1 ? "match" : "matcher"} lästes in.`,
+			failed: "Det gick inte att nå Google Drive just nu. Försök igen senare.",
+			signInFailed: "Inloggningen misslyckades eller avbröts.",
+		},
 		problem(problem: MatchFileProblem): string {
 			switch (problem.code) {
 				case "notObject":
