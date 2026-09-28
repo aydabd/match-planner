@@ -3,6 +3,7 @@ import { POLICY } from "../src/core/policy.js";
 import {
 	buildReport,
 	isStoredReport,
+	restFlag,
 	type StoredReport,
 	withReport,
 } from "../src/core/report.js";
@@ -79,6 +80,7 @@ const report = (
 		timeline: [...timeline(delays), ...extra],
 		players: PLAYERS,
 		endedAt: 1200,
+		rotationSeconds: 300,
 	});
 
 describe("playtime in the report", () => {
@@ -121,7 +123,12 @@ describe("playtime in the report", () => {
 
 	it("counts a period that was cut short by ending the match", () => {
 		const cut: TimelineEvent[] = timeline({ first: 0, second: 0 }).slice(0, 4);
-		const r = buildReport({ timeline: cut, players: PLAYERS, endedAt: 420 });
+		const r = buildReport({
+			timeline: cut,
+			players: PLAYERS,
+			endedAt: 420,
+			rotationSeconds: 300,
+		});
 		expect(r.periods).toBe(1);
 		expect(r.players.find((p) => p.id === "c")?.totalSeconds).toBe(120);
 	});
@@ -175,6 +182,7 @@ describe("feedback", () => {
 			timeline: timeline({ first: 5, second: 5 }),
 			players: PLAYERS.filter((p) => p.id !== "c" && p.id !== "d"),
 			endedAt: 1200,
+			rotationSeconds: 300,
 		});
 		expect(even.feedback).toContainEqual({
 			code: "swapsOnTime",
@@ -213,6 +221,7 @@ describe("feedback", () => {
 			],
 			players: PLAYERS.slice(0, 1),
 			endedAt: 600,
+			rotationSeconds: 300,
 		});
 		expect(r.feedback[0]).toEqual({ code: "noSwaps" });
 	});
@@ -241,6 +250,18 @@ describe("kept reports", () => {
 		["another version", { ...stored("m1"), schemaVersion: 2 }],
 		["no report", { ...stored("m1"), report: null }],
 		[
+			"a rest with an unknown flag",
+			(() => {
+				const bad = structuredClone(stored("m1"));
+				const player = bad.report.players[0];
+				if (player)
+					player.rests = [
+						{ startedAt: 0, endedAt: 10, seconds: 10, flag: "odd" as never },
+					];
+				return bad;
+			})(),
+		],
+		[
 			"a player without minutes",
 			{
 				...stored("m1"),
@@ -259,5 +280,111 @@ describe("kept reports", () => {
 		kept = withReport(kept, stored("m2", "Nytt namn"), 2);
 		expect(kept.map((r) => r.matchId)).toEqual(["m2", "m3"]);
 		expect(kept[0]?.match.opponent).toBe("Nytt namn");
+	});
+});
+
+describe("rest times in the report", () => {
+	/** a rests 60 s (out at 100, back at 160); c rests 400 s (from 0 to 400). */
+	const restTimeline: TimelineEvent[] = [
+		{ type: "periodStart", at: 0, period: 1 },
+		{
+			type: "lineup",
+			at: 0,
+			zones: { back: ["a"], fwd: ["b"] },
+			keeperId: "k",
+		},
+		{
+			type: "lineup",
+			at: 100,
+			zones: { back: ["d"], fwd: ["b"] },
+			keeperId: "k",
+		},
+		{
+			type: "substitution",
+			at: 160,
+			plannedAt: 150,
+			period: 1,
+			inId: "a",
+			zoneId: "back",
+			moves: [],
+			outId: "d",
+		},
+		{
+			type: "lineup",
+			at: 160,
+			zones: { back: ["a"], fwd: ["b"] },
+			keeperId: "k",
+		},
+		{
+			type: "substitution",
+			at: 400,
+			plannedAt: 400,
+			period: 1,
+			inId: "c",
+			zoneId: "fwd",
+			moves: [],
+			outId: "b",
+		},
+		{
+			type: "lineup",
+			at: 400,
+			zones: { back: ["a"], fwd: ["c"] },
+			keeperId: "k",
+		},
+		{ type: "periodEnd", at: 1500, period: 1 },
+	];
+	const built = (rotationSeconds: number) =>
+		buildReport({
+			timeline: restTimeline,
+			players: PLAYERS,
+			endedAt: 1500,
+			rotationSeconds,
+		});
+
+	it("lists every rest with its length", () => {
+		const a = built(600).players.find((p) => p.id === "a");
+		expect(a?.rests).toEqual([
+			{ startedAt: 100, endedAt: 160, seconds: 60, flag: "short" },
+		]);
+	});
+
+	it("says how long the player coming on had rested", () => {
+		const swaps = built(600).swaps;
+		expect(swaps.map((s) => [s.inName, s.inRestedSeconds])).toEqual([
+			["A", 60],
+			["C", 400],
+		]);
+	});
+
+	it("flags a rest shorter than the limit but not one at the limit", () => {
+		const short = built(600).feedback.filter((f) => f.code === "shortRest");
+		// d sat out from kickoff to 100 s, a from 100 to 160 s; shortest first.
+		expect(short).toEqual([
+			{ code: "shortRest", playerId: "a", seconds: 60 },
+			{ code: "shortRest", playerId: "d", seconds: 100 },
+		]);
+		expect(restFlag(POLICY.shortRestSeconds, true, 9999)).toBeNull();
+		expect(restFlag(POLICY.shortRestSeconds - 1, true, 9999)).toBe("short");
+	});
+
+	it("flags a rest longer than two swap intervals, also one that lasts to the end", () => {
+		// Interval 5 min: more than 10 min is long. d rests from 160 to the end (1340 s).
+		const long = built(300).feedback.filter((f) => f.code === "longRest");
+		expect(long).toContainEqual({
+			code: "longRest",
+			playerId: "d",
+			seconds: 1340,
+		});
+		expect(
+			built(600).feedback.filter((f) => f.code === "longRest"),
+		).toContainEqual({
+			code: "longRest",
+			playerId: "d",
+			seconds: 1340,
+		});
+		expect(restFlag(600, false, 600)).toBeNull();
+		expect(restFlag(601, false, 600)).toBe("long");
+		// Only a finished rest can be too short.
+		expect(restFlag(10, false, 600)).toBeNull();
 	});
 });

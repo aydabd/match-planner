@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
 	recordLineup,
+	restsOf,
 	secondsPlayed,
 	swapDelays,
 	type TimelineEvent,
 } from "../src/core/timeline.js";
+import { makeMatchFile } from "./support/matchFiles.js";
 
 const START = { zones: { back: ["a", "b"], fwd: ["c"] }, bench: ["d"] };
 
@@ -125,5 +127,82 @@ describe("swapDelays", () => {
 			{ inId: "d", outId: "b", plannedAt: 600, at: 630, delaySeconds: 30 },
 			{ inId: "e", outId: "c", plannedAt: 600, at: 590, delaySeconds: -10 },
 		]);
+	});
+});
+
+describe("restsOf", () => {
+	const ids = ["a", "b", "c"];
+	const timeline: TimelineEvent[] = [
+		{ type: "periodStart", at: 0, period: 1 },
+		{ type: "lineup", at: 0, zones: { back: ["a", "b"] }, keeperId: null },
+		{ type: "lineup", at: 300, zones: { back: ["c", "b"] }, keeperId: null },
+		{ type: "lineup", at: 600, zones: { back: ["a", "b"] }, keeperId: null },
+		{ type: "periodEnd", at: 900, period: 1 },
+	];
+
+	it("gives each stretch on the bench, from coming off to going on", () => {
+		const rests = restsOf(timeline, ids, 900);
+		expect(rests.a).toEqual([{ startedAt: 300, endedAt: 600, seconds: 300 }]);
+		expect(rests.b).toEqual([]);
+		// c sat out from kickoff, played 300 s and rests again to the end.
+		expect(rests.c).toEqual([
+			{ startedAt: 0, endedAt: 300, seconds: 300 },
+			{ startedAt: 600, endedAt: null, seconds: 300 },
+		]);
+	});
+
+	it("counts a rest that is still going on up to now", () => {
+		expect(restsOf(timeline.slice(0, 3), ids, 450).a).toEqual([
+			{ startedAt: 300, endedAt: null, seconds: 150 },
+		]);
+	});
+
+	it("starts a late arrival's rest when they arrive", () => {
+		const late: TimelineEvent[] = [
+			timeline[0] as TimelineEvent,
+			timeline[1] as TimelineEvent,
+			{ type: "lateArrival", at: 100, period: 1, playerId: "c" },
+			timeline[2] as TimelineEvent,
+		];
+		expect(restsOf(late, ids, 300).c).toEqual([
+			{ startedAt: 100, endedAt: 300, seconds: 200 },
+		]);
+	});
+
+	it("gives a player who is out for the match no rest after that", () => {
+		const hurt: TimelineEvent[] = [
+			timeline[0] as TimelineEvent,
+			timeline[1] as TimelineEvent,
+			{ type: "outForMatch", at: 100, period: 1, playerId: "c" },
+			timeline[2] as TimelineEvent,
+		];
+		expect(restsOf(hurt, ids, 900).c).toEqual([]);
+	});
+
+	it("does not count the break between periods", () => {
+		const twoPeriods: TimelineEvent[] = [
+			{ type: "periodStart", at: 0, period: 1 },
+			{ type: "lineup", at: 0, zones: { back: ["a"] }, keeperId: null },
+			{ type: "periodEnd", at: 600, period: 1 },
+			{ type: "periodStart", at: 600, period: 2 },
+			{ type: "lineup", at: 600, zones: { back: ["b"] }, keeperId: null },
+			{ type: "periodEnd", at: 1200, period: 2 },
+		];
+		expect(restsOf(twoPeriods, ["a", "b"], 1200).a).toEqual([
+			{ startedAt: 600, endedAt: null, seconds: 600 },
+		]);
+	});
+
+	it("adds up with playtime: every player either plays or rests the whole match", () => {
+		for (let seed = 1; seed <= 30; seed++) {
+			const file = makeMatchFile({ seed });
+			const ids = file.squad.players.map((p) => p.id);
+			const played = secondsPlayed(file.timeline, file.endedAt);
+			const rests = restsOf(file.timeline, ids, file.endedAt);
+			for (const id of ids) {
+				const resting = (rests[id] ?? []).reduce((s, r) => s + r.seconds, 0);
+				expect((played[id]?.total ?? 0) + resting).toBe(file.endedAt);
+			}
+		}
 	});
 });

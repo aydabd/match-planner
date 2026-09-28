@@ -1,6 +1,7 @@
 import { POLICY } from "./policy.js";
 import type { MatchDetails } from "./storage.js";
 import {
+	restsOf,
 	secondsPlayed,
 	secondsPlayedByPeriod,
 	type TimelineEvent,
@@ -15,6 +16,18 @@ import {
 
 export type PlayerStatus = "played" | "outForMatch" | "lateArrival";
 
+export type RestFlag = "short" | "long";
+
+/** One rest on the bench, as audited in the report. */
+export interface RestReport {
+	startedAt: number;
+	/** When the player came on; null if the rest went on to the end. */
+	endedAt: number | null;
+	seconds: number;
+	/** Shorter than POLICY.shortRestSeconds, or longer than the long limit. */
+	flag: RestFlag | null;
+}
+
 export interface PlayerReport {
 	id: string;
 	name: string;
@@ -23,6 +36,8 @@ export interface PlayerReport {
 	periodSeconds: number[];
 	/** Seconds per line id, and GOAL for the keeper. */
 	zoneSeconds: Record<string, number>;
+	/** Every rest on the bench, in order. */
+	rests: RestReport[];
 	status: PlayerStatus;
 }
 
@@ -37,6 +52,8 @@ export interface SwapReport {
 	at: number;
 	/** Negative: early. Positive: late. */
 	delaySeconds: number;
+	/** How long the player coming on had rested; null if they started. */
+	inRestedSeconds: number | null;
 }
 
 export interface SwapSummary {
@@ -58,6 +75,8 @@ export type Feedback =
 	| { code: "noSwaps" }
 	| { code: "swapsOnTime"; averageSeconds: number }
 	| { code: "swapsLate"; averageSeconds: number; period: number | null }
+	| { code: "shortRest"; playerId: string; seconds: number }
+	| { code: "longRest"; playerId: string; seconds: number }
 	| { code: "evenPlaytime"; spreadSeconds: number }
 	| { code: "playerBelowAverage"; playerId: string; belowSeconds: number };
 
@@ -83,6 +102,8 @@ export interface ReportInput {
 	players: readonly { id: string; name: string }[];
 	/** Seconds the match lasted (the clock at the end). */
 	endedAt: number;
+	/** The swap interval; a rest is long when it spans more than a few of them. */
+	rotationSeconds: number;
 }
 
 /** The delay furthest from on time, keeping its sign (so all-early swaps report the earliest). */
@@ -121,12 +142,22 @@ export function buildReport(input: ReportInput): MatchReport {
 	const byPeriod = secondsPlayedByPeriod(timeline, endedAt);
 	const periods = byPeriod.length;
 
+	const longRestSeconds = POLICY.longRestIntervals * input.rotationSeconds;
+	const allRests = restsOf(
+		timeline,
+		input.players.map((p) => p.id),
+		endedAt,
+	);
 	const players: PlayerReport[] = input.players.map((p) => ({
 		id: p.id,
 		name: p.name,
 		totalSeconds: total[p.id]?.total ?? 0,
 		periodSeconds: byPeriod.map((period) => period[p.id] ?? 0),
 		zoneSeconds: { ...(total[p.id]?.byZone ?? {}) },
+		rests: (allRests[p.id] ?? []).map((rest) => ({
+			...rest,
+			flag: restFlag(rest.seconds, rest.endedAt !== null, longRestSeconds),
+		})),
 		status: statusOf(timeline, p.id),
 	}));
 
@@ -142,6 +173,9 @@ export function buildReport(input: ReportInput): MatchReport {
 						plannedAt: event.plannedAt,
 						at: event.at,
 						delaySeconds: event.at - event.plannedAt,
+						inRestedSeconds:
+							(allRests[event.inId] ?? []).find((r) => r.endedAt === event.at)
+								?.seconds ?? null,
 					},
 				]
 			: [],
@@ -177,8 +211,45 @@ export function buildReport(input: ReportInput): MatchReport {
 		swaps,
 		swapSummary,
 		playtime: { averageSeconds, spreadSeconds },
-		feedback: feedbackFor(swapSummary, compared, averageSeconds, spreadSeconds),
+		feedback: [
+			...feedbackFor(swapSummary, compared, averageSeconds, spreadSeconds),
+			...restFeedback(players),
+		],
 	};
+}
+
+/** A rest that is short or long; a rest still going on can only be long. */
+export function restFlag(
+	seconds: number,
+	ended: boolean,
+	longRestSeconds: number,
+): RestFlag | null {
+	if (seconds > longRestSeconds) return "long";
+	if (ended && seconds < POLICY.shortRestSeconds) return "short";
+	return null;
+}
+
+/** The worst few short and long rests, as findings for the coach. */
+function restFeedback(players: readonly PlayerReport[]): Feedback[] {
+	const flagged = (flag: RestFlag) =>
+		players
+			.flatMap((p) =>
+				p.rests
+					.filter((r) => r.flag === flag)
+					.map((r) => ({ playerId: p.id, seconds: r.seconds })),
+			)
+			.sort((a, b) =>
+				flag === "short" ? a.seconds - b.seconds : b.seconds - a.seconds,
+			)
+			.slice(0, 3);
+	return [
+		...flagged("short").map(
+			(r) => ({ code: "shortRest", ...r }) as const satisfies Feedback,
+		),
+		...flagged("long").map(
+			(r) => ({ code: "longRest", ...r }) as const satisfies Feedback,
+		),
+	];
 }
 
 function feedbackFor(
@@ -297,6 +368,15 @@ export function isStoredReport(value: unknown): value is StoredReport {
 				isNumbers(p.periodSeconds) &&
 				isRecord(p.zoneSeconds) &&
 				Object.values(p.zoneSeconds).every(isNumber) &&
+				Array.isArray(p.rests) &&
+				p.rests.every(
+					(r) =>
+						isRecord(r) &&
+						isNumber(r.startedAt) &&
+						(r.endedAt === null || isNumber(r.endedAt)) &&
+						isNumber(r.seconds) &&
+						(r.flag === null || r.flag === "short" || r.flag === "long"),
+				) &&
 				["played", "outForMatch", "lateArrival"].includes(String(p.status)),
 		) &&
 		Array.isArray(swaps) &&
@@ -308,7 +388,8 @@ export function isStoredReport(value: unknown): value is StoredReport {
 				isNumber(s.period) &&
 				isNumber(s.plannedAt) &&
 				isNumber(s.at) &&
-				isNumber(s.delaySeconds),
+				isNumber(s.delaySeconds) &&
+				(s.inRestedSeconds === null || isNumber(s.inRestedSeconds)),
 		) &&
 		isRecord(swapSummary) &&
 		isNumber(swapSummary.count) &&

@@ -16,6 +16,17 @@ export function zoneBreakdown(zoneSeconds: Record<string, number>): string {
 		.join(", ");
 }
 
+/** "3 vilor, kortast 02:10, längst 09:40", or that the player never rested. */
+export function restSummary(rests: readonly { seconds: number }[]): string {
+	if (rests.length === 0) return TEXT.report.noRest;
+	const seconds = rests.map((r) => r.seconds);
+	return TEXT.report.restSummary(
+		rests.length,
+		formatTime(Math.min(...seconds)),
+		formatTime(Math.max(...seconds)),
+	);
+}
+
 /** The details line: opponent, place, date and format. */
 export function reportDetails(stored: StoredReport): string[] {
 	const { opponent, venue, date } = stored.match;
@@ -41,11 +52,11 @@ export function reportAsText(stored: StoredReport): string {
 			const periods = p.periodSeconds
 				.map((s, i) => `${TEXT.report.periodColumn(i + 1)} ${formatTime(s)}`)
 				.join(", ");
-			return `${p.name}: ${formatTime(p.totalSeconds)} (${periods})${note ? `, ${note}` : ""}`;
+			return `${p.name}: ${formatTime(p.totalSeconds)} (${periods})${note ? `, ${note}` : ""}. ${restSummary(p.rests)}`;
 		}),
 		swaps: report.swaps.map(
 			(s) =>
-				`${formatTime(s.at)} ${TEXT.match.substitution(s.inName, s.outName)}, planerat ${formatTime(s.plannedAt)}: ${TEXT.report.delay(s.delaySeconds)}`,
+				`${formatTime(s.at)} ${TEXT.match.substitution(s.inName, s.outName)}, planerat ${formatTime(s.plannedAt)}: ${TEXT.report.delay(s.delaySeconds)}${s.inRestedSeconds === null ? "" : `, ${s.inName} hade vilat ${formatTime(s.inRestedSeconds)}`}`,
 		),
 	});
 }
