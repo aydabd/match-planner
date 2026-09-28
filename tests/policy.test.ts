@@ -1,0 +1,98 @@
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+import { getFormat, TEAM_SIZES } from "../src/core/formations.js";
+import {
+	POLICY,
+	RULES,
+	SOURCES,
+	sourcesByPublisher,
+} from "../src/core/policy.js";
+import { canAssignZone } from "../src/core/scheduler.js";
+import type { PlayerState } from "../src/core/types.js";
+import { TEXT } from "../src/ui/text.js";
+
+const player = (zonesPlayed: string[]): PlayerState => ({
+	id: "p",
+	totalSeconds: 0,
+	zonesPlayed,
+	unavailable: false,
+});
+
+describe("policy: every rule says where it comes from", () => {
+	it("gives each rule text and at least one source", () => {
+		for (const rule of RULES) {
+			expect(TEXT.policy.rules[rule.id].title).not.toBe("");
+			expect(rule.sources.length).toBeGreaterThan(0);
+			for (const id of rule.sources)
+				expect(SOURCES[id].url).toMatch(/^https:\/\//);
+		}
+	});
+
+	it("has a quote, a check date and a version for every rule labelled as policy", () => {
+		for (const rule of RULES.filter((r) => r.origin === "policy")) {
+			expect(rule.quotes.length).toBeGreaterThan(0);
+			expect(rule.sources).toContain(rule.quoteSource);
+			expect(rule).toMatchObject({
+				quotes: expect.arrayContaining([expect.stringMatching(/\S/)]),
+				checked: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+				documentVersion: expect.stringMatching(/\S/),
+			});
+		}
+	});
+
+	it("does not attribute a quote to a rule that is MatchPlanner's own decision", () => {
+		for (const rule of RULES.filter((r) => r.origin === "decision")) {
+			expect("quotes" in rule).toBe(false);
+		}
+	});
+
+	it("links the three organisations", () => {
+		const publishers = sourcesByPublisher().map((g) => g.publisher);
+		expect(publishers).toEqual([
+			expect.stringContaining("RF"),
+			expect.stringContaining("SvFF"),
+			expect.stringContaining("Skånebollen"),
+		]);
+	});
+});
+
+describe("policy: the code uses the policy values", () => {
+	it("gives the team sizes the match plan from POLICY", () => {
+		for (const [id, size] of Object.entries(TEAM_SIZES)) {
+			const plan = POLICY.formats[id as keyof typeof POLICY.formats];
+			expect(size.periods).toBe(plan.periods);
+			expect(size.periodMinutes).toBe(plan.periodMinutes);
+		}
+	});
+
+	it("allows no more lines per player than POLICY.maxZonesPerPlayer", () => {
+		const format = getFormat("9v9:3-3-2");
+		const lines = format.zones.map((z) => z.id);
+		expect(POLICY.maxZonesPerPlayer).toBe(2);
+		// back, mid, fwd: back+mid is allowed, a third line never is.
+		expect(
+			canAssignZone(player([lines[0] as string]), lines[1] as string, format),
+		).toBe(true);
+		expect(
+			canAssignZone(player(lines.slice(0, 2)), lines[2] as string, format),
+		).toBe(false);
+	});
+
+	it("keeps neighbouring lines only", () => {
+		const format = getFormat("9v9:3-3-2");
+		const [back, , fwd] = format.zones.map((z) => z.id) as [
+			string,
+			string,
+			string,
+		];
+		expect(POLICY.zonesMustBeAdjacent).toBe(true);
+		expect(canAssignZone(player([back]), fwd, format)).toBe(false);
+	});
+});
+
+describe("policy: the README lists the same sources", () => {
+	it("links every document", () => {
+		const readme = readFileSync("README.md", "utf8");
+		for (const { url } of Object.values(SOURCES)) expect(readme).toContain(url);
+	});
+});

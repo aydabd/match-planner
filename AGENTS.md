@@ -66,8 +66,9 @@ Run all of them before you push.
 
 ## Rules for the code
 
-- Every numeric limit is in `src/core/limits.ts`; every rotation rule is in `src/core/policy.ts`
-  once it exists. Do not duplicate either.
+- Every numeric limit is in `src/core/limits.ts`; every rotation rule is in `src/core/policy.ts`,
+  with its source or a "decision" label. Do not duplicate either. Never attribute a rule to RF, SvFF
+  or Skånebollen without quoting the current document.
 - No module-level mutable state in `src/` (a test enforces it).
 - Files a coach saves or loads are validated strictly; refuse bad input with a clear Swedish
   message instead of guessing.

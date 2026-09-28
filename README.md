@@ -130,3 +130,39 @@ data lagras lokalt i webbläsarens `localStorage` hos varje tränare.
   så den behöver ingen schemaläggning).
 - Ingen delad/synkad data mellan tränare i realtid - bara export/import av
   fil. Skulle det behövas krävs en backend, vilket är ett medvetet v2-beslut.
+
+## Varför fungerar det så här? Källor för reglerna
+
+Reglerna för vem som spelar, vilar och var de står finns på ett ställe, `src/core/policy.ts`. Varje
+regel är antingen hämtad ur ett dokument (med citat, datum och länk) eller markerad som
+MatchPlanners eget val. Appen förklarar dem på sidan **Varför fungerar det så här?**, som nås från
+startsidan och matchmenyn. Dokumenten:
+
+**Riksidrottsförbundet (RF)**
+- [Riktlinjer för barn- och ungdomsidrott](https://www.rf.se/rf-arbetar-med/barn--och-ungdomsidrott/riktlinjer-for-barn--och-ungdomsidrott)
+- [Riktlinjerna i sin helhet (PDF)](https://www.rf.se/download/18.407871d3183abb2a6133d5/1665042792026/Riktlinjer%20barn-%20och%20ungdomsidrott.pdf)
+- [Riktlinjerna, kortversion (PDF)](https://www.rf.se/download/18.bb2bb9e1900fe9007258a4/1718272991496/Riktlinjer_barn_ung_utskrift.pdf)
+- [Selektering och nivåindelning](https://www.rf.se/rf-arbetar-med/barn--och-ungdomsidrott/selektering-och-nivaindelning)
+
+**Svenska Fotbollförbundet (SvFF)**
+- [Barn- och ungdomsfotboll](https://aktiva.svenskfotboll.se/spelare/spela/barn-och-ungdom/)
+- [Spelformer: speltid och byten](https://aktiva.svenskfotboll.se/tranare/spelformer/)
+- [Svensk fotbolls spelarutbildningsplan](https://aktiva.svenskfotboll.se/tranare/spelarutbildning/spelarutbildningsplan/)
+- [Riktlinjer och utbildningsmaterial](https://aktiva.svenskfotboll.se/spelare/utbildningsmaterial/utbildningsmaterial/)
+
+**Skånes Fotbollförbund (Skånebollen)**
+- [Uppdaterade spelregler barn- och ungdomsfotboll 2025](https://www.skaneboll.se/nyheter/2025/april/uppdaterade-spelregler-barn--unga/)
+- [Information kring spelregler 2025–2026 (PDF)](https://www.skaneboll.se/49666a/globalassets/distrikt/skane/dokument/tavling/tavlingsbestammelser/info-kring-spelregler-for-barn--och-ungdomsfotboll-2025-2026.pdf)
+- [Bestämmelser och föreskrifter](https://www.skaneboll.se/tavling/bestammelser/)
+
+Kontrollerat mot dokumenten 2026-09-28. Matchtiderna i seriespel kommer från SvFF:s sida om
+spelformer (5 mot 5: 3 x 15, 7 mot 7: 3 x 20, 9 mot 9: 3 x 25, 11 mot 11: 2 x 40 för 15-åringar). Cuper
+har egna regler, till exempel 2 x 12 minuter: tränaren ändrar då perioder och minuter i appen.
+
+Kontrollera att citaten fortfarande står på sidorna (kräver nät):
+
+```sh
+npm run check:policy
+```
+
+Ändras en policy: uppdatera `src/core/policy.ts` (länkarna här kontrolleras av ett test).

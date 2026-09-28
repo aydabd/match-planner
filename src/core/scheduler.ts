@@ -1,4 +1,5 @@
 import { outfieldCount } from "./formations.js";
+import { POLICY } from "./policy.js";
 import type {
 	FormatConfig,
 	PlayerState,
@@ -110,13 +111,17 @@ export function canAssignZone(
 ): boolean {
 	if (player.zonesPlayed.includes(zoneId)) return true;
 	const prospective = [...player.zonesPlayed, zoneId];
-	if (prospective.length > 2) return false;
-	if (prospective.length === 2) {
-		const [a, b] = prospective as [string, string];
-		return (
-			getZone(format, a).adjacent.includes(b) ||
-			getZone(format, b).adjacent.includes(a)
-		);
+	if (prospective.length > POLICY.maxZonesPerPlayer) return false;
+	if (POLICY.zonesMustBeAdjacent) {
+		// Every pair must be neighbours (with the limit of two, exactly one pair).
+		for (const [i, a] of prospective.entries()) {
+			for (const b of prospective.slice(i + 1)) {
+				const linked =
+					getZone(format, a).adjacent.includes(b) ||
+					getZone(format, b).adjacent.includes(a);
+				if (!linked) return false;
+			}
+		}
 	}
 	return true;
 }

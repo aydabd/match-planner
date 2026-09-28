@@ -1,4 +1,6 @@
 import type { FormationProblem } from "../core/formations.js";
+import { LIMITS } from "../core/limits.js";
+import { POLICY, type RuleId } from "../core/policy.js";
 import type { SchedulingProblem } from "../core/scheduler.js";
 import type { SquadFileProblem } from "../core/storage.js";
 
@@ -84,6 +86,55 @@ export const TEXT = {
 					return TEXT.squadFile.unreadable;
 			}
 		},
+	},
+
+	policy: {
+		fromPolicy: "Från riktlinjer",
+		ownDecision: "MatchPlanners eget val",
+		quote: "Citat ur dokumentet",
+		checked: (date: string, version: string) =>
+			`Kontrollerat ${date} mot: ${version}.`,
+		sources: "Läs mer",
+		sourcesTitle: "Dokument och länkar",
+		offline: "Sidan fungerar utan nät. Länkarna öppnas när du är uppkopplad.",
+		rules: {
+			participation: {
+				title: "Alla ska vara med",
+				text: "Alla barn ska få ett allsidigt och lekfullt idrottande. Därför får alla i truppen spela, och appen strävar efter så lika speltid som möjligt.",
+			},
+			versatility: {
+				title: "Allsidighet och variation",
+				text: "Riktlinjerna vill ha allsidighet och variation. Därför byter spelare plats i laget istället för att fastna på en position.",
+			},
+			matchFormats: {
+				title: "Spelform efter ålder",
+				text: `5 mot 5 för ${POLICY.formats["5v5"].ages.join("–")} år, 7 mot 7 för ${POLICY.formats["7v7"].ages.join("–")} år, 9 mot 9 för ${POLICY.formats["9v9"].ages.join("–")} år och 11 mot 11 från ${POLICY.formats["11v11"].ages[0]} år. Lagstorlekarna i appen följer detta. Skånebollen skriver att de nationella spelformerna gäller i Skåne från säsongen 2026.`,
+			},
+			matchLengths: {
+				title: "Matchtid i seriespel",
+				text: `SvFF anger ${POLICY.formats["5v5"].periods} x ${POLICY.formats["5v5"].periodMinutes} minuter i 5 mot 5, ${POLICY.formats["7v7"].periods} x ${POLICY.formats["7v7"].periodMinutes} i 7 mot 7, ${POLICY.formats["9v9"].periods} x ${POLICY.formats["9v9"].periodMinutes} i 9 mot 9 och ${POLICY.formats["11v11"].periods} x ${POLICY.formats["11v11"].periodMinutes} minuter för 15-åringar i 11 mot 11 (2 x 45 från 16 år). Vid sammandrag är tiden kortare i 5 mot 5 och 7 mot 7. Appen börjar med tiden för en enskild match i serien. Cuper har ofta egna regler, till exempel två gånger 12 minuter: ändra då Perioder och Minuter per period själv.`,
+			},
+			freeSubstitutions: {
+				title: "Fria byten",
+				text: "Alla spelformer i barn- och ungdomsfotboll har fria byten. Därför kan du byta en spelare i taget, när det passar, och appen visar bara vem som ska in och ut.",
+			},
+			equalPlaytime: {
+				title: "Så lika speltid som möjligt",
+				text: "Vem som vilar väljs utifrån hur mycket varje spelare har spelat hittills. Det är ett eget val som bygger på tanken att alla ska få vara med, inte ett krav i något dokument.",
+			},
+			twoLines: {
+				title: `Högst ${POLICY.maxZonesPerPlayer} led per spelare`,
+				text: `En spelare står i högst ${POLICY.maxZonesPerPlayer} olika led under en match, så att det blir variation utan att någon flyttas runt hela tiden. Det här är ett eget val; inget dokument anger antalet.`,
+			},
+			neighbouringLines: {
+				title: "Bara angränsande led",
+				text: "En spelare flyttas aldrig direkt mellan försvar och anfall. Det är ett eget val för att laget ska kännas tryggt för barnen.",
+			},
+			swapTiming: {
+				title: "Byten och tid",
+				text: `Tiden mellan byten väljer du själv. Appen varnar ${LIMITS.headsUpSeconds} sekunder före ett byte, och markerar byten som blir ${POLICY.lateSwapSeconds} respektive ${POLICY.veryLateSwapSeconds} sekunder sena i matchrapporten. Det är MatchPlanners egna gränser.`,
+			},
+		} satisfies Record<RuleId, { title: string; text: string }>,
 	},
 
 	match: {

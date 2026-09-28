@@ -1207,3 +1207,33 @@ button:disabled {
 		outline-width: 4px;
 	}
 }
+
+/* ---------- policy page ---------- */
+.policy-rules {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+.policy-rule {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 8px;
+}
+.policy-rule p {
+	margin: 0;
+}
+.pill-decision {
+	background: var(--surface-2);
+	color: var(--ink);
+}
+.policy-quote {
+	margin: 0;
+	padding: 4px 0 4px 12px;
+	border-left: 3px solid var(--line);
+	font-style: italic;
+}
+.policy-links {
+	margin: 0;
+	padding-left: 18px;
+}
