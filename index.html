@@ -121,6 +121,12 @@
         <p class="hint" id="importError" role="status"></p>
       </details>
 
+      <details class="card disclosure" id="reportsSection" hidden>
+        <summary>Tidigare matchrapporter</summary>
+        <p class="hint">Rapporterna från de senaste matcherna sparas i den här webbläsaren.</p>
+        <div id="reportList" class="report-list"></div>
+      </details>
+
       <div class="sticky-cta">
         <button type="button" id="startMatchBtn" class="btn btn-cta">Starta match</button>
       </div>
@@ -147,6 +153,7 @@
             <button type="button" id="backToSetupBtn" class="menu-item">Ändra trupp eller format</button>
             <button type="button" id="policyFromMatchBtn" class="menu-item">Varför fungerar det så här?</button>
             <button type="button" class="menu-item" id="testBtn">Testa ett byte (hoppa till slutet)</button>
+            <button type="button" id="endMatchBtn" class="menu-item">Avsluta matchen</button>
             <button type="button" id="resetMatchBtn" class="menu-item menu-item-danger">Nollställ matchen</button>
           </div>
         </details>
@@ -175,6 +182,7 @@
             <button type="button" class="btn btn-secondary btn-big" id="pauseBtn" disabled>Pausa</button>
             <button type="button" class="btn btn-newteam btn-big" id="newTeamBtn">Byt in nya laget</button>
             <button type="button" class="btn btn-primary btn-big" id="nextPeriodBtn" disabled></button>
+            <button type="button" class="btn btn-primary btn-big" id="reportBtn" hidden>Visa matchrapport</button>
           </div>
           <div class="field break-keeper" id="breakKeeperField" hidden>
             <label class="field-label" for="breakKeeperSelect">Målvakt i nästa period</label>
@@ -232,6 +240,41 @@
       </div>
 
       <footer class="footer">Spelare flyttas aldrig direkt mellan försvar och anfall. v<span data-app-version></span></footer>
+    </section>
+
+    <!-- ============ REPORT VIEW ============ -->
+    <section id="reportView" class="view view-report hidden" aria-labelledby="reportTitle">
+      <header class="topbar">
+        <span class="brand"><span class="brand-ball" aria-hidden="true">⚽</span>MatchPlanner</span>
+        <button type="button" id="reportBackBtn" class="btn btn-ghost">Tillbaka</button>
+      </header>
+      <div class="intro">
+        <h1 id="reportTitle" tabindex="-1">Matchrapport</h1>
+        <p class="lede" id="reportSubtitle"></p>
+      </div>
+      <section class="card" aria-labelledby="reportFeedbackTitle">
+        <h2 id="reportFeedbackTitle">Sammanfattning</h2>
+        <ul id="reportFeedback" class="report-feedback"></ul>
+      </section>
+      <section class="card" aria-labelledby="reportPlaytimeTitle">
+        <h2 id="reportPlaytimeTitle">Speltid</h2>
+        <p class="hint" id="reportPlaytimeSummary"></p>
+        <table id="reportPlaytime" class="report-table"></table>
+      </section>
+      <section class="card" aria-labelledby="reportSwapsTitle">
+        <h2 id="reportSwapsTitle">Byten: planerat mot gjort</h2>
+        <p class="hint" id="reportSwapSummary"></p>
+        <table id="reportSwaps" class="report-table"></table>
+      </section>
+      <section class="card" aria-labelledby="reportShareTitle">
+        <h2 id="reportShareTitle">Spara eller dela</h2>
+        <div class="row-buttons">
+          <button type="button" id="reportCopyBtn" class="btn btn-secondary">Kopiera som text</button>
+          <button type="button" id="reportSaveBtn" class="btn btn-secondary">Spara som fil</button>
+        </div>
+        <p class="hint" id="reportShareStatus" role="status"></p>
+      </section>
+      <footer class="footer">MatchPlanner v<span data-app-version></span></footer>
     </section>
 
     <!-- ============ POLICY VIEW ============ -->

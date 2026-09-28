@@ -39,6 +39,30 @@ for (const colorScheme of ["light", "dark"] as const) {
 			expect(await accessibilityViolations(page)).toEqual([]);
 		});
 
+		test("the match report has no WCAG A/AA violations", async ({
+			startedMatch,
+			report,
+			page,
+		}) => {
+			await startedMatch.startClock();
+			await startedMatch.play(11);
+			await startedMatch.confirmSwap("Greta");
+			await startedMatch.endMatch();
+			await expect(report.root).toBeVisible();
+			expect(await accessibilityViolations(page)).toEqual([]);
+		});
+
+		test("the policy page has no WCAG A/AA violations", async ({
+			setup,
+			page,
+		}) => {
+			await setup.open();
+			await page
+				.getByRole("button", { name: "Varför fungerar det så här?" })
+				.click();
+			expect(await accessibilityViolations(page)).toEqual([]);
+		});
+
 		test("the match screen has no WCAG A/AA violations when a swap is due", async ({
 			startedMatch,
 			page,

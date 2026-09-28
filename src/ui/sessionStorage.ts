@@ -26,6 +26,8 @@ export interface PendingSwap {
  */
 export interface MatchSession {
 	schemaVersion: 2;
+	/** Identifies this match in its report; absent in older saved matches. */
+	matchId?: string;
 	formatId: string;
 	plan: MatchPlan;
 	clock: MatchClock;

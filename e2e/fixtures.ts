@@ -4,6 +4,7 @@ import {
 	type Locator,
 } from "@playwright/test";
 import { MatchPage } from "./pages/MatchPage.js";
+import { ReportPage } from "./pages/ReportPage.js";
 import { SetupPage } from "./pages/SetupPage.js";
 import { SQUAD } from "./support/squads.js";
 
@@ -13,6 +14,7 @@ const START = new Date("2026-09-05T09:00:00");
 interface Fixtures {
 	setup: SetupPage;
 	match: MatchPage;
+	report: ReportPage;
 	/** A match started with the test squad; the clock is not running yet. */
 	startedMatch: MatchPage;
 }
@@ -36,6 +38,9 @@ export const test = base.extend<Fixtures>({
 	},
 	match: async ({ page }, use) => {
 		await use(new MatchPage(page));
+	},
+	report: async ({ page }, use) => {
+		await use(new ReportPage(page));
 	},
 	startedMatch: async ({ setup, match }, use) => {
 		await setup.open();
