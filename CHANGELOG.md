@@ -3,6 +3,22 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.7.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.6.0...matchplanner-v0.7.0) (2026-09-28)
+
+
+### Features
+
+* **history:** match files and a season history for players ([#49](https://github.com/aydabd/match-planner/issues/49)) ([fb7f2c2](https://github.com/aydabd/match-planner/commit/fb7f2c212d15816d5d1ffaf32885528a42f9139d)), closes [#38](https://github.com/aydabd/match-planner/issues/38)
+* **policy:** one policy source and a page that explains where the rules come from ([#47](https://github.com/aydabd/match-planner/issues/47)) ([26c9142](https://github.com/aydabd/match-planner/commit/26c9142bed4ef5d25fc6f1a58ce566965465c17b)), closes [#23](https://github.com/aydabd/match-planner/issues/23)
+* **report:** post-match report with substitution deviation and fairness feedback ([#48](https://github.com/aydabd/match-planner/issues/48)) ([42ae148](https://github.com/aydabd/match-planner/commit/42ae14878cc068a7b318bfb80b57c4189fc503ac)), closes [#13](https://github.com/aydabd/match-planner/issues/13)
+* **rest:** show and audit how long players rest on the bench ([#52](https://github.com/aydabd/match-planner/issues/52)) ([df93017](https://github.com/aydabd/match-planner/commit/df93017f03620a5a24fc061f556e846ac564b3c2))
+
+
+### Bug Fixes
+
+* **match:** the clock follows the device clock and survives a reload ([#51](https://github.com/aydabd/match-planner/issues/51)) ([3913cf0](https://github.com/aydabd/match-planner/commit/3913cf07fe3c92222aceabc074d0a74f656d80ce))
+* **ui:** one footer with the version and copyright on every screen ([#53](https://github.com/aydabd/match-planner/issues/53)) ([c6b9f90](https://github.com/aydabd/match-planner/commit/c6b9f907175a9dfde69017019dfe34a412be0591))
+
 ## [0.6.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.5.0...matchplanner-v0.6.0) (2026-09-28)
 
 
