@@ -38,6 +38,8 @@ export interface FormatConfig {
 export interface Player {
 	readonly id: string;
 	name: string;
+	/** Can play in goal; the coach picks who starts there. */
+	goalkeeper: boolean;
 }
 
 /** Mutable per-player bookkeeping the scheduler needs to stay fair. */

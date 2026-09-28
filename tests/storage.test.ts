@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+	newRoster,
 	parseRosterFile,
 	rosterToJson,
 	StorageError,
-	serializeRoster,
 	squadFile,
 } from "../src/core/storage.js";
 
@@ -23,9 +23,13 @@ const validPlayers = [
 	{ id: "p2", name: "Christos" },
 ];
 
-describe("serializeRoster / rosterToJson / parseRosterFile round trip", () => {
+describe("newRoster / rosterToJson / parseRosterFile round trip", () => {
 	it("round-trips a roster through JSON without loss", () => {
-		const roster = serializeRoster("7v7:2-3-1", 600, validPlayers);
+		const roster = newRoster({
+			formatId: "7v7:2-3-1",
+			rotationSeconds: 600,
+			players: validPlayers,
+		});
 		const json = rosterToJson(roster);
 		const parsed = parseRosterFile(JSON.parse(json));
 		expect(parsed).toEqual(roster);
@@ -223,19 +227,183 @@ describe("parseRosterFile - rejects malformed or hostile input", () => {
 });
 
 describe("squadFile - what the coach saves to share the team", () => {
-	it("holds the whole setup and is named after team size and formation", () => {
-		const roster = serializeRoster("11v11:4-2-1-2-1", 480, validPlayers);
+	const SAVED_BY = {
+		createdAt: "2026-09-28T10:15:00.000Z",
+		createdBy: "Aydin",
+		appVersion: "0.5.0",
+	};
 
-		const file = squadFile(roster);
+	it("holds the whole setup and is named after team size and formation", () => {
+		const roster = newRoster({
+			formatId: "11v11:4-2-1-2-1",
+			rotationSeconds: 480,
+			players: validPlayers,
+		});
+
+		const file = squadFile(roster, SAVED_BY);
 
 		expect(file.fileName).toBe("trupp-11v11-4-2-1-2-1.json");
-		expect(parseRosterFile(JSON.parse(file.json))).toEqual(roster);
+		expect(parseRosterFile(JSON.parse(file.json))).toEqual({
+			...roster,
+			audit: SAVED_BY,
+		});
 	});
 
 	it("always writes the current format id, never the original 7v7 one", () => {
-		const file = squadFile(serializeRoster("7v7", 600, validPlayers));
+		const file = squadFile(
+			newRoster({
+				formatId: "7v7",
+				rotationSeconds: 600,
+				players: validPlayers,
+			}),
+			SAVED_BY,
+		);
 
 		expect(file.fileName).toBe("trupp-7v7-2-3-1.json");
 		expect(JSON.parse(file.json).formatId).toBe("7v7:2-3-1");
+	});
+});
+
+describe("squad file version 2", () => {
+	const AUDIT = {
+		createdAt: "2026-09-28T10:15:00.000Z",
+		createdBy: "Aydin",
+		appVersion: "0.5.0",
+	};
+	const PLAYERS = [
+		{ id: "p1", name: "Alva", goalkeeper: true },
+		{ id: "p2", name: "Bo", goalkeeper: false },
+	];
+
+	function file(overrides: Record<string, unknown> = {}) {
+		return {
+			schemaVersion: 2,
+			formatId: "9v9:3-3-2",
+			rotationSeconds: 480,
+			periods: 3,
+			periodSeconds: 1500,
+			match: {
+				opponent: "IFK Lund",
+				venue: "Klostergården",
+				date: "2026-10-04",
+			},
+			players: PLAYERS,
+			audit: AUDIT,
+			...overrides,
+		};
+	}
+
+	it("keeps the whole team setup, goalkeepers and audit", () => {
+		expect(parseRosterFile(file())).toEqual(file());
+	});
+
+	it("reads a version 1 file with the team size's match length and no keepers", () => {
+		expect(
+			parseRosterFile({
+				schemaVersion: 1,
+				formatId: "11v11:4-4-2",
+				rotationSeconds: 600,
+				players: [{ id: "p1", name: "Alva" }],
+			}),
+		).toEqual({
+			schemaVersion: 2,
+			formatId: "11v11:4-4-2",
+			rotationSeconds: 600,
+			periods: 2,
+			periodSeconds: 2400,
+			match: { opponent: "", venue: "", date: "" },
+			players: [{ id: "p1", name: "Alva", goalkeeper: false }],
+		});
+	});
+
+	it("does not require match details or an audit record", () => {
+		const { match: _match, audit: _audit, ...rest } = file();
+		expect(parseRosterFile(rest)).toMatchObject({
+			match: { opponent: "", venue: "", date: "" },
+		});
+		expect(parseRosterFile(rest)).not.toHaveProperty("audit");
+	});
+
+	it.each([
+		["too many periods", { periods: 5 }, "periods"],
+		["no periods", { periods: 0 }, "periods"],
+		["periods that are not whole minutes", { periodSeconds: 1530 }, "periods"],
+		["periods that are too long", { periodSeconds: 60 * 60 }, "periods"],
+		[
+			"an opponent name that is too long",
+			{ match: { opponent: "x".repeat(61), venue: "", date: "" } },
+			"matchDetails",
+		],
+		[
+			"a date that is not a date",
+			{ match: { opponent: "", venue: "", date: "next Sunday" } },
+			"matchDetails",
+		],
+		[
+			"an audit time that is not a time",
+			{ audit: { ...AUDIT, createdAt: "yesterday" } },
+			"audit",
+		],
+		[
+			"an audit without a version",
+			{ audit: { ...AUDIT, appVersion: 3 } },
+			"audit",
+		],
+		[
+			"a goalkeeper flag that is not true or false",
+			{ players: [{ id: "p1", name: "Alva", goalkeeper: "yes" }] },
+			"invalidPlayer",
+		],
+	])("refuses %s", (_, overrides, code) => {
+		expect(problemOf(file(overrides))).toBe(code);
+	});
+
+	it("measures text after trimming spaces, like player names", () => {
+		const padded = `  ${"x".repeat(60)}  `;
+		const roster = parseRosterFile(
+			file({
+				match: { opponent: padded, venue: "", date: "" },
+				audit: { ...AUDIT, createdBy: `  ${"y".repeat(40)}  ` },
+			}),
+		);
+		expect(roster.match.opponent).toBe("x".repeat(60));
+		expect(roster.audit?.createdBy).toBe("y".repeat(40));
+	});
+
+	it("accepts a kickoff time as well as a date", () => {
+		const withTime = file({
+			match: { opponent: "", venue: "", date: "2026-10-04T10:30" },
+		});
+		expect(parseRosterFile(withTime).match.date).toBe("2026-10-04T10:30");
+	});
+});
+
+describe("newRoster", () => {
+	it("fills the team size's defaults", () => {
+		expect(newRoster({ formatId: "5v5:1-2-1" })).toEqual({
+			schemaVersion: 2,
+			formatId: "5v5:1-2-1",
+			rotationSeconds: 300,
+			periods: 3,
+			periodSeconds: 900,
+			match: { opponent: "", venue: "", date: "" },
+			players: [],
+		});
+	});
+});
+
+describe("squadFile audit", () => {
+	it("records who saved the file, when, and with which app version", () => {
+		const roster = newRoster({ formatId: "7v7:2-3-1", players: validPlayers });
+		const audit = {
+			createdAt: "2026-09-28T10:15:00.000Z",
+			createdBy: "Aydin",
+			appVersion: "0.5.0",
+		};
+
+		const saved = JSON.parse(squadFile(roster, audit).json);
+
+		expect(saved.audit).toEqual(audit);
+		expect(saved.schemaVersion).toBe(2);
 	});
 });

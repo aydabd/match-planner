@@ -166,7 +166,7 @@ export function createRosterView(callbacks: RosterViewCallbacks): void {
 	}
 
 	function addPlayer(name: string): void {
-		const player: Player = { id: freshId(), name };
+		const player: Player = { id: freshId(), name, goalkeeper: false };
 		draft = { ...draft, players: [...draft.players, player] };
 		persist();
 	}
@@ -190,7 +190,11 @@ export function createRosterView(callbacks: RosterViewCallbacks): void {
 	});
 
 	exportBtn.addEventListener("click", () => {
-		const { fileName, json } = squadFile(draft);
+		const { fileName, json } = squadFile(draft, {
+			createdAt: new Date().toISOString(),
+			createdBy: "",
+			appVersion: __APP_VERSION__,
+		});
 		const blob = new Blob([json], { type: "application/json" });
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement("a");
