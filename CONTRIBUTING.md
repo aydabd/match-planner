@@ -26,6 +26,11 @@ Commits merged to `main` and release tags must also have a cryptographically ver
 Use an SSH or GPG signing key configured in GitHub, and keep the matching public key in
 `.github/allowed_signers` for local verification.
 
+## Working with agents and stacked PRs
+
+People and coding agents use the same flow: see `AGENTS.md` (work in a git worktree under
+`.worktrees/`, ship stacked PRs with `gh stack`).
+
 ## Pull requests
 
 - Use a Conventional Commit-style PR title (`feat:`, `fix:`, `chore:`, and so on).
