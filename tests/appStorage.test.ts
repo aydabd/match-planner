@@ -41,6 +41,11 @@ describe("appStorage", () => {
 	});
 });
 
+/** Source code with // line comments and /* block comments *\/ removed. */
+function withoutComments(source: string): string {
+	return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+}
+
 describe("single place for browser storage", () => {
 	function sourceFiles(dir: string): string[] {
 		return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -53,9 +58,11 @@ describe("single place for browser storage", () => {
 		const offenders = sourceFiles("src")
 			.filter((file) => file.endsWith(".ts"))
 			.filter((file) => file !== join("src", "ui", "appStorage.ts"))
-			// Any use: localStorage.getItem(...), localStorage["key"], etc.
+			// Any use of the name in code: property access, optional chaining,
+			// aliasing (const ls = localStorage), passing it around. Comments
+			// may mention it, so they are removed first.
 			.filter((file) =>
-				/\blocalStorage\s*[.[]/.test(readFileSync(file, "utf8")),
+				/\blocalStorage\b/.test(withoutComments(readFileSync(file, "utf8"))),
 			);
 		expect(offenders).toEqual([]);
 	});
