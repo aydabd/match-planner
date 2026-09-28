@@ -12,6 +12,8 @@ export class SetupPage {
 	readonly players: Locator;
 	readonly newPlayerName: Locator;
 	readonly squadFullMessage: Locator;
+	readonly startOverButton: Locator;
+	readonly clearAllButton: Locator;
 	readonly emptySquadMessage: Locator;
 	readonly startButton: Locator;
 	readonly squadFileMessage: Locator;
@@ -34,6 +36,8 @@ export class SetupPage {
 		this.squadFileMessage = this.root.locator("#importError");
 		this.newPlayerName = this.root.getByLabel("Spelarens namn");
 		this.squadFullMessage = this.root.locator("#squadFullMessage");
+		this.startOverButton = this.root.locator("#startOverBtn");
+		this.clearAllButton = this.root.locator("#clearAllDataBtn");
 		this.squadFileSection = this.root.getByRole("group").filter({
 			hasText: "Spara eller hämta en trupp",
 		});
@@ -85,6 +89,26 @@ export class SetupPage {
 	async setMinutesBetweenSwaps(minutes: number): Promise<void> {
 		await this.minutesBetweenSwaps.fill(String(minutes));
 		await this.minutesBetweenSwaps.blur();
+	}
+
+	/** Empty the squad: two taps, like every destructive action. */
+	async startOver(): Promise<void> {
+		await this.startOverButton.click();
+		await this.startOverButton.click();
+	}
+
+	/** Remove everything the app saved; the page reloads afterwards. */
+	async clearAllSavedData(): Promise<void> {
+		const section = this.root.getByRole("group").filter({
+			hasText: "Om appen och sparad data",
+		});
+		if ((await section.getAttribute("open")) === null) {
+			await section.locator("summary").click();
+		}
+		await this.clearAllButton.click();
+		const reloaded = this.page.waitForEvent("load");
+		await this.clearAllButton.click();
+		await reloaded;
 	}
 
 	async startMatch(): Promise<void> {

@@ -65,6 +65,9 @@
           </form>
           <p class="hint" id="squadFullMessage" role="status"></p>
           <div id="playerList" class="player-list"></div>
+          <div class="step-actions">
+            <button type="button" id="startOverBtn" class="btn btn-quiet">Börja om med tom trupp</button>
+          </div>
         </li>
       </ol>
 
@@ -84,6 +87,14 @@
       <div class="sticky-cta">
         <button type="button" id="startMatchBtn" class="btn btn-cta">Starta match</button>
       </div>
+      <details class="card disclosure">
+        <summary>Om appen och sparad data</summary>
+        <p class="hint">MatchPlanner v<span data-app-version></span> sparar truppen, en pågående match och en offlinekopia av appen i den här webbläsaren. Inget skickas någon annanstans.</p>
+        <p class="hint">Rensa allt om appen krånglar eller om du vill börja helt från början. Spara truppen som fil först om du vill ha kvar den.</p>
+        <div class="row-buttons">
+          <button type="button" id="clearAllDataBtn" class="btn btn-danger-outline">Rensa all sparad data</button>
+        </div>
+      </details>
       <footer class="footer">MatchPlanner v<span data-app-version></span></footer>
     </section>
 
