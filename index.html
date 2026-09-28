@@ -3,13 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#123821" />
+  <meta name="theme-color" content="#f3f6f1" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#0c1a12" media="(prefers-color-scheme: dark)" />
   <title>MatchPlanner</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9A%BD%3C/text%3E%3C/svg%3E" />
   <link rel="apple-touch-icon" href="icon-192.svg" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="MatchPlan" />
   <link rel="stylesheet" href="src/ui/style.css" />
 </head>
@@ -17,112 +18,140 @@
   <div class="app" id="app">
 
     <!-- ============ SETUP VIEW ============ -->
-    <section id="setupView" class="view">
-      <header>
-        <h1>⚽ MatchPlanner</h1>
-        <p class="muted">Sätt ihop dagens trupp innan ni sätter igång.</p>
+    <section id="setupView" class="view view-setup">
+      <header class="topbar">
+        <span class="brand"><span class="brand-ball" aria-hidden="true">⚽</span>MatchPlanner</span>
       </header>
 
-      <div class="card">
-        <label class="field">
-          <span>Format</span>
-          <select id="formatSelect"></select>
-        </label>
-        <label class="field">
-          <span>Minuter per byte</span>
-          <input id="rotationMinutesInput" type="number" min="1" max="30" value="10" />
-        </label>
+      <div class="intro">
+        <h1>Ny match</h1>
+        <p class="lede">Välj format och lägg till dagens spelare. Under matchen visar appen vilka som ska in och ut, så att alla får lika mycket speltid.</p>
       </div>
 
-      <div class="card">
-        <div class="card-head">
-          <h2>Trupp</h2>
-          <span class="muted" id="squadCount"></span>
-        </div>
-        <div id="playerList" class="player-list"></div>
-        <form id="addPlayerForm" class="add-player-form">
-          <input id="newPlayerName" type="text" placeholder="Spelarens namn" maxlength="40" required />
-          <button type="submit" class="btn btn-primary">+ Lägg till</button>
-        </form>
-      </div>
+      <ol class="steps">
+        <li class="card step">
+          <h2 class="step-title"><span class="step-num" aria-hidden="true">1</span>Matchinställningar</h2>
+          <div class="field-grid">
+            <label class="field">
+              <span class="field-label">Format</span>
+              <select id="formatSelect"></select>
+            </label>
+            <label class="field">
+              <span class="field-label">Minuter mellan byten</span>
+              <input id="rotationMinutesInput" type="number" inputmode="numeric" min="1" max="30" value="10" />
+              <span class="field-help">Hela laget roteras så här ofta.</span>
+            </label>
+          </div>
+        </li>
 
-      <div class="card">
+        <li class="card step">
+          <div class="step-head">
+            <h2 class="step-title"><span class="step-num" aria-hidden="true">2</span>Dagens trupp</h2>
+            <span class="pill" id="squadCount"></span>
+          </div>
+          <form id="addPlayerForm" class="add-player-form">
+            <label class="visually-hidden" for="newPlayerName">Spelarens namn</label>
+            <input id="newPlayerName" type="text" placeholder="Spelarens namn" maxlength="40" autocomplete="off" required />
+            <button type="submit" class="btn btn-primary">Lägg till</button>
+          </form>
+          <div id="playerList" class="player-list"></div>
+        </li>
+      </ol>
+
+      <details class="card disclosure">
+        <summary>Spara eller hämta en trupp</summary>
+        <p class="hint">Spara truppen som en fil och hämta den igen nästa match, så slipper du skriva in alla namn.</p>
         <div class="row-buttons">
-          <button type="button" id="exportBtn" class="btn btn-secondary">⬇️ Exportera trupp (JSON)</button>
+          <button type="button" id="exportBtn" class="btn btn-secondary">Spara trupp som fil</button>
           <label class="btn btn-secondary file-btn">
-            ⬆️ Importera trupp
+            Hämta trupp från fil
             <input id="importInput" class="visually-hidden" type="file" accept="application/json" />
           </label>
         </div>
-        <p class="hint" id="importError"></p>
-      </div>
+        <p class="hint" id="importError" role="status"></p>
+      </details>
 
-      <button type="button" id="startMatchBtn" class="btn btn-cta">Starta match ▶</button>
-      <footer class="muted">MatchPlanner v<span data-app-version></span></footer>
+      <div class="sticky-cta">
+        <button type="button" id="startMatchBtn" class="btn btn-cta">Starta match</button>
+      </div>
+      <footer class="footer">MatchPlanner v<span data-app-version></span></footer>
     </section>
 
     <!-- ============ MATCH VIEW ============ -->
-    <section id="matchView" class="view hidden">
-      <header>
-        <h1>⚽ MatchPlanner</h1>
-        <p class="muted" id="formatLabel"></p>
-        <div class="settings-row">
-          <button type="button" id="addLateBtn" class="btn btn-settings">🏃 Sen ankomst</button>
-          <button type="button" id="backToSetupBtn" class="btn btn-settings">⚙️ Ändra trupp</button>
-          <button type="button" id="resetMatchBtn" class="btn btn-settings">🔄 Nollställ matchen</button>
-        </div>
-        <div class="swap-panel" id="lateArrivalPanel"></div>
+    <section id="matchView" class="view view-match hidden">
+      <header class="topbar">
+        <span class="brand"><span class="brand-ball" aria-hidden="true">⚽</span><span class="brand-name">MatchPlanner</span></span>
+        <span class="topbar-meta" id="formatLabel"></span>
+        <details class="menu" id="matchMenu">
+          <summary class="btn btn-ghost">Meny</summary>
+          <div class="menu-panel">
+            <button type="button" id="addLateBtn" class="menu-item">Lägg till spelare som kom sent</button>
+            <button type="button" id="backToSetupBtn" class="menu-item">Ändra trupp eller format</button>
+            <button type="button" class="menu-item" id="testBtn">Testa ett byte (hoppa till slutet)</button>
+            <button type="button" id="resetMatchBtn" class="menu-item menu-item-danger">Nollställ matchen</button>
+          </div>
+        </details>
       </header>
 
-      <div class="status-row">
-        <!-- Only the rotation number is live: fairnessLabel changes every clock tick -->
-        <span role="status" aria-live="polite" aria-atomic="true">Byte <strong id="rotationLabel">1</strong></span>
-        <span id="fairnessLabel" class="muted"></span>
-      </div>
+      <div class="swap-panel card" id="lateArrivalPanel"></div>
 
       <div class="alert-banner" id="alertBanner" role="alert">
-        <h3>🚑 Ute ur matchen</h3>
+        <h3>Ute ur matchen</h3>
         <div id="alertList"></div>
       </div>
 
-      <div class="timer-box">
-        <div class="timer" id="timerDisplay">00:00</div>
-        <div class="controls">
-          <button type="button" class="btn btn-primary" id="startBtn">Starta klockan</button>
-          <button type="button" class="btn btn-secondary" id="pauseBtn" disabled>Pausa</button>
-          <button type="button" class="btn btn-test" id="testBtn">Testa byte</button>
+      <div class="match-grid">
+        <div class="match-col match-col-main">
+        <section class="card clock" id="clockCard" aria-label="Klocka">
+          <div class="clock-head">
+            <!-- Only the rotation number is live: fairnessLabel changes every clock tick -->
+            <span class="clock-period" role="status" aria-live="polite" aria-atomic="true">Byte <strong id="rotationLabel">1</strong></span>
+            <span id="fairnessLabel" class="clock-fairness"></span>
+          </div>
+          <div class="timer" id="timerDisplay">00:00</div>
+          <div class="progress" aria-hidden="true"><div class="progress-fill" id="timerProgress"></div></div>
+          <p class="clock-remaining" id="timerRemaining"></p>
+          <div class="controls">
+            <button type="button" class="btn btn-primary btn-big" id="startBtn">Starta klockan</button>
+            <button type="button" class="btn btn-secondary btn-big" id="pauseBtn" disabled>Pausa</button>
+            <button type="button" class="btn btn-newteam btn-big" id="newTeamBtn">Byt in nya laget</button>
+          </div>
+        </section>
+
+
+        <section class="card pitch-card" aria-labelledby="pitchTitle">
+          <div class="card-head">
+            <h2 id="pitchTitle">På planen</h2>
+            <span class="card-note">Tryck på en spelare för att byta</span>
+          </div>
+          <div class="pitch" id="pitch"></div>
+        </section>
+
+        <section class="card bench-card" aria-labelledby="benchTitle">
+          <div class="card-head">
+            <h2 id="benchTitle">På bänken</h2>
+            <button type="button" class="btn btn-quiet" id="undoBtn">Ångra tillfälliga byten</button>
+          </div>
+          <div class="bench-list" id="benchList"></div>
+          <div class="swap-panel" id="swapPanel" aria-live="polite"></div>
+          <p class="hint"><strong>Tillfälligt byte:</strong> tryck på en spelare på planen, sedan på en bänkspelare, och välj hur länge. Vid allvarlig skada väljer du <strong>Ute resten av matchen</strong>.</p>
+        </section>
+
+        </div>
+        <div class="match-col match-col-side">
+        <section class="card next" aria-labelledby="nextTitle">
+          <h2 id="nextTitle">Nästa byte</h2>
+          <div id="previewBody"></div>
+        </section>
+
+        <section class="card playtime-card" aria-labelledby="playtimeTitle">
+          <h2 id="playtimeTitle">Speltid</h2>
+          <div id="playtimeList" class="playtime-list"></div>
+        </section>
         </div>
       </div>
 
-      <div class="newteam-wrap">
-        <button type="button" class="btn btn-newteam" id="newTeamBtn">🔄 NYA LAGET</button>
-      </div>
-
-      <div class="pitch-wrap">
-        <div class="pitch" id="pitch"></div>
-      </div>
-
-      <div class="preview-wrap">
-        <h2>🔜 Nästa byte — så här blir det</h2>
-        <div id="previewBody"></div>
-      </div>
-
-      <div class="bench-wrap">
-        <div class="bench-head">
-          <h2>På bänken</h2>
-          <button type="button" class="btn btn-undo" id="undoBtn">Ångra byten</button>
-        </div>
-        <div class="bench-list" id="benchList"></div>
-        <div class="swap-panel" id="swapPanel"></div>
-        <p class="hint">🩹 <strong>Tillfälligt byte:</strong> tryck på en spelare på planen, sedan på en bänkspelare, och välj hur länge hen behöver vila. <strong>Allvarlig skada:</strong> välj "Ute resten av matchen".</p>
-      </div>
-
-      <div class="playtime-wrap">
-        <h2>⏱️ Speltid just nu</h2>
-        <div id="playtimeList"></div>
-      </div>
-
-      <footer class="muted">Byggd för att aldrig flytta en spelare direkt mellan icke-angränsande zoner. · v<span data-app-version></span></footer>
+      <footer class="footer">Spelare flyttas aldrig direkt mellan försvar och anfall. v<span data-app-version></span></footer>
     </section>
 
   </div>

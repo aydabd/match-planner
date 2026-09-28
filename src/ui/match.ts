@@ -45,6 +45,10 @@ interface Els {
 	rotationLabel: HTMLElement;
 	fairnessLabel: HTMLElement;
 	timerDisplay: HTMLElement;
+	timerProgress: HTMLElement;
+	timerRemaining: HTMLElement;
+	clockCard: HTMLElement;
+	matchMenu: HTMLDetailsElement;
 	startBtn: HTMLButtonElement;
 	pauseBtn: HTMLButtonElement;
 	testBtn: HTMLButtonElement;
@@ -71,6 +75,10 @@ function getEls(): Els {
 		rotationLabel: byId("rotationLabel"),
 		fairnessLabel: byId("fairnessLabel"),
 		timerDisplay: byId("timerDisplay"),
+		timerProgress: byId("timerProgress"),
+		timerRemaining: byId("timerRemaining"),
+		clockCard: byId("clockCard"),
+		matchMenu: byId<HTMLDetailsElement>("matchMenu"),
 		startBtn: byId("startBtn"),
 		pauseBtn: byId("pauseBtn"),
 		testBtn: byId("testBtn"),
@@ -156,29 +164,32 @@ function persist(): void {
 // ---------------- rendering ----------------
 
 function pitchChip(id: string, zoneId: string, idx: number): HTMLElement {
-	const el = document.createElement("div");
-	el.className = "chip selectable";
-	if (
-		live?.selected &&
-		live.selected.zoneId === zoneId &&
-		live.selected.idx === idx
-	)
-		el.classList.add("selected");
+	const el = document.createElement("button");
+	el.type = "button";
+	el.className = "chip";
+	const isSelected =
+		live?.selected?.zoneId === zoneId && live.selected.idx === idx;
+	if (isSelected) el.classList.add("selected");
+	el.setAttribute("aria-pressed", String(isSelected));
 	el.textContent = nameOf(id);
 	el.addEventListener("click", () => onPitchClick(zoneId, idx));
 	return el;
 }
 
 function benchChip(id: string, idx: number): HTMLElement {
-	const wrap = document.createElement("div");
+	const wrap = document.createElement("button");
+	wrap.type = "button";
 	wrap.className = "bench-chip";
-	if (live?.pendingBenchIdx === idx) wrap.classList.add("selected");
+	const isSelected = live?.pendingBenchIdx === idx;
+	if (isSelected) wrap.classList.add("selected");
+	else if (live?.selected) wrap.classList.add("is-target");
+	wrap.setAttribute("aria-pressed", String(isSelected));
 	wrap.textContent = nameOf(id);
 	const activeTemp = live?.tempSwaps.find((t) => t.inId === id);
 	if (activeTemp) {
 		const cd = document.createElement("span");
 		cd.className = "bench-countdown";
-		cd.textContent = `ers. ${nameOf(activeTemp.outId)} · ${formatTime(activeTemp.remainingSeconds)}`;
+		cd.textContent = `vilar för ${nameOf(activeTemp.outId)}, ${formatTime(activeTemp.remainingSeconds)}`;
 		wrap.appendChild(cd);
 	}
 	wrap.addEventListener("click", () => onBenchClick(idx));
@@ -192,11 +203,18 @@ function renderPitch(): void {
 	for (const zone of zonesTopFirst) {
 		const row = document.createElement("div");
 		row.className = "line-row";
+		const label = document.createElement("span");
+		label.className = "zone-label";
+		label.textContent = zone.label;
+		const chips = document.createElement("div");
+		chips.className = "line-chips";
 		for (const [idx, id] of (
 			live.currentAssignment.zones[zone.id] ?? []
 		).entries()) {
-			row.appendChild(pitchChip(id, zone.id, idx));
+			chips.appendChild(pitchChip(id, zone.id, idx));
 		}
+		row.appendChild(label);
+		row.appendChild(chips);
 		els.pitch.appendChild(row);
 	}
 }
@@ -204,9 +222,30 @@ function renderPitch(): void {
 function renderBench(): void {
 	if (!live || !els) return;
 	els.benchList.innerHTML = "";
+	if (live.currentAssignment.bench.length === 0) {
+		const empty = document.createElement("p");
+		empty.className = "empty-state";
+		empty.textContent = "Ingen på bänken just nu.";
+		els.benchList.appendChild(empty);
+		return;
+	}
 	for (const [idx, id] of live.currentAssignment.bench.entries()) {
 		els.benchList.appendChild(benchChip(id, idx));
 	}
+}
+
+/** Build a paragraph from plain text and bold (player name) parts, without innerHTML. */
+function sentence(parts: readonly (string | { bold: string })[]): HTMLElement {
+	const p = document.createElement("p");
+	for (const part of parts) {
+		if (typeof part === "string") p.append(part);
+		else {
+			const strong = document.createElement("strong");
+			strong.textContent = part.bold;
+			p.appendChild(strong);
+		}
+	}
+	return p;
 }
 
 function renderSwapPanel(): void {
@@ -226,20 +265,25 @@ function renderSwapPanel(): void {
 	els.swapPanel.classList.add("show");
 
 	if (live.pendingBenchIdx === null) {
-		const p = document.createElement("p");
-		p.innerHTML = `Vald: <strong>${nameOf(outId)}</strong>. Tryck på en bänkspelare för tillfälligt byte, eller:`;
-		els.swapPanel.appendChild(p);
+		els.swapPanel.appendChild(
+			sentence([
+				{ bold: nameOf(outId) },
+				" är vald. Tryck på en bänkspelare som ska in, eller:",
+			]),
+		);
 		const row = document.createElement("div");
 		row.className = "row";
 		const outBtn = document.createElement("button");
+		outBtn.type = "button";
 		outBtn.className = "btn-danger";
-		outBtn.textContent = "🚑 Ute resten av matchen";
+		outBtn.textContent = "Ute resten av matchen";
 		const selected = live.selected;
 		if (!selected) return;
 		outBtn.addEventListener("click", () =>
 			markUnavailable(selected.zoneId, selected.idx),
 		);
 		const cancelBtn = document.createElement("button");
+		cancelBtn.type = "button";
 		cancelBtn.className = "btn-cancel";
 		cancelBtn.textContent = "Avbryt";
 		cancelBtn.addEventListener("click", () => {
@@ -256,9 +300,14 @@ function renderSwapPanel(): void {
 			render();
 			return;
 		}
-		const p = document.createElement("p");
-		p.innerHTML = `<strong>${nameOf(inId)}</strong> byts in för <strong>${nameOf(outId)}</strong> i:`;
-		els.swapPanel.appendChild(p);
+		els.swapPanel.appendChild(
+			sentence([
+				{ bold: nameOf(inId) },
+				" går in för ",
+				{ bold: nameOf(outId) },
+				". Hur länge?",
+			]),
+		);
 		const row = document.createElement("div");
 		row.className = "row";
 		(
@@ -269,17 +318,20 @@ function renderSwapPanel(): void {
 			] as const
 		).forEach(([label, secs]) => {
 			const b = document.createElement("button");
+			b.type = "button";
 			b.className = "btn-chip";
 			b.textContent = label;
 			b.addEventListener("click", () => commitTempSwap(secs));
 			row.appendChild(b);
 		});
 		const untilNext = document.createElement("button");
+		untilNext.type = "button";
 		untilNext.className = "btn-chip";
 		untilNext.textContent = "Till nästa byte";
 		untilNext.addEventListener("click", () => commitTempSwap(null));
 		row.appendChild(untilNext);
 		const cancelBtn = document.createElement("button");
+		cancelBtn.type = "button";
 		cancelBtn.className = "btn-cancel";
 		cancelBtn.textContent = "Avbryt";
 		cancelBtn.addEventListener("click", () => {
@@ -315,9 +367,10 @@ function renderAlertBanner(): void {
 		const row = document.createElement("div");
 		row.className = "alert-row";
 		const span = document.createElement("span");
-		span.textContent = `${nameOf(id)} — spelar inte mer idag`;
+		span.textContent = `${nameOf(id)} spelar inte mer idag`;
 		const btn = document.createElement("button");
-		btn.textContent = "↩ Tillbaka i truppen";
+		btn.type = "button";
+		btn.textContent = "Tillbaka i truppen";
 		btn.addEventListener("click", () => {
 			// Rows outlive a single render now, so resolve the match at click time.
 			if (!live) return;
@@ -330,8 +383,41 @@ function renderAlertBanner(): void {
 	});
 }
 
+function nameColumn(
+	title: string,
+	className: string,
+	ids: readonly string[],
+	emptyText: string,
+): HTMLElement {
+	const col = document.createElement("div");
+	col.className = `next-col ${className}`;
+	const h = document.createElement("h3");
+	h.textContent = title;
+	col.appendChild(h);
+	if (ids.length === 0) {
+		const p = document.createElement("span");
+		p.className = "next-empty";
+		p.textContent = emptyText;
+		col.appendChild(p);
+		return col;
+	}
+	const list = document.createElement("ul");
+	list.className = "next-names";
+	for (const id of ids) {
+		const li = document.createElement("li");
+		li.textContent = nameOf(id);
+		list.appendChild(li);
+	}
+	col.appendChild(list);
+	return col;
+}
+
 function renderPreview(): void {
 	if (!live || !els) return;
+	// Keep the full-lineup disclosure open across clock ticks.
+	const wasOpen =
+		els.previewBody.querySelector<HTMLDetailsElement>(".next-lineup")?.open ??
+		false;
 	els.previewBody.innerHTML = "";
 	let next: RotationAssignment;
 	try {
@@ -341,7 +427,7 @@ function renderPreview(): void {
 		p.className = "preview-none";
 		p.textContent =
 			err instanceof SchedulingError
-				? `⚠️ ${err.message}`
+				? err.message
 				: "Kunde inte beräkna nästa byte.";
 		els.previewBody.appendChild(p);
 		return;
@@ -350,6 +436,25 @@ function renderPreview(): void {
 		Object.values(live.currentAssignment.zones).flat(),
 	);
 	const nextOnPitch = new Set(Object.values(next.zones).flat());
+	const comingIn = [...nextOnPitch].filter((id) => !currentOnPitch.has(id));
+	const goingOut = [...currentOnPitch].filter((id) => !nextOnPitch.has(id));
+
+	const summary = document.createElement("div");
+	summary.className = "next-summary";
+	summary.appendChild(
+		nameColumn("In på planen", "next-in", comingIn, "Ingen ny"),
+	);
+	summary.appendChild(
+		nameColumn("Ut till bänken", "next-out", goingOut, "Ingen går ut"),
+	);
+	els.previewBody.appendChild(summary);
+
+	const lineup = document.createElement("details");
+	lineup.className = "next-lineup";
+	lineup.open = wasOpen;
+	const lineupSummary = document.createElement("summary");
+	lineupSummary.textContent = "Visa hela nya laget";
+	lineup.appendChild(lineupSummary);
 
 	const zonesTopFirst = [...live.format.zones].reverse();
 	for (const zone of zonesTopFirst) {
@@ -357,37 +462,43 @@ function renderPreview(): void {
 		row.className = "preview-line";
 		const tag = document.createElement("span");
 		tag.className = "zone-tag";
-		tag.textContent = `${zone.label}:`;
+		tag.textContent = zone.label;
 		row.appendChild(tag);
 		(next.zones[zone.id] ?? []).forEach((id) => {
 			const c = document.createElement("span");
-			c.className = `chip-ghost${currentOnPitch.has(id) ? "" : " is-new"}`;
+			c.className = "chip-ghost";
 			c.textContent = nameOf(id);
+			if (comingIn.includes(id)) {
+				// Colour marks incoming players visually; the hidden text says it
+				// for screen readers, so the legend isn't colour-only.
+				c.classList.add("is-new");
+				const sr = document.createElement("span");
+				sr.className = "visually-hidden";
+				sr.textContent = " (kommer in)";
+				c.appendChild(sr);
+			}
 			row.appendChild(c);
 		});
-		els?.previewBody.appendChild(row);
+		lineup.appendChild(row);
 	}
 	const benchRow = document.createElement("div");
 	benchRow.className = "preview-line";
 	const benchTag = document.createElement("span");
 	benchTag.className = "zone-tag";
-	benchTag.textContent = "Bänk:";
+	benchTag.textContent = "Bänk";
 	benchRow.appendChild(benchTag);
 	next.bench.forEach((id) => {
 		const c = document.createElement("span");
-		c.className = `chip-ghost${currentOnPitch.has(id) ? "" : " is-new"}`;
+		c.className = "chip-ghost";
 		c.textContent = nameOf(id);
 		benchRow.appendChild(c);
 	});
-	els.previewBody.appendChild(benchRow);
-
-	const goingOut = [...currentOnPitch].filter((id) => !nextOnPitch.has(id));
-	if (goingOut.length) {
-		const p = document.createElement("p");
-		p.className = "preview-out";
-		p.textContent = `⬅ Går ut till bänken: ${goingOut.map(nameOf).join(", ")}  ·  🆕 = kommer in`;
-		els.previewBody.appendChild(p);
-	}
+	lineup.appendChild(benchRow);
+	const legend = document.createElement("p");
+	legend.className = "hint";
+	legend.textContent = "Gula namn kommer in från bänken.";
+	lineup.appendChild(legend);
+	els.previewBody.appendChild(lineup);
 }
 
 function renderPlaytime(): void {
@@ -396,19 +507,43 @@ function renderPlaytime(): void {
 	const elements = els;
 	elements.playtimeList.innerHTML = "";
 	const onPitch = new Set(Object.values(live.currentAssignment.zones).flat());
+	const maxSeconds = Math.max(
+		1,
+		...currentLive.schedulerState.order.map(
+			(id) => currentLive.schedulerState.players[id]?.totalSeconds ?? 0,
+		),
+	);
 	currentLive.schedulerState.order.forEach((id) => {
 		const p = currentLive.schedulerState.players[id];
 		if (!p) return;
+		const status = p.unavailable
+			? "out"
+			: onPitch.has(id)
+				? "on-pitch"
+				: "on-bench";
 		const row = document.createElement("div");
-		row.className = "pt-row";
+		row.className = `pt-row${status === "on-bench" ? " is-bench" : ""}`;
 		const nameEl = document.createElement("span");
-		nameEl.className = `pt-name ${p.unavailable ? "out" : onPitch.has(id) ? "on-pitch" : "on-bench"}`;
-		nameEl.textContent = nameOf(id) + (onPitch.has(id) ? " ●" : "");
+		nameEl.className = `pt-name ${status}`;
+		nameEl.textContent = nameOf(id);
+		if (status === "on-pitch") {
+			const tag = document.createElement("span");
+			tag.className = "pt-status";
+			tag.textContent = "på planen";
+			nameEl.appendChild(tag);
+		}
 		const timeEl = document.createElement("span");
 		timeEl.className = "pt-time";
 		timeEl.textContent = formatTime(p.totalSeconds);
+		const bar = document.createElement("div");
+		bar.className = "pt-bar";
+		bar.setAttribute("aria-hidden", "true");
+		const fill = document.createElement("span");
+		fill.style.width = `${(p.totalSeconds / maxSeconds) * 100}%`;
+		bar.appendChild(fill);
 		row.appendChild(nameEl);
 		row.appendChild(timeEl);
+		row.appendChild(bar);
 		elements.playtimeList.appendChild(row);
 	});
 }
@@ -419,7 +554,7 @@ function render(): void {
 	const rotationText = String(live.rotationIndex + 1);
 	if (els.rotationLabel.textContent !== rotationText)
 		els.rotationLabel.textContent = rotationText;
-	els.fairnessLabel.textContent = `spridning ${formatTime(fairnessSpread(live.schedulerState))}`;
+	els.fairnessLabel.textContent = `Skillnad i speltid ${formatTime(fairnessSpread(live.schedulerState))}`;
 	renderPitch();
 	renderBench();
 	renderSwapPanel();
@@ -538,11 +673,17 @@ function tick(): void {
 
 function updateTimerDisplay(): void {
 	if (!live || !els) return;
+	const total = live.schedulerState.rotationSeconds;
+	const due = live.elapsedSeconds >= total;
 	els.timerDisplay.textContent = formatTime(live.elapsedSeconds);
-	els.timerDisplay.classList.toggle(
-		"done",
-		live.elapsedSeconds >= live.schedulerState.rotationSeconds,
-	);
+	els.timerDisplay.classList.toggle("done", due);
+	els.clockCard.classList.toggle("is-due", due);
+	els.timerProgress.style.width = `${Math.min(100, (live.elapsedSeconds / total) * 100)}%`;
+	els.timerRemaining.textContent = due
+		? "Dags att byta!"
+		: `${formatTime(total - live.elapsedSeconds)} kvar till nästa byte`;
+	els.startBtn.textContent =
+		live.elapsedSeconds > 0 ? "Fortsätt" : "Starta klockan";
 }
 
 function startClock(): void {
@@ -615,6 +756,17 @@ export function initMatchView(callbacks: MatchCallbacks): void {
 	wired = true;
 	els = getEls();
 
+	// Close the match menu after any action except reset, which needs a
+	// second tap to confirm.
+	for (const item of els.matchMenu.querySelectorAll<HTMLButtonElement>(
+		".menu-item",
+	)) {
+		if (item === els.resetBtn) continue;
+		item.addEventListener("click", () => {
+			if (els) els.matchMenu.open = false;
+		});
+	}
+
 	els.startBtn.addEventListener("click", startClock);
 	els.pauseBtn.addEventListener("click", pauseClock);
 	els.testBtn.addEventListener("click", testByte);
@@ -638,10 +790,15 @@ export function initMatchView(callbacks: MatchCallbacks): void {
 		els.lateArrivalPanel.classList.toggle("show");
 		if (!els.lateArrivalPanel.classList.contains("show")) return;
 		els.lateArrivalPanel.innerHTML = "";
+		const title = document.createElement("p");
+		title.textContent =
+			"Spelaren hamnar på bänken och kommer med i nästa byte.";
+		els.lateArrivalPanel.appendChild(title);
 		const form = document.createElement("form");
 		form.className = "add-player-form";
 		const input = document.createElement("input");
 		input.type = "text";
+		input.setAttribute("aria-label", "Namn på spelaren som kom sent");
 		input.placeholder = "Namn på spelaren som just kom";
 		input.maxLength = 40;
 		input.required = true;
@@ -664,6 +821,7 @@ export function initMatchView(callbacks: MatchCallbacks): void {
 			render();
 		});
 		els.lateArrivalPanel.appendChild(form);
+		input.focus();
 	});
 
 	let resetArmed = false;
@@ -672,19 +830,20 @@ export function initMatchView(callbacks: MatchCallbacks): void {
 		if (!live || !els) return;
 		if (!resetArmed) {
 			resetArmed = true;
-			els.resetBtn.textContent = "⚠️ Tryck igen för att nollställa";
+			els.resetBtn.textContent = "Tryck igen för att nollställa";
 			els.resetBtn.classList.add("confirming");
 			const elements = els;
 			resetArmTimeout = setTimeout(() => {
 				resetArmed = false;
-				elements.resetBtn.textContent = "🔄 Nollställ matchen";
+				elements.resetBtn.textContent = "Nollställ matchen";
 				elements.resetBtn.classList.remove("confirming");
 			}, 3000);
 		} else {
 			if (resetArmTimeout) clearTimeout(resetArmTimeout);
 			resetArmed = false;
-			els.resetBtn.textContent = "🔄 Nollställ matchen";
+			els.resetBtn.textContent = "Nollställ matchen";
 			els.resetBtn.classList.remove("confirming");
+			els.matchMenu.open = false;
 			clearSession();
 			stopClock();
 			for (const id of live.schedulerState.order) {
@@ -712,7 +871,7 @@ export function initMatchView(callbacks: MatchCallbacks): void {
 function loadLive(next: LiveMatch): void {
 	live = next;
 	if (!els) return;
-	els.formatLabel.textContent = `${live.format.label} · byte var ${Math.round(live.schedulerState.rotationSeconds / 60)} min`;
+	els.formatLabel.textContent = `${live.format.label}, byte var ${Math.round(live.schedulerState.rotationSeconds / 60)} min`;
 	els.startBtn.disabled =
 		live.elapsedSeconds >= live.schedulerState.rotationSeconds;
 	els.pauseBtn.disabled = true;
