@@ -59,7 +59,13 @@ export function whenOf(file: MatchFile): string {
 	return file.match.date || file.audit.createdAt;
 }
 
-const nameKey = (name: string): string => name.trim().toLocaleLowerCase("sv");
+/**
+ * How a player is recognised across match files (see the module comment):
+ * exported so other season-scoped records (src/core/playerNotes.ts) key
+ * themselves the same way and mean the same player.
+ */
+export const nameKey = (name: string): string =>
+	name.trim().toLocaleLowerCase("sv");
 
 /**
  * Which of two files for the same match to keep: the later one, and if they

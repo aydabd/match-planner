@@ -34,6 +34,10 @@ export const LIMITS = {
 	recentMatches: 8,
 	/** How long "tap again to reset" stays armed, in seconds. */
 	resetConfirmSeconds: 3,
+	/** Longest free-text note a coach writes about a player, in characters. */
+	playerNoteLength: 500,
+	/** Most development notes kept per player; the oldest is dropped first. */
+	developmentNotesPerPlayer: 200,
 } as const;
 
 /**
