@@ -3,6 +3,19 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.4.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.3.1...matchplanner-v0.4.0) (2026-09-28)
+
+
+### Features
+
+* **formations:** team sizes 5v5–11v11 with quick-pick and custom formations ([#26](https://github.com/aydabd/match-planner/issues/26)) ([7bb7097](https://github.com/aydabd/match-planner/commit/7bb7097e055c45f8e3340641fb588db9cad605e3))
+* **setup:** choose team size and formation, including custom formations ([#27](https://github.com/aydabd/match-planner/issues/27)) ([9e33f65](https://github.com/aydabd/match-planner/commit/9e33f6596d9f3b28ff945847c79e82363a51c5e7))
+
+
+### Bug Fixes
+
+* **scheduler:** build lineups with exact matching so any formation works ([#25](https://github.com/aydabd/match-planner/issues/25)) ([9de7f5b](https://github.com/aydabd/match-planner/commit/9de7f5b061780cdca97eb21421fcfedacd961549))
+
 ## [0.3.1](https://github.com/aydabd/match-planner/compare/matchplanner-v0.3.0...matchplanner-v0.3.1) (2026-09-28)
 
 
