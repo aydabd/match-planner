@@ -70,26 +70,30 @@ npm run build      # produktionsbygge till dist/
 npm run preview    # förhandsgranska produktionsbygget lokalt
 ```
 
-## Deploy till GitHub Pages
-
-1. Repo Settings → Pages → Source: **GitHub Actions**.
-2. Pusha till `main`. `.github/workflows/deploy.yml` bygger och publicerar
-   automatiskt till `https://<ditt-användarnamn>.github.io/<repo-namn>/`.
-3. Testerna måste vara gröna innan deploy sker (deploy.yml anropar ci.yml).
-
-Appen är helt statisk - ingen backend, inga hemligheter, ingen databas.
-
-## Release-process
+## Release och deploy
 
 Vi använder [release-please](https://github.com/googleapis/release-please):
-skriv commit-meddelanden enligt [Conventional Commits](https://www.conventionalcommits.org/)
-(`feat: ...`, `fix: ...`, `chore: ...`) så öppnar release-please automatiskt
-en PR med uppdaterad `CHANGELOG.md` och versionsnummer. Slå ihop den PR:n för
-att skapa en GitHub Release.
+skriv commits enligt [Conventional Commits](https://www.conventionalcommits.org/)
+(`feat: ...`, `fix: ...`, `chore: ...`) så håller release-please en PR med
+uppdaterad `CHANGELOG.md` och version öppen. Vi kör inte commitlint/husky för att
+hålla `devDependencies` minimala - skriv commits enligt konventionen manuellt.
 
-Vi kör inte commitlint/husky för att hålla `devDependencies` minimala - det
-är en medveten avvägning, se till att skriva commits enligt konventionen
-manuellt.
+Pipeline (`.github/workflows/release.yml`, körs vid varje push till `main`):
+
+1. **build** - `check`, `typecheck`, tester och `build` körs en enda gång.
+2. **release** - först när build är grön skapas tagg och GitHub Release
+   (`matchplanner-vX.Y.Z`) på exakt den testade committen.
+3. **deploy** - det redan byggda artefaktet publiceras till GitHub Pages.
+   Inget byggs eller testas om.
+
+Misslyckas build/test skapas varken tagg, release eller deploy. Versionen visas
+i appens sidfot (kommer från `package.json`). Pull requests kontrolleras av `ci.yml`.
+
+Node-versionen styrs av `mise.toml` (används både lokalt och i CI). Renovate
+öppnar en PR när en ny stabil Node släpps; att uppgradera är att slå ihop den.
+
+Setup: Repo Settings → Pages → Source: **GitHub Actions**. Appen är helt
+statisk - ingen backend, inga hemligheter, ingen databas.
 
 ## Dela trupper mellan tränare
 

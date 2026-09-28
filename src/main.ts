@@ -3,6 +3,10 @@ import { resumeMatch, startMatch } from "./ui/match.js";
 import { initRosterView } from "./ui/roster.js";
 import { clearSession, loadSession } from "./ui/sessionStorage.js";
 
+for (const el of document.querySelectorAll("[data-app-version]")) {
+	el.textContent = __APP_VERSION__;
+}
+
 const setupViewElement = document.getElementById("setupView");
 const matchViewElement = document.getElementById("matchView");
 
