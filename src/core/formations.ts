@@ -55,35 +55,38 @@ export function isTeamSize(id: string): id is TeamSizeId {
 const MIN_LINES = 2;
 const MAX_LINES = 5;
 
-/** Zone ids and names by number of lines. 3 lines keep the original ids. */
-const LINE_ZONES: Record<number, readonly (readonly [string, string])[]> = {
-	2: [
-		["back", "Back"],
-		["fwd", "Anfall"],
-	],
-	3: [
-		["back", "Back"],
-		["mid", "Mittfält"],
-		["fwd", "Anfall"],
-	],
-	4: [
-		["back", "Back"],
-		["dmid", "Defensivt mittfält"],
-		["amid", "Offensivt mittfält"],
-		["fwd", "Anfall"],
-	],
-	5: [
-		["back", "Back"],
-		["dmid", "Defensivt mittfält"],
-		["mid", "Mittfält"],
-		["amid", "Offensivt mittfält"],
-		["fwd", "Anfall"],
-	],
+/**
+ * Zone ids by number of lines, back to front. 3 lines keep the original ids,
+ * so saved matches stay valid. src/ui/text.ts names each zone.
+ */
+const LINE_ZONE_IDS: Record<number, readonly string[]> = {
+	2: ["back", "fwd"],
+	3: ["back", "mid", "fwd"],
+	4: ["back", "dmid", "amid", "fwd"],
+	5: ["back", "dmid", "mid", "amid", "fwd"],
 };
+
+/** Why a formation is not valid; src/ui/text.ts turns it into a sentence. */
+export type FormationProblem =
+	| { code: "notNumbers" }
+	| { code: "lineCount"; min: number; max: number }
+	| { code: "emptyLine" }
+	| { code: "playerCount"; size: TeamSizeId; got: number; need: number };
 
 export type FormationResult =
 	| { ok: true; formation: string; lines: number[] }
-	| { ok: false; error: string };
+	| { ok: false; problem: FormationProblem };
+
+/** A format id or formation that cannot be used. The message is for developers. */
+export class FormatError extends Error {
+	constructor(
+		message: string,
+		readonly problem?: FormationProblem,
+	) {
+		super(message);
+		this.name = "FormatError";
+	}
+}
 
 /**
  * Validate a formation typed by a coach for a team size. Spaces and any
@@ -95,28 +98,24 @@ export function parseFormation(
 ): FormationResult {
 	const parts = text.trim().split(/\s*[-–—]\s*/);
 	if (!parts.every((part) => /^\d+$/.test(part))) {
-		return {
-			ok: false,
-			error:
-				"Skriv formationen som siffror med bindestreck, till exempel 2-3-1.",
-		};
+		return { ok: false, problem: { code: "notNumbers" } };
 	}
 	const lines = parts.map(Number);
 	if (lines.length < MIN_LINES || lines.length > MAX_LINES) {
 		return {
 			ok: false,
-			error: `En formation har ${MIN_LINES} till ${MAX_LINES} led.`,
+			problem: { code: "lineCount", min: MIN_LINES, max: MAX_LINES },
 		};
 	}
 	if (lines.some((n) => n === 0)) {
-		return { ok: false, error: "Varje led behöver minst en spelare." };
+		return { ok: false, problem: { code: "emptyLine" } };
 	}
 	const total = lines.reduce((sum, n) => sum + n, 0);
 	const { outfield } = TEAM_SIZES[size];
 	if (total !== outfield) {
 		return {
 			ok: false,
-			error: `Formationen har ${total} utespelare, men ${size} behöver ${outfield}.`,
+			problem: { code: "playerCount", size, got: total, need: outfield },
 		};
 	}
 	return { ok: true, formation: lines.join("-"), lines };
@@ -125,15 +124,21 @@ export function parseFormation(
 /** Build the pitch format for a team size and formation. Throws if invalid. */
 export function buildFormat(size: TeamSizeId, formation: string): FormatConfig {
 	const parsed = parseFormation(formation, size);
-	if (!parsed.ok) throw new Error(parsed.error);
-	const names = LINE_ZONES[parsed.lines.length] ?? [];
-	const zones: ZoneConfig[] = parsed.lines.map((count, i) => {
-		const [id, label] = names[i] ?? [`line${i + 1}`, `Led ${i + 1}`];
-		const adjacent = [names[i - 1]?.[0], names[i + 1]?.[0]].filter(
-			(zoneId): zoneId is string => zoneId !== undefined,
+	if (!parsed.ok) {
+		throw new FormatError(
+			`Invalid formation "${formation}" for ${size}`,
+			parsed.problem,
 		);
-		return { id, label, count, adjacent };
-	});
+	}
+	// parseFormation guarantees 2-5 lines, so every line has an id.
+	const ids = LINE_ZONE_IDS[parsed.lines.length] as readonly string[];
+	const zones: ZoneConfig[] = parsed.lines.map((count, i) => ({
+		id: ids[i] as string,
+		count,
+		adjacent: [ids[i - 1], ids[i + 1]].filter(
+			(zoneId): zoneId is string => zoneId !== undefined,
+		),
+	}));
 	const teamSize = TEAM_SIZES[size];
 	return {
 		id: `${size}:${parsed.formation}`,
@@ -183,8 +188,8 @@ export function getFormat(id: string): FormatConfig {
 			return buildFormat(size, formation);
 		}
 	}
-	throw new Error(
-		`Okänt format: "${id}". Använd lagstorlek och formation, till exempel 7v7:2-3-1.`,
+	throw new FormatError(
+		`Unknown format id "${id}"; expected size:formation, e.g. 7v7:2-3-1`,
 	);
 }
 

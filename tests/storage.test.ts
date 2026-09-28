@@ -7,6 +7,17 @@ import {
 	squadFile,
 } from "../src/core/storage.js";
 
+/** The problem code a squad file is rejected with. */
+function problemOf(data: unknown): string | undefined {
+	try {
+		parseRosterFile(data);
+	} catch (err) {
+		if (err instanceof StorageError) return err.problem.code;
+		throw err;
+	}
+	return undefined;
+}
+
 const validPlayers = [
 	{ id: "p1", name: "Liam P" },
 	{ id: "p2", name: "Christos" },
@@ -29,14 +40,14 @@ describe("parseRosterFile - rejects malformed or hostile input", () => {
 	});
 
 	it("rejects an unknown or missing schemaVersion", () => {
-		expect(() =>
-			parseRosterFile({
+		expect(
+			problemOf({
 				schemaVersion: 99,
 				formatId: "7v7",
 				rotationSeconds: 600,
 				players: validPlayers,
 			}),
-		).toThrow(/schemaVersion/);
+		).toBe("schemaVersion");
 		expect(() =>
 			parseRosterFile({
 				formatId: "7v7",
@@ -64,25 +75,25 @@ describe("parseRosterFile - rejects malformed or hostile input", () => {
 	);
 
 	it("rejects an unregistered formatId", () => {
-		expect(() =>
-			parseRosterFile({
+		expect(
+			problemOf({
 				schemaVersion: 1,
 				formatId: "13v13",
 				rotationSeconds: 600,
 				players: validPlayers,
 			}),
-		).toThrow(/formatId/);
+		).toBe("unknownFormat");
 	});
 
 	it("rejects a formation that does not fit the team size", () => {
-		expect(() =>
-			parseRosterFile({
+		expect(
+			problemOf({
 				schemaVersion: 1,
 				formatId: "7v7:2-3-2",
 				rotationSeconds: 600,
 				players: validPlayers,
 			}),
-		).toThrow(/formatId/);
+		).toBe("unknownFormat");
 	});
 
 	it.each([
@@ -143,19 +154,19 @@ describe("parseRosterFile - rejects malformed or hostile input", () => {
 	});
 
 	it("rejects an empty squad", () => {
-		expect(() =>
-			parseRosterFile({
+		expect(
+			problemOf({
 				schemaVersion: 1,
 				formatId: "7v7",
 				rotationSeconds: 600,
 				players: [],
 			}),
-		).toThrow(/tom/);
+		).toBe("emptySquad");
 	});
 
 	it("rejects duplicate player ids", () => {
-		expect(() =>
-			parseRosterFile({
+		expect(
+			problemOf({
 				schemaVersion: 1,
 				formatId: "7v7",
 				rotationSeconds: 600,
@@ -164,7 +175,7 @@ describe("parseRosterFile - rejects malformed or hostile input", () => {
 					{ id: "p1", name: "B" },
 				],
 			}),
-		).toThrow(/Dubblett/);
+		).toBe("duplicateId");
 	});
 
 	it("rejects a player missing a name or id", () => {

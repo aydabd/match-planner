@@ -35,6 +35,7 @@ import {
 	saveSession,
 	type TempSwap,
 } from "./sessionStorage.js";
+import { TEXT } from "./text.js";
 
 interface Els {
 	formatLabel: HTMLElement;
@@ -175,7 +176,7 @@ function benchChip(id: string, idx: number): HTMLElement {
 	if (activeTemp) {
 		const cd = document.createElement("span");
 		cd.className = "bench-countdown";
-		cd.textContent = `tillbaka om ${formatTime(activeTemp.remainingSeconds)}`;
+		cd.textContent = TEXT.match.backIn(formatTime(activeTemp.remainingSeconds));
 		wrap.appendChild(cd);
 	}
 	wrap.addEventListener("click", () => onBenchClick(idx));
@@ -191,7 +192,7 @@ function renderPitch(): void {
 		row.className = "line-row";
 		const label = document.createElement("span");
 		label.className = "zone-label";
-		label.textContent = zone.label;
+		label.textContent = TEXT.match.zoneName(zone.id);
 		const chips = document.createElement("div");
 		chips.className = "line-chips";
 		for (const [idx, id] of (
@@ -211,7 +212,7 @@ function renderBench(): void {
 	if (live.currentAssignment.bench.length === 0) {
 		const empty = document.createElement("p");
 		empty.className = "empty-state";
-		empty.textContent = "Ingen på bänken just nu.";
+		empty.textContent = TEXT.match.emptyBench;
 		els.benchList.appendChild(empty);
 		return;
 	}
@@ -252,17 +253,14 @@ function renderSwapPanel(): void {
 
 	if (live.pendingBenchIdx === null) {
 		els.swapPanel.appendChild(
-			sentence([
-				{ bold: nameOf(outId) },
-				" är vald. Tryck på en bänkspelare som ska in, eller:",
-			]),
+			sentence([{ bold: nameOf(outId) }, TEXT.match.selected]),
 		);
 		const row = document.createElement("div");
 		row.className = "row";
 		const outBtn = document.createElement("button");
 		outBtn.type = "button";
 		outBtn.className = "btn-danger";
-		outBtn.textContent = "Ute resten av matchen";
+		outBtn.textContent = TEXT.match.outForMatch;
 		const selected = live.selected;
 		if (!selected) return;
 		outBtn.addEventListener("click", () =>
@@ -271,7 +269,7 @@ function renderSwapPanel(): void {
 		const cancelBtn = document.createElement("button");
 		cancelBtn.type = "button";
 		cancelBtn.className = "btn-cancel";
-		cancelBtn.textContent = "Avbryt";
+		cancelBtn.textContent = TEXT.match.cancel;
 		cancelBtn.addEventListener("click", () => {
 			if (live) live.selected = null;
 			render();
@@ -289,9 +287,9 @@ function renderSwapPanel(): void {
 		els.swapPanel.appendChild(
 			sentence([
 				{ bold: nameOf(inId) },
-				" går in för ",
+				TEXT.match.goesInFor,
 				{ bold: nameOf(outId) },
-				". Hur länge?",
+				TEXT.match.howLong,
 			]),
 		);
 		const row = document.createElement("div");
@@ -300,20 +298,20 @@ function renderSwapPanel(): void {
 			const b = document.createElement("button");
 			b.type = "button";
 			b.className = "btn-chip";
-			b.textContent = `${secs / 60} min`;
+			b.textContent = TEXT.match.minutes(secs / 60);
 			b.addEventListener("click", () => commitTempSwap(secs));
 			row.appendChild(b);
 		});
 		const untilNext = document.createElement("button");
 		untilNext.type = "button";
 		untilNext.className = "btn-chip";
-		untilNext.textContent = "Till nästa byte";
+		untilNext.textContent = TEXT.match.untilNextSwap;
 		untilNext.addEventListener("click", () => commitTempSwap(null));
 		row.appendChild(untilNext);
 		const cancelBtn = document.createElement("button");
 		cancelBtn.type = "button";
 		cancelBtn.className = "btn-cancel";
-		cancelBtn.textContent = "Avbryt";
+		cancelBtn.textContent = TEXT.match.cancel;
 		cancelBtn.addEventListener("click", () => {
 			if (live) {
 				live.selected = null;
@@ -347,10 +345,10 @@ function renderAlertBanner(): void {
 		const row = document.createElement("div");
 		row.className = "alert-row";
 		const span = document.createElement("span");
-		span.textContent = `${nameOf(id)} spelar inte mer idag`;
+		span.textContent = TEXT.match.notPlayingToday(nameOf(id));
 		const btn = document.createElement("button");
 		btn.type = "button";
-		btn.textContent = "Tillbaka i truppen";
+		btn.textContent = TEXT.match.backInSquad;
 		btn.addEventListener("click", () => {
 			// Rows outlive a single render now, so resolve the match at click time.
 			if (!live) return;
@@ -407,8 +405,8 @@ function renderPreview(): void {
 		p.className = "preview-none";
 		p.textContent =
 			err instanceof SchedulingError
-				? err.message
-				: "Kunde inte beräkna nästa byte.";
+				? TEXT.match.schedulingProblem(err.problem)
+				: TEXT.match.cannotPlanNextSwap;
 		els.previewBody.appendChild(p);
 		return;
 	}
@@ -417,10 +415,20 @@ function renderPreview(): void {
 	const summary = document.createElement("div");
 	summary.className = "next-summary";
 	summary.appendChild(
-		nameColumn("In på planen", "next-in", comingIn, "Ingen ny"),
+		nameColumn(
+			TEXT.match.comingIn,
+			"next-in",
+			comingIn,
+			TEXT.match.noneComingIn,
+		),
 	);
 	summary.appendChild(
-		nameColumn("Ut till bänken", "next-out", goingOut, "Ingen går ut"),
+		nameColumn(
+			TEXT.match.goingOut,
+			"next-out",
+			goingOut,
+			TEXT.match.noneGoingOut,
+		),
 	);
 	els.previewBody.appendChild(summary);
 
@@ -428,7 +436,7 @@ function renderPreview(): void {
 	lineup.className = "next-lineup";
 	lineup.open = wasOpen;
 	const lineupSummary = document.createElement("summary");
-	lineupSummary.textContent = "Visa hela nya laget";
+	lineupSummary.textContent = TEXT.match.showFullLineup;
 	lineup.appendChild(lineupSummary);
 
 	const zonesTopFirst = [...live.format.zones].reverse();
@@ -437,7 +445,7 @@ function renderPreview(): void {
 		row.className = "preview-line";
 		const tag = document.createElement("span");
 		tag.className = "zone-tag";
-		tag.textContent = zone.label;
+		tag.textContent = TEXT.match.zoneName(zone.id);
 		row.appendChild(tag);
 		(next.zones[zone.id] ?? []).forEach((id) => {
 			const c = document.createElement("span");
@@ -449,7 +457,7 @@ function renderPreview(): void {
 				c.classList.add("is-new");
 				const sr = document.createElement("span");
 				sr.className = "visually-hidden";
-				sr.textContent = " (kommer in)";
+				sr.textContent = TEXT.match.comingInHint;
 				c.appendChild(sr);
 			}
 			row.appendChild(c);
@@ -460,7 +468,7 @@ function renderPreview(): void {
 	benchRow.className = "preview-line";
 	const benchTag = document.createElement("span");
 	benchTag.className = "zone-tag";
-	benchTag.textContent = "Bänk";
+	benchTag.textContent = TEXT.match.benchLine;
 	benchRow.appendChild(benchTag);
 	next.bench.forEach((id) => {
 		const c = document.createElement("span");
@@ -471,7 +479,7 @@ function renderPreview(): void {
 	lineup.appendChild(benchRow);
 	const legend = document.createElement("p");
 	legend.className = "hint";
-	legend.textContent = "Gula namn kommer in från bänken.";
+	legend.textContent = TEXT.match.comingInLegend;
 	lineup.appendChild(legend);
 	els.previewBody.appendChild(lineup);
 }
@@ -504,7 +512,7 @@ function renderPlaytime(): void {
 		if (status === "on-pitch") {
 			const tag = document.createElement("span");
 			tag.className = "pt-status";
-			tag.textContent = "på planen";
+			tag.textContent = TEXT.match.onPitch;
 			nameEl.appendChild(tag);
 		}
 		const timeEl = document.createElement("span");
@@ -529,7 +537,9 @@ function render(): void {
 	const rotationText = String(live.rotationIndex + 1);
 	if (els.rotationLabel.textContent !== rotationText)
 		els.rotationLabel.textContent = rotationText;
-	els.fairnessLabel.textContent = `Skillnad i speltid ${formatTime(fairnessSpread(live.schedulerState))}`;
+	els.fairnessLabel.textContent = TEXT.match.fairness(
+		formatTime(fairnessSpread(live.schedulerState)),
+	);
 	renderPitch();
 	renderBench();
 	renderSwapPanel();
@@ -612,10 +622,10 @@ function updateTimerDisplay(): void {
 	els.clockCard.classList.toggle("is-due", due);
 	els.timerProgress.style.width = `${progress * 100}%`;
 	els.timerRemaining.textContent = due
-		? "Dags att byta!"
-		: `${formatTime(remainingSeconds)} kvar till nästa byte`;
+		? TEXT.match.swapDue
+		: TEXT.match.timeLeft(formatTime(remainingSeconds));
 	els.startBtn.textContent =
-		live.elapsedSeconds > 0 ? "Fortsätt" : "Starta klockan";
+		live.elapsedSeconds > 0 ? TEXT.match.continueClock : TEXT.match.startClock;
 }
 
 function startClock(): void {
@@ -721,21 +731,20 @@ export function initMatchView(callbacks: MatchCallbacks): void {
 		if (!els.lateArrivalPanel.classList.contains("show")) return;
 		els.lateArrivalPanel.innerHTML = "";
 		const title = document.createElement("p");
-		title.textContent =
-			"Spelaren hamnar på bänken och kommer med i nästa byte.";
+		title.textContent = TEXT.match.lateArrivalHelp;
 		els.lateArrivalPanel.appendChild(title);
 		const form = document.createElement("form");
 		form.className = "add-player-form";
 		const input = document.createElement("input");
 		input.type = "text";
-		input.setAttribute("aria-label", "Namn på spelaren som kom sent");
-		input.placeholder = "Namn på spelaren som just kom";
+		input.setAttribute("aria-label", TEXT.match.lateArrivalLabel);
+		input.placeholder = TEXT.match.lateArrivalPlaceholder;
 		input.maxLength = LIMITS.playerNameLength;
 		input.required = true;
 		const btn = document.createElement("button");
 		btn.type = "submit";
 		btn.className = "btn btn-primary";
-		btn.textContent = "Lägg till";
+		btn.textContent = TEXT.match.add;
 		form.appendChild(input);
 		form.appendChild(btn);
 		form.addEventListener("submit", (e) => {
@@ -760,18 +769,18 @@ export function initMatchView(callbacks: MatchCallbacks): void {
 		if (!live || !els) return;
 		if (!resetArmed) {
 			resetArmed = true;
-			els.resetBtn.textContent = "Tryck igen för att nollställa";
+			els.resetBtn.textContent = TEXT.match.confirmReset;
 			els.resetBtn.classList.add("confirming");
 			const elements = els;
 			resetArmTimeout = setTimeout(() => {
 				resetArmed = false;
-				elements.resetBtn.textContent = "Nollställ matchen";
+				elements.resetBtn.textContent = TEXT.match.reset;
 				elements.resetBtn.classList.remove("confirming");
 			}, 3000);
 		} else {
 			if (resetArmTimeout) clearTimeout(resetArmTimeout);
 			resetArmed = false;
-			els.resetBtn.textContent = "Nollställ matchen";
+			els.resetBtn.textContent = TEXT.match.reset;
 			els.resetBtn.classList.remove("confirming");
 			els.matchMenu.open = false;
 			clearSession();
@@ -795,7 +804,10 @@ export function initMatchView(callbacks: MatchCallbacks): void {
 function loadLive(next: LiveMatch): void {
 	live = next;
 	if (!els) return;
-	els.formatLabel.textContent = `${live.format.label}, byte var ${Math.round(live.schedulerState.rotationSeconds / 60)} min`;
+	els.formatLabel.textContent = TEXT.match.formatLabel(
+		live.format.label,
+		Math.round(live.schedulerState.rotationSeconds / 60),
+	);
 	els.startBtn.disabled =
 		live.elapsedSeconds >= live.schedulerState.rotationSeconds;
 	els.pauseBtn.disabled = true;

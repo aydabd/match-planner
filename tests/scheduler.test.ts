@@ -18,6 +18,17 @@ function ids(n: number): string[] {
 	return Array.from({ length: n }, (_, i) => `p${i + 1}`);
 }
 
+/** The problem a SchedulingError carries, or undefined if nothing was thrown. */
+function problemOf(run: () => unknown) {
+	try {
+		run();
+	} catch (err) {
+		if (err instanceof SchedulingError) return err.problem;
+		throw err;
+	}
+	return undefined;
+}
+
 function simulate(state: SchedulerState, rotations: number): void {
 	for (let i = 0; i < rotations; i++) {
 		const assignment = generateRotation(state);
@@ -48,6 +59,11 @@ describe("generateRotation - single rotation shape", () => {
 	it("throws SchedulingError with too few available players for the format", () => {
 		const state = createSchedulerState(FORMAT_7V7, 600, ids(5));
 		expect(() => generateRotation(state)).toThrow(SchedulingError);
+		expect(problemOf(() => generateRotation(state))).toEqual({
+			code: "tooFewPlayers",
+			available: 5,
+			need: 6,
+		});
 	});
 
 	it("never selects an unavailable player", () => {
@@ -162,7 +178,9 @@ describe("full-match simulation - property tests", () => {
 		for (const id of ids(7)) {
 			state.players[id]?.zonesPlayed.push("back");
 		}
-		expect(() => generateRotation(state)).toThrow(SchedulingError);
+		expect(problemOf(() => generateRotation(state))).toEqual({
+			code: "cannotFillLineup",
+		});
 	});
 });
 
@@ -184,7 +202,6 @@ function formation(...lines: number[]): FormatConfig {
 		label: lines.join("-"),
 		zones: lines.map((count, i) => ({
 			id: names[i] ?? `z${i}`,
-			label: names[i] ?? `z${i}`,
 			count,
 			adjacent: [names[i - 1], names[i + 1]].filter(
 				(z): z is string => z !== undefined,

@@ -12,8 +12,24 @@ export interface RosterFile {
 	players: Player[];
 }
 
+/** Why a squad file was refused; src/ui/text.ts turns it into a sentence. */
+export type SquadFileProblem =
+	| { code: "notObject" }
+	| { code: "schemaVersion" }
+	| { code: "unknownFormat" }
+	| { code: "rotation" }
+	| { code: "playersNotList" }
+	| { code: "emptySquad" }
+	| { code: "tooManyPlayers"; max: number }
+	| { code: "invalidPlayer"; position: number }
+	| { code: "duplicateId" };
+
+/** A squad file that cannot be used. The message is for developers. */
 export class StorageError extends Error {
-	constructor(message: string) {
+	constructor(
+		message: string,
+		readonly problem: SquadFileProblem,
+	) {
 		super(message);
 		this.name = "StorageError";
 	}
@@ -87,57 +103,76 @@ export function parseRosterFile(
 	options: ParseOptions = {},
 ): RosterFile {
 	if (typeof data !== "object" || data === null) {
-		throw new StorageError("Filen ar inte ett giltigt JSON-objekt.");
+		throw new StorageError("Squad file is not a JSON object", {
+			code: "notObject",
+		});
 	}
 	const obj = data as Record<string, unknown>;
 
 	if (obj.schemaVersion !== 1) {
 		throw new StorageError(
-			`Okant eller saknat schemaVersion (forvantade 1, fick ${JSON.stringify(obj.schemaVersion)}).`,
+			`Unknown or missing schemaVersion (expected 1, got ${JSON.stringify(obj.schemaVersion)})`,
+			{ code: "schemaVersion" },
 		);
 	}
 
 	const formatId =
 		typeof obj.formatId === "string" ? canonicalFormatId(obj.formatId) : null;
 	if (formatId === null) {
-		throw new StorageError(
-			`Okänt formatId "${String(obj.formatId)}". Använd lagstorlek och formation, till exempel 7v7:2-3-1.`,
-		);
+		throw new StorageError(`Unknown formatId "${String(obj.formatId)}"`, {
+			code: "unknownFormat",
+		});
 	}
 
 	if (
 		typeof obj.rotationSeconds !== "number" ||
 		!isAllowedRotation(obj.rotationSeconds)
 	) {
-		throw new StorageError("rotationSeconds maste vara ett positivt tal.");
+		throw new StorageError("rotationSeconds must be a positive number", {
+			code: "rotation",
+		});
 	}
 
 	if (!Array.isArray(obj.players)) {
-		throw new StorageError("players maste vara en lista.");
+		throw new StorageError("players must be a list", {
+			code: "playersNotList",
+		});
 	}
 	if (obj.players.length === 0 && !options.allowEmptySquad) {
-		throw new StorageError("Truppen ar tom.");
+		throw new StorageError("The squad is empty", { code: "emptySquad" });
 	}
 	if (obj.players.length > LIMITS.squadSize) {
-		throw new StorageError(`For manga spelare (max ${LIMITS.squadSize}).`);
+		throw new StorageError(`More than ${LIMITS.squadSize} players`, {
+			code: "tooManyPlayers",
+			max: LIMITS.squadSize,
+		});
 	}
 
 	const seenIds = new Set<string>();
 	const players: Player[] = obj.players.map((raw, index) => {
 		if (typeof raw !== "object" || raw === null) {
-			throw new StorageError(
-				`Spelare pa index ${index} ar inte ett giltigt objekt.`,
-			);
+			throw new StorageError(`Player at index ${index} is not an object`, {
+				code: "invalidPlayer",
+				position: index + 1,
+			});
 		}
 		const p = raw as Record<string, unknown>;
 		if (typeof p.id !== "string" || p.id.trim() === "") {
-			throw new StorageError(`Spelare pa index ${index} saknar giltigt id.`);
+			throw new StorageError(`Player at index ${index} has no valid id`, {
+				code: "invalidPlayer",
+				position: index + 1,
+			});
 		}
 		if (typeof p.name !== "string" || p.name.trim() === "") {
-			throw new StorageError(`Spelare pa index ${index} saknar giltigt namn.`);
+			throw new StorageError(`Player at index ${index} has no valid name`, {
+				code: "invalidPlayer",
+				position: index + 1,
+			});
 		}
 		if (seenIds.has(p.id)) {
-			throw new StorageError(`Dubblett-id "${p.id}" i truppen.`);
+			throw new StorageError(`Duplicate player id "${p.id}"`, {
+				code: "duplicateId",
+			});
 		}
 		seenIds.add(p.id);
 		const name = p.name.trim().slice(0, LIMITS.playerNameLength);
