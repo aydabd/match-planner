@@ -9,8 +9,12 @@ npx playwright test --ui               # watch and debug interactively
 npx playwright test --repeat-each=10   # check for flakiness before pushing
 ```
 
-The suite runs on every pull request (CI job **E2E**) and again in the
-release workflow. There it tests the exact `dist/` that gets deployed,
+The suite runs on pull requests that change app code, the e2e suite,
+build or runtime config, or dependencies (`src/`, `public/`, `e2e/`,
+`index.html`, `package*.json`, `mise.*`, `vite`/`playwright` config,
+`tsconfig.json`). Other PRs (docs, rulesets, unit tests, workflows) skip it,
+and the skipped **E2E** check still counts as passed. The suite always runs
+again in the release workflow. There it tests the exact `dist/` that gets deployed,
 served under the GitHub Pages base path:
 
 ```sh
