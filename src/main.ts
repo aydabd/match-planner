@@ -10,6 +10,10 @@ for (const el of document.querySelectorAll("[data-app-version]")) {
 	el.textContent = __APP_VERSION__;
 }
 
+for (const el of document.querySelectorAll("[data-copyright]")) {
+	el.textContent = __COPYRIGHT__;
+}
+
 function byId(id: string): HTMLElement {
 	const el = document.getElementById(id);
 	if (!el)

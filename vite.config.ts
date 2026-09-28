@@ -10,6 +10,19 @@ const { version } = JSON.parse(readFileSync("package.json", "utf8")) as {
 	version: string;
 };
 
+// "Copyright (c) 2026 Holder" from LICENSE, shown in the footer as "© 2026 Holder".
+// The build fails if LICENSE does not start that way, so the footer can never
+// ship without its copyright line.
+const licenseLine = /^Copyright \(c\) (.+)$/m.exec(
+	readFileSync("LICENSE", "utf8"),
+)?.[1];
+if (!licenseLine?.trim()) {
+	throw new Error(
+		'LICENSE must contain a line like "Copyright (c) 2026 Holder"; the footer shows it.',
+	);
+}
+const copyright = licenseLine.trim();
+
 // GitHub Pages project sites are served from https://<user>.github.io/<repo>/,
 // so the base path must match the repo name. Set BASE_PATH as a build-time
 // env var in CI (see .github/workflows/release.yml). Defaults to "/" for local
@@ -36,7 +49,10 @@ export default defineConfig(({ mode }) => ({
 	plugins: [serviceWorker(version)],
 	base: process.env.BASE_PATH ?? "/",
 	// Shown in the UI footer; comes from package.json, which release-please bumps.
-	define: { __APP_VERSION__: JSON.stringify(version) },
+	define: {
+		__APP_VERSION__: JSON.stringify(version),
+		__COPYRIGHT__: JSON.stringify(`© ${copyright}`),
+	},
 	build: {
 		target: "es2020",
 		sourcemap: mode !== "production",
