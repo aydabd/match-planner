@@ -3,6 +3,13 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.2.2](https://github.com/aydabd/match-planner/compare/matchplanner-v0.2.1...matchplanner-v0.2.2) (2026-09-28)
+
+
+### Bug Fixes
+
+* **ci:** build once, tag after green, deploy the tested build ([#6](https://github.com/aydabd/match-planner/issues/6)) ([e790dd4](https://github.com/aydabd/match-planner/commit/e790dd44ebb9020d2054171c9172d31cd2e27a63))
+
 ## [0.2.1](https://github.com/aydabd/match-planner/compare/matchplanner-v0.2.0...matchplanner-v0.2.1) (2026-09-28)
 
 
