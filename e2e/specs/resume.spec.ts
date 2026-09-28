@@ -138,4 +138,32 @@ test.describe("Resuming after the page reloads", () => {
 		await expect(match.time).toHaveText("03:00");
 		await expect(match.playtime("Alva")).toHaveText("03:00");
 	});
+
+	test("a reload mid-swap keeps what's still due and does not repeat the swap already made", async ({
+		startedMatch: match,
+		page,
+	}) => {
+		await match.startClock();
+		await match.play(10);
+		await match.play(20 / 60);
+		// Two substitutions are due (Greta in for Ebba, Hugo in for Filip);
+		// only the first is made before the reload.
+		await match.confirmSwap("Greta");
+
+		await page.reload();
+
+		await expect(match.pitchPlayer("Greta")).toBeVisible();
+		await expect(match.benchPlayer("Ebba")).toBeVisible();
+		await expect(match.swapRows.locator(".swap-title")).toHaveText([
+			"Hugo in för Filip",
+		]);
+		await expect(match.periodAndSwap).toHaveText("Period 1 av 3, byte 1");
+
+		await match.confirmSwap("Hugo");
+
+		await expect(match.periodAndSwap).toHaveText("Period 1 av 3, byte 2");
+		await expect(match.swapRows).toHaveCount(0);
+		await expect(match.playtime("Ebba")).toHaveText("10:20");
+		await expect(match.playtime("Filip")).toHaveText("10:20");
+	});
 });
