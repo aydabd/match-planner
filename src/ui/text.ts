@@ -86,9 +86,16 @@ export const TEXT = {
 		formatLabel: (format: string, minutes: number) =>
 			`${format}, byte var ${minutes} min`,
 		fairness: (spread: string) => `Skillnad i speltid ${spread}`,
-		swapDue: "Dags att byta!",
+		swapDue: (late: string, isLate: boolean) =>
+			isLate ? `Dags att byta! ${late} sen` : "Dags att byta!",
+		periodOf: (period: number, periods: number) =>
+			`Period ${period} av ${periods}`,
+		periodLeft: (time: string) => `${time} kvar av perioden`,
+		periodOver: (period: number) => `Period ${period} är slut.`,
+		matchOver: "Matchen är slut.",
+		startPeriod: (period: number) => `Starta period ${period}`,
+		kickoff: "Starta matchen",
 		timeLeft: (time: string) => `${time} kvar till nästa byte`,
-		startClock: "Starta klockan",
 		continueClock: "Fortsätt",
 		cannotPlanNextSwap: "Kunde inte beräkna nästa byte.",
 		schedulingProblem(problem: SchedulingProblem): string {

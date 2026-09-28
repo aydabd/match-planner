@@ -25,12 +25,20 @@ export const LIMITS = {
 } as const;
 
 /**
- * Minutes between swaps from what the coach typed, rounded and kept within
- * LIMITS. Anything that is not a number keeps `current` instead of guessing.
+ * A whole number from what the coach typed, rounded and kept within `range`.
+ * Anything that is not a number keeps `current` instead of guessing.
  */
-export function rotationMinutesFrom(input: string, current: number): number {
+export function numberWithin(
+	input: string,
+	range: { min: number; max: number },
+	current: number,
+): number {
 	const value = Number.parseFloat(input);
 	if (!Number.isFinite(value)) return current;
-	const { min, max } = LIMITS.rotationMinutes;
-	return Math.min(max, Math.max(min, Math.round(value)));
+	return Math.min(range.max, Math.max(range.min, Math.round(value)));
+}
+
+/** Minutes between swaps from what the coach typed, within LIMITS. */
+export function rotationMinutesFrom(input: string, current: number): number {
+	return numberWithin(input, LIMITS.rotationMinutes, current);
 }

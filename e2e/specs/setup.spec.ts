@@ -86,6 +86,26 @@ test.describe("Setting up a match", () => {
 		await expect(setup.minutesBetweenSwaps).toHaveValue("1");
 	});
 
+	test("the team size sets the match length, and the coach can change it", async ({
+		setup,
+		match,
+	}) => {
+		await expect(setup.periods).toHaveValue("3");
+		await expect(setup.periodMinutes).toHaveValue("20");
+
+		await setup.chooseTeamSize("11v11");
+		await expect(setup.periods).toHaveValue("2");
+		await expect(setup.periodMinutes).toHaveValue("40");
+
+		await setup.chooseTeamSize("7v7");
+		await setup.setMatchLength(2, 25);
+		await setup.addPlayers(SQUAD);
+		await setup.startMatch();
+
+		await expect(match.periodAndSwap).toHaveText("Period 1 av 2, byte 1");
+		await expect(match.periodTimeLeft).toHaveText("25:00 kvar av perioden");
+	});
+
 	test("the squad and settings are kept after a reload", async ({
 		setup,
 		page,

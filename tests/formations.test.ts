@@ -11,6 +11,7 @@ import {
 	parseFormation,
 	TEAM_SIZES,
 	type TeamSizeId,
+	teamSizeOf,
 } from "../src/core/formations.js";
 
 describe("team sizes", () => {
@@ -194,5 +195,15 @@ describe("quick-pick formats", () => {
 				}
 			}
 		}
+	});
+});
+
+describe("teamSizeOf", () => {
+	it.each([
+		["9v9:3-3-2", "9v9"],
+		["11v11:4-2-1-2-1", "11v11"],
+		["7v7", "7v7"],
+	])("%s is a %s team", (id, size) => {
+		expect(teamSizeOf(id)).toBe(size);
 	});
 });

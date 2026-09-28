@@ -1,7 +1,6 @@
 import { getFormat } from "../core/formations.js";
 import { LIMITS } from "../core/limits.js";
 import {
-	clockStatus,
 	cloneAssignment,
 	formatTime,
 	generateRotationSafe,
@@ -13,6 +12,17 @@ import {
 	undoTempSwaps,
 } from "../core/match.js";
 import {
+	kickoff,
+	lineupChanged,
+	type MatchClock,
+	type MatchPlan,
+	NEW_CLOCK,
+	periodStatus,
+	rotationStatus,
+	startNextPeriod,
+	tick as tickClock,
+} from "../core/matchClock.js";
+import {
 	applyElapsed,
 	createSchedulerState,
 	fairnessSpread,
@@ -21,7 +31,7 @@ import {
 	addPlayer as schedulerAddPlayer,
 	setUnavailable,
 } from "../core/scheduler.js";
-import type { RosterFile } from "../core/storage.js";
+import type { MatchDetails, RosterFile } from "../core/storage.js";
 import type {
 	FormatConfig,
 	RotationAssignment,
@@ -42,6 +52,9 @@ interface Els {
 	formatLabel: HTMLElement;
 	rotationLabel: HTMLElement;
 	fairnessLabel: HTMLElement;
+	periodLabel: HTMLElement;
+	periodTime: HTMLElement;
+	nextPeriodBtn: HTMLButtonElement;
 	timerDisplay: HTMLElement;
 	timerProgress: HTMLElement;
 	timerRemaining: HTMLElement;
@@ -72,6 +85,9 @@ function getEls(): Els {
 		formatLabel: byId("formatLabel"),
 		rotationLabel: byId("rotationLabel"),
 		fairnessLabel: byId("fairnessLabel"),
+		periodLabel: byId("periodLabel"),
+		periodTime: byId("periodTime"),
+		nextPeriodBtn: byId("nextPeriodBtn"),
 		timerDisplay: byId("timerDisplay"),
 		timerProgress: byId("timerProgress"),
 		timerRemaining: byId("timerRemaining"),
@@ -110,7 +126,10 @@ interface LiveMatch {
 	playerNames: Map<string, string>;
 	format: FormatConfig;
 	rotationIndex: number;
-	elapsedSeconds: number;
+	plan: MatchPlan;
+	clock: MatchClock;
+	match: MatchDetails;
+	/** The interval is ticking (the coach has not paused). */
 	running: boolean;
 	timerHandle: ReturnType<typeof setInterval> | null;
 	currentAssignment: MutableAssignment;
@@ -142,14 +161,15 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 	function persist(): void {
 		if (!live) return;
 		const session: MatchSession = {
-			schemaVersion: 1,
+			schemaVersion: 2,
 			formatId: live.format.id,
-			rotationSeconds: live.schedulerState.rotationSeconds,
+			plan: live.plan,
+			clock: live.clock,
+			match: live.match,
 			playerNames: Object.fromEntries(live.playerNames.entries()),
 			schedulerPlayers: live.schedulerState.players,
 			schedulerOrder: live.schedulerState.order,
 			rotationIndex: live.rotationIndex,
-			elapsedSeconds: live.elapsedSeconds,
 			currentAssignment: live.currentAssignment,
 			tempSwaps: live.tempSwaps,
 		};
@@ -611,99 +631,139 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 	}
 
 	// ---------------- clock ----------------
+	// The rules live in core/matchClock.ts; here we only tick it once a second
+	// while the match is running and show its state.
 
 	function tick(): void {
-		if (!live) return;
+		if (live?.clock.phase !== "playing") return;
 		applyElapsed(live.schedulerState, live.currentAssignment, 1);
 		live.tempSwaps = tickTempSwaps(live.currentAssignment, live.tempSwaps, 1);
-		live.elapsedSeconds += 1;
-		if (live.elapsedSeconds >= live.schedulerState.rotationSeconds) {
-			live.elapsedSeconds = live.schedulerState.rotationSeconds;
-			stopClock();
-			els.newTeamBtn.classList.add("show");
-		}
-		updateTimerDisplay();
+		const result = tickClock(live.clock, live.plan);
+		live.clock = result.clock;
+		// A period end stops the clock; the coach starts the next period.
+		if (live.clock.phase !== "playing") stopTimer();
+		refreshClock();
 		render();
 	}
 
-	function updateTimerDisplay(): void {
+	/** Timer, period and buttons, all from the match state in one place. */
+	function refreshClock(): void {
 		if (!live) return;
-		const { due, progress, remainingSeconds } = clockStatus(
-			live.elapsedSeconds,
-			live.schedulerState.rotationSeconds,
-		);
-		els.timerDisplay.textContent = formatTime(live.elapsedSeconds);
+		const { clock, plan } = live;
+		const rotation = rotationStatus(clock, plan);
+		const period = periodStatus(clock, plan);
+		const due = clock.phase === "playing" && rotation.due;
+
+		els.timerDisplay.textContent = formatTime(clock.rotationElapsed);
 		els.timerDisplay.classList.toggle("done", due);
 		els.clockCard.classList.toggle("is-due", due);
-		els.timerProgress.style.width = `${progress * 100}%`;
-		els.timerRemaining.textContent = due
-			? TEXT.match.swapDue
-			: TEXT.match.timeLeft(formatTime(remainingSeconds));
+		els.timerProgress.style.width = `${rotation.progress * 100}%`;
+		els.timerRemaining.textContent =
+			clock.phase === "finished"
+				? TEXT.match.matchOver
+				: clock.phase === "periodBreak"
+					? TEXT.match.periodOver(clock.period)
+					: due
+						? TEXT.match.swapDue(
+								formatTime(rotation.lateSeconds),
+								rotation.lateSeconds > 0,
+							)
+						: TEXT.match.timeLeft(formatTime(rotation.remainingSeconds));
+
+		// Inside a live region: only write when the text changes.
+		const periodText = TEXT.match.periodOf(period.period, period.periods);
+		if (els.periodLabel.textContent !== periodText)
+			els.periodLabel.textContent = periodText;
+		els.periodTime.textContent = TEXT.match.periodLeft(
+			formatTime(period.remainingSeconds),
+		);
+
+		// One obvious action at a time (disabled buttons are hidden).
+		const canRun = clock.phase === "beforeKickoff" || clock.phase === "playing";
+		els.startBtn.disabled = live.running || !canRun;
 		els.startBtn.textContent =
-			live.elapsedSeconds > 0
-				? TEXT.match.continueClock
-				: TEXT.match.startClock;
+			clock.phase === "beforeKickoff"
+				? TEXT.match.kickoff
+				: TEXT.match.continueClock;
+		els.pauseBtn.disabled = !live.running;
+		els.newTeamBtn.classList.toggle("show", due);
+		els.nextPeriodBtn.disabled = clock.phase !== "periodBreak";
+		els.nextPeriodBtn.textContent = TEXT.match.startPeriod(clock.period + 1);
 	}
 
 	function startClock(): void {
-		if (!live) return;
-		if (
-			live.running ||
-			live.elapsedSeconds >= live.schedulerState.rotationSeconds
-		)
-			return;
+		if (!live || live.running) return;
+		live.clock = kickoff(live.clock);
+		if (live.clock.phase !== "playing") return;
 		live.running = true;
-		els.startBtn.disabled = true;
-		els.pauseBtn.disabled = false;
 		live.timerHandle = setInterval(tick, 1000);
+		refreshClock();
 	}
 
-	function stopClock(): void {
+	function stopTimer(): void {
 		if (!live) return;
 		live.running = false;
 		if (live.timerHandle !== null) clearInterval(live.timerHandle);
-		els.startBtn.disabled =
-			live.elapsedSeconds >= live.schedulerState.rotationSeconds;
-		els.pauseBtn.disabled = true;
+		live.timerHandle = null;
 	}
 
 	function pauseClock(): void {
-		if (!live) return;
-		if (!live.running) return;
-		stopClock();
-		els.startBtn.disabled = false;
+		if (!live?.running) return;
+		stopTimer();
+		refreshClock();
 	}
 
 	function testByte(): void {
 		if (!live) return;
-		if (live.elapsedSeconds >= live.schedulerState.rotationSeconds) return;
-		live.elapsedSeconds = live.schedulerState.rotationSeconds - 2;
-		updateTimerDisplay();
+		live.clock = {
+			...live.clock,
+			rotationElapsed: Math.max(0, live.plan.rotationSeconds - 2),
+		};
 		startClock();
+		refreshClock();
+	}
+
+	/** Put the scheduler's next lineup on; the swap timer starts again. */
+	function putNextLineupOn(): void {
+		if (!live) return;
+		live.rotationIndex += 1;
+		live.currentAssignment = cloneAssignment(
+			generateRotationSafe(live.schedulerState),
+		);
+		live.tempSwaps = [];
+		live.selected = null;
+		live.pendingBenchIdx = null;
+		live.clock = lineupChanged(live.clock);
 	}
 
 	function advanceRotation(): void {
 		if (!live) return;
-		els.pitch.classList.add("fade-out");
-		els.benchList.classList.add("fade-out");
-		setTimeout(() => {
+		const swap = () => {
 			if (!live) return;
-			live.rotationIndex += 1;
-			live.currentAssignment = cloneAssignment(
-				generateRotationSafe(live.schedulerState),
-			);
-			live.tempSwaps = [];
-			live.selected = null;
-			live.pendingBenchIdx = null;
-			live.elapsedSeconds = 0;
-			updateTimerDisplay();
-			els.newTeamBtn.classList.remove("show");
-			els.startBtn.disabled = false;
-			els.pauseBtn.disabled = true;
+			putNextLineupOn();
+			refreshClock();
 			render();
 			els.pitch.classList.remove("fade-out");
 			els.benchList.classList.remove("fade-out");
-		}, 380);
+		};
+		// With reduced motion there is no fade to wait for.
+		if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+			swap();
+			return;
+		}
+		els.pitch.classList.add("fade-out");
+		els.benchList.classList.add("fade-out");
+		setTimeout(swap, 380);
+	}
+
+	/** After a break: next period, next lineup, clock running. */
+	function beginNextPeriod(): void {
+		if (live?.clock.phase !== "periodBreak") return;
+		putNextLineupOn();
+		live.clock = startNextPeriod(live.clock, live.plan);
+		startClock();
+		refreshClock();
+		render();
 	}
 
 	// ---------------- public API ----------------
@@ -725,6 +785,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		els.pauseBtn.addEventListener("click", pauseClock);
 		els.testBtn.addEventListener("click", testByte);
 		els.newTeamBtn.addEventListener("click", advanceRotation);
+		els.nextPeriodBtn.addEventListener("click", beginNextPeriod);
 		els.undoBtn.addEventListener("click", () => {
 			if (!live) return;
 			undoTempSwaps(live.currentAssignment, live.tempSwaps);
@@ -780,22 +841,17 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 				if (!live) return;
 				els.matchMenu.open = false;
 				clearSession();
-				stopClock();
+				stopTimer();
 				resetPlayers(live.schedulerState);
 				live.rotationIndex = 0;
-				live.elapsedSeconds = 0;
+				live.clock = NEW_CLOCK;
 				live.currentAssignment = cloneAssignment(
 					generateRotationSafe(live.schedulerState),
 				);
 				live.tempSwaps = [];
 				live.selected = null;
 				live.pendingBenchIdx = null;
-				// stopClock() ran while the swap may have been due, which disables
-				// Start; the match is back at 00:00, so it can start again.
-				els.startBtn.disabled = false;
-				els.pauseBtn.disabled = true;
-				els.newTeamBtn.classList.remove("show");
-				updateTimerDisplay();
+				refreshClock();
 				render();
 			},
 		});
@@ -807,15 +863,8 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			live.format.label,
 			Math.round(live.schedulerState.rotationSeconds / 60),
 		);
-		els.startBtn.disabled =
-			live.elapsedSeconds >= live.schedulerState.rotationSeconds;
-		els.pauseBtn.disabled = true;
-		els.newTeamBtn.classList.toggle(
-			"show",
-			live.elapsedSeconds >= live.schedulerState.rotationSeconds,
-		);
 		els.lateArrivalPanel.classList.remove("show");
-		updateTimerDisplay();
+		refreshClock();
 		render();
 	}
 
@@ -834,7 +883,13 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			playerNames,
 			format,
 			rotationIndex: 0,
-			elapsedSeconds: 0,
+			plan: {
+				periods: roster.periods,
+				periodSeconds: roster.periodSeconds,
+				rotationSeconds: roster.rotationSeconds,
+			},
+			clock: NEW_CLOCK,
+			match: roster.match,
 			running: false,
 			timerHandle: null,
 			currentAssignment: cloneAssignment(generateRotationSafe(schedulerState)),
@@ -850,7 +905,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		const format = getFormat(session.formatId);
 		const schedulerState: SchedulerState = {
 			format,
-			rotationSeconds: session.rotationSeconds,
+			rotationSeconds: session.plan.rotationSeconds,
 			players: session.schedulerPlayers,
 			order: session.schedulerOrder,
 		};
@@ -860,7 +915,9 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			playerNames,
 			format,
 			rotationIndex: session.rotationIndex,
-			elapsedSeconds: session.elapsedSeconds,
+			plan: session.plan,
+			clock: session.clock,
+			match: session.match,
 			running: false,
 			timerHandle: null,
 			currentAssignment:

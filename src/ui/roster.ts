@@ -1,12 +1,14 @@
-import { getFormat, outfieldCount } from "../core/formations.js";
-import { LIMITS, rotationMinutesFrom } from "../core/limits.js";
+import { getFormat, outfieldCount, teamSizeOf } from "../core/formations.js";
+import { LIMITS, numberWithin, rotationMinutesFrom } from "../core/limits.js";
 import {
+	newRoster,
 	parseRosterFile,
 	type RosterFile,
 	StorageError,
 	squadFile,
 } from "../core/storage.js";
 import type { Player } from "../core/types.js";
+import { loadCoachName, saveCoachName } from "./coachName.js";
 import { confirmWithSecondTap } from "./confirmButton.js";
 import { emptyDraft, loadDraft, saveDraft } from "./draftStorage.js";
 import { initFormationPicker } from "./formationPicker.js";
@@ -50,10 +52,28 @@ export function createRosterView(callbacks: RosterViewCallbacks): void {
 		"squadFullMessage",
 	) as HTMLElement;
 
+	const byId = <T extends HTMLElement>(id: string) =>
+		document.getElementById(id) as T;
+	const periodsInput = byId<HTMLInputElement>("periodsInput");
+	const periodMinutesInput = byId<HTMLInputElement>("periodMinutesInput");
+	const opponentInput = byId<HTMLInputElement>("opponentInput");
+	const venueInput = byId<HTMLInputElement>("venueInput");
+	const matchDateInput = byId<HTMLInputElement>("matchDateInput");
+	const coachNameInput = byId<HTMLInputElement>("coachNameInput");
+
 	// Limits come from core/limits.ts, never from numbers written in the HTML.
 	rotationInput.min = String(LIMITS.rotationMinutes.min);
 	rotationInput.max = String(LIMITS.rotationMinutes.max);
+	periodsInput.min = String(LIMITS.periods.min);
+	periodsInput.max = String(LIMITS.periods.max);
+	periodMinutesInput.min = String(LIMITS.periodMinutes.min);
+	periodMinutesInput.max = String(LIMITS.periodMinutes.max);
 	nameInput.maxLength = LIMITS.playerNameLength;
+	for (const input of [opponentInput, venueInput]) {
+		input.maxLength = LIMITS.matchDetailLength;
+	}
+	coachNameInput.maxLength = LIMITS.coachNameLength;
+	coachNameInput.value = loadCoachName();
 	const exportBtn = document.getElementById("exportBtn") as HTMLButtonElement;
 	const importInput = document.getElementById(
 		"importInput",
@@ -71,7 +91,18 @@ export function createRosterView(callbacks: RosterViewCallbacks): void {
 		onChange: (formatId) => {
 			formationValid = formatId !== null;
 			if (formatId !== null && formatId !== draft.formatId) {
-				draft = { ...draft, formatId };
+				// A new team size brings its own match length; a new formation
+				// for the same team size keeps what the coach set.
+				const sizeChanged = teamSizeOf(formatId) !== teamSizeOf(draft.formatId);
+				const defaults = newRoster({ formatId });
+				draft = sizeChanged
+					? {
+							...draft,
+							formatId,
+							periods: defaults.periods,
+							periodSeconds: defaults.periodSeconds,
+						}
+					: { ...draft, formatId };
 				persist();
 			} else {
 				render();
@@ -82,6 +113,11 @@ export function createRosterView(callbacks: RosterViewCallbacks): void {
 	function render(): void {
 		formationPicker.render(draft.formatId);
 		rotationInput.value = String(Math.round(draft.rotationSeconds / 60));
+		periodsInput.value = String(draft.periods);
+		periodMinutesInput.value = String(Math.round(draft.periodSeconds / 60));
+		opponentInput.value = draft.match.opponent;
+		venueInput.value = draft.match.venue;
+		matchDateInput.value = draft.match.date;
 
 		playerList.innerHTML = "";
 		if (draft.players.length === 0) {
@@ -171,6 +207,43 @@ export function createRosterView(callbacks: RosterViewCallbacks): void {
 		persist();
 	}
 
+	periodsInput.addEventListener("change", () => {
+		draft = {
+			...draft,
+			periods: numberWithin(periodsInput.value, LIMITS.periods, draft.periods),
+		};
+		persist();
+	});
+
+	periodMinutesInput.addEventListener("change", () => {
+		const minutes = numberWithin(
+			periodMinutesInput.value,
+			LIMITS.periodMinutes,
+			Math.round(draft.periodSeconds / 60),
+		);
+		draft = { ...draft, periodSeconds: minutes * 60 };
+		persist();
+	});
+
+	for (const [input, field] of [
+		[opponentInput, "opponent"],
+		[venueInput, "venue"],
+		[matchDateInput, "date"],
+	] as const) {
+		input.addEventListener("change", () => {
+			draft = {
+				...draft,
+				match: { ...draft.match, [field]: input.value.trim() },
+			};
+			persist();
+		});
+	}
+
+	coachNameInput.addEventListener("change", () => {
+		coachNameInput.value = coachNameInput.value.trim();
+		saveCoachName(coachNameInput.value);
+	});
+
 	rotationInput.addEventListener("change", () => {
 		const minutes = rotationMinutesFrom(
 			rotationInput.value,
@@ -192,7 +265,7 @@ export function createRosterView(callbacks: RosterViewCallbacks): void {
 	exportBtn.addEventListener("click", () => {
 		const { fileName, json } = squadFile(draft, {
 			createdAt: new Date().toISOString(),
-			createdBy: "",
+			createdBy: loadCoachName(),
 			appVersion: __APP_VERSION__,
 		});
 		const blob = new Blob([json], { type: "application/json" });

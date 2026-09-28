@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { LIMITS, rotationMinutesFrom } from "../src/core/limits.js";
+import {
+	LIMITS,
+	numberWithin,
+	rotationMinutesFrom,
+} from "../src/core/limits.js";
 
 describe("rotationMinutesFrom", () => {
 	it.each([
@@ -33,5 +37,17 @@ describe("temporary swap lengths", () => {
 		const seconds = [...LIMITS.tempSwapSeconds];
 		expect(seconds).toEqual([...seconds].sort((a, b) => a - b));
 		for (const s of seconds) expect(s % 60).toBe(0);
+	});
+});
+
+describe("numberWithin", () => {
+	it.each([
+		["3", 3],
+		["0", 1],
+		["9", 4],
+		["2.4", 2],
+		["", 2],
+	])("reads %j as %i periods", (input, periods) => {
+		expect(numberWithin(input, LIMITS.periods, 2)).toBe(periods);
 	});
 });

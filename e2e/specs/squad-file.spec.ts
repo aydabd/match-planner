@@ -56,6 +56,13 @@ test.describe("Saving and loading a squad file", () => {
 		await setup.chooseTeamSize("11v11");
 		await setup.enterCustomFormation("4-2-1-2-1");
 		await setup.setMinutesBetweenSwaps(8);
+		await setup.setMatchLength(2, 35);
+		await setup.setMatchDetails({
+			opponent: "IFK Lund",
+			venue: "Klostergården",
+			date: "2026-10-04T10:30",
+			coach: "Aydin",
+		});
 		await setup.addPlayers(TEAM_11);
 		const download = await setup.saveSquadToFile();
 		expect(download.suggestedFilename()).toBe("trupp-11v11-4-2-1-2-1.json");
@@ -64,6 +71,12 @@ test.describe("Saving and loading a squad file", () => {
 		expect(saved.schemaVersion).toBe(2);
 		expect(saved.audit.appVersion).toBe(APP_VERSION);
 		expect(Date.parse(saved.audit.createdAt)).not.toBeNaN();
+		expect(saved.audit.createdBy).toBe("Aydin");
+		expect(saved.match).toEqual({
+			opponent: "IFK Lund",
+			venue: "Klostergården",
+			date: "2026-10-04T10:30",
+		});
 
 		const other = await openOtherPhone(browser);
 		await other.setup.loadSquadFromFile({ name: "team.json", contents });
@@ -76,6 +89,11 @@ test.describe("Saving and loading a squad file", () => {
 		).toBeChecked();
 		await expect(other.setup.customFormation).toHaveValue("4-2-1-2-1");
 		await expect(other.setup.minutesBetweenSwaps).toHaveValue("8");
+		await expect(other.setup.periods).toHaveValue("2");
+		await expect(other.setup.periodMinutes).toHaveValue("35");
+		await expect(other.setup.opponent).toHaveValue("IFK Lund");
+		await expect(other.setup.venue).toHaveValue("Klostergården");
+		await expect(other.setup.matchDate).toHaveValue("2026-10-04T10:30");
 		await expect(other.setup.players).toHaveInputValues(TEAM_11);
 
 		await other.setup.startMatch();
@@ -83,6 +101,7 @@ test.describe("Saving and loading a squad file", () => {
 		await expect(other.match.formatLabel).toHaveText(
 			"11v11 (4-2-1-2-1), byte var 8 min",
 		);
+		await expect(other.match.periodAndSwap).toHaveText("Period 1 av 2, byte 1");
 		await expect(other.match.pitchPlayers).toHaveCount(10);
 		await other.context.close();
 	});

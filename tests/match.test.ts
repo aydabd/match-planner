@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getFormat } from "../src/core/formations.js";
 import {
-	clockStatus,
 	cloneAssignment,
 	formatTime,
 	generateRotationSafe,
@@ -46,51 +45,6 @@ describe("formatTime", () => {
 		[59.9, "00:59"],
 	])("formats %s seconds as %s", (seconds, expected) => {
 		expect(formatTime(seconds)).toBe(expected);
-	});
-});
-
-describe("clockStatus", () => {
-	it("is not due and shows the full time left at kick-off", () => {
-		expect(clockStatus(0, 600)).toEqual({
-			due: false,
-			progress: 0,
-			remainingSeconds: 600,
-		});
-	});
-
-	it("reports progress and time left mid-rotation", () => {
-		expect(clockStatus(150, 600)).toEqual({
-			due: false,
-			progress: 0.25,
-			remainingSeconds: 450,
-		});
-	});
-
-	it("is due exactly when the rotation time is reached", () => {
-		expect(clockStatus(600, 600)).toEqual({
-			due: true,
-			progress: 1,
-			remainingSeconds: 0,
-		});
-	});
-
-	it.each([0, -60])(
-		"treats a %s-second rotation as already due instead of dividing by zero",
-		(rotationSeconds) => {
-			expect(clockStatus(0, rotationSeconds)).toEqual({
-				due: true,
-				progress: 1,
-				remainingSeconds: 0,
-			});
-		},
-	);
-
-	it("never goes past 100% or below zero seconds left", () => {
-		expect(clockStatus(700, 600)).toEqual({
-			due: true,
-			progress: 1,
-			remainingSeconds: 0,
-		});
 	});
 });
 

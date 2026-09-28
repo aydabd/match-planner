@@ -11,6 +11,8 @@ export const STORAGE_KEYS = {
 	draft: "matchplanner:draft:v1",
 	/** The match in progress, so a reload resumes it. */
 	session: "matchplanner:session:v1",
+	/** The coach's name, recorded in files they save. */
+	coachName: "matchplanner:coach:v1",
 } as const;
 
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];

@@ -211,6 +211,11 @@ export function getFormat(id: string): FormatConfig {
 	);
 }
 
+/** The team size of a format id, e.g. "9v9:3-3-2" -> "9v9". */
+export function teamSizeOf(formatId: string): TeamSizeId {
+	return getFormat(formatId).id.split(":")[0] as TeamSizeId;
+}
+
 export interface FormatChoice {
 	size: TeamSizeId;
 	formation: string;

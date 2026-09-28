@@ -7,6 +7,9 @@ import { MatchPage } from "./pages/MatchPage.js";
 import { SetupPage } from "./pages/SetupPage.js";
 import { SQUAD } from "./support/squads.js";
 
+/** A fixed moment for every test's fake clock. */
+const START = new Date("2026-09-05T09:00:00");
+
 interface Fixtures {
 	setup: SetupPage;
 	match: MatchPage;
@@ -22,7 +25,10 @@ interface Fixtures {
  */
 export const test = base.extend<Fixtures>({
 	page: async ({ page }, use) => {
-		await page.clock.install();
+		// Paused, so match time moves only through match.play(); real time
+		// passing during assertions can never change what a test sees.
+		await page.clock.install({ time: START });
+		await page.clock.pauseAt(START);
 		await use(page);
 	},
 	setup: async ({ page }, use) => {
