@@ -87,6 +87,10 @@ export function initRosterView(callbacks: RosterViewCallbacks): void {
 			input.type = "text";
 			input.value = player.name;
 			input.maxLength = 40;
+			input.setAttribute(
+				"aria-label",
+				`Namn, spelare ${draft.players.indexOf(player) + 1}`,
+			);
 			input.addEventListener("change", () => {
 				const trimmed = input.value.trim();
 				if (trimmed) updatePlayer(player.id, trimmed);
@@ -106,13 +110,13 @@ export function initRosterView(callbacks: RosterViewCallbacks): void {
 		});
 
 		const format = getFormat(draft.formatId);
-		squadCount.textContent = `${draft.players.length} spelare (minst ${outfieldCount(format)} behövs)`;
+		squadCount.textContent = `${draft.players.length} av minst ${outfieldCount(format)}`;
 
 		const canStart = draft.players.length >= outfieldCount(format);
 		startBtn.disabled = !canStart;
 		startBtn.textContent = canStart
-			? "Starta match ▶"
-			: `Lägg till minst ${outfieldCount(format) - draft.players.length} till ▶`;
+			? `Starta match med ${draft.players.length} spelare`
+			: `Lägg till ${outfieldCount(format) - draft.players.length} spelare till för att starta`;
 	}
 
 	function persist(): void {
@@ -188,8 +192,8 @@ export function initRosterView(callbacks: RosterViewCallbacks): void {
 			const message =
 				err instanceof StorageError
 					? err.message
-					: "Kunde inte läsa filen - är det rätt JSON-format?";
-			importError.textContent = `⚠️ ${message}`;
+					: "Filen kunde inte läsas. Välj en fil som sparats från MatchPlanner.";
+			importError.textContent = message;
 			importError.classList.add("error");
 		}
 	});
