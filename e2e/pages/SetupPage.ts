@@ -8,6 +8,12 @@ export class SetupPage {
 	readonly customFormation: Locator;
 	readonly customFormationMessage: Locator;
 	readonly minutesBetweenSwaps: Locator;
+	readonly periods: Locator;
+	readonly periodMinutes: Locator;
+	readonly opponent: Locator;
+	readonly venue: Locator;
+	readonly matchDate: Locator;
+	readonly coachName: Locator;
 	readonly squadCount: Locator;
 	readonly players: Locator;
 	readonly newPlayerName: Locator;
@@ -29,6 +35,12 @@ export class SetupPage {
 		);
 		this.customFormationMessage = this.root.locator("#customFormationMessage");
 		this.minutesBetweenSwaps = this.root.getByLabel("Minuter mellan byten");
+		this.periods = this.root.getByLabel("Perioder");
+		this.periodMinutes = this.root.getByLabel("Minuter per period");
+		this.opponent = this.root.getByLabel("Motståndare");
+		this.venue = this.root.getByLabel("Plats");
+		this.matchDate = this.root.getByLabel("Datum och avspark");
+		this.coachName = this.root.getByLabel("Ditt namn (tränare)");
 		this.squadCount = this.root.locator("#squadCount");
 		this.players = this.root.getByRole("textbox", { name: /^Namn, spelare/ });
 		this.emptySquadMessage = this.root.getByText("Inga spelare än");
@@ -84,6 +96,40 @@ export class SetupPage {
 	async enterCustomFormation(formation: string): Promise<void> {
 		await this.formations.getByRole("radio", { name: "Egen" }).check();
 		await this.customFormation.fill(formation);
+	}
+
+	async setMatchLength(
+		periods: number,
+		minutesPerPeriod: number,
+	): Promise<void> {
+		await this.periods.fill(String(periods));
+		await this.periods.blur();
+		await this.periodMinutes.fill(String(minutesPerPeriod));
+		await this.periodMinutes.blur();
+	}
+
+	/** Fill the optional match details (the section opens if needed). */
+	async setMatchDetails(details: {
+		opponent: string;
+		venue: string;
+		date: string;
+		coach: string;
+	}): Promise<void> {
+		const section = this.root.getByRole("group").filter({
+			hasText: "Matchuppgifter (valfritt)",
+		});
+		if ((await section.getAttribute("open")) === null) {
+			await section.locator("summary").click();
+		}
+		for (const [input, value] of [
+			[this.opponent, details.opponent],
+			[this.venue, details.venue],
+			[this.matchDate, details.date],
+			[this.coachName, details.coach],
+		] as const) {
+			await input.fill(value);
+			await input.blur();
+		}
 	}
 
 	async setMinutesBetweenSwaps(minutes: number): Promise<void> {

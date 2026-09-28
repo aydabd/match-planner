@@ -16,6 +16,11 @@ export class MatchPage {
 	readonly continueButton: Locator;
 	readonly pauseButton: Locator;
 	readonly swapInNewTeamButton: Locator;
+	readonly nextPeriodButton: Locator;
+	/** "Period 1 av 3, byte 1" (a live region). */
+	readonly periodAndSwap: Locator;
+	/** "17:30 kvar av perioden". */
+	readonly periodTimeLeft: Locator;
 
 	// Lineup
 	readonly pitchPlayers: Locator;
@@ -40,13 +45,18 @@ export class MatchPage {
 		this.timeLeft = this.root.locator("#timerRemaining");
 		this.swapNumber = this.root.locator("#rotationLabel");
 		this.startClockButton = this.root.getByRole("button", {
-			name: "Starta klockan",
+			name: "Starta matchen",
 		});
 		this.continueButton = this.root.getByRole("button", { name: "Fortsätt" });
 		this.pauseButton = this.root.getByRole("button", { name: "Pausa" });
 		this.swapInNewTeamButton = this.root.getByRole("button", {
 			name: "Byt in nya laget",
 		});
+		this.nextPeriodButton = this.root.getByRole("button", {
+			name: /^Starta period \d$/,
+		});
+		this.periodAndSwap = this.root.locator(".clock-period");
+		this.periodTimeLeft = this.root.locator("#periodTime");
 
 		this.pitch = this.root.locator("#pitch");
 		this.bench = this.root.locator("#benchList");
@@ -72,9 +82,12 @@ export class MatchPage {
 		await this.startClockButton.click();
 	}
 
-	/** Play a whole rotation and put the next team on. */
+	/**
+	 * Play a whole rotation and put the next team on. Kicks off first if the
+	 * match has not started; the match clock keeps running through the swap.
+	 */
 	async playRotationAndSwap(minutes = 10): Promise<void> {
-		await this.startClock();
+		if (await this.startClockButton.isVisible()) await this.startClock();
 		await this.play(minutes);
 		await this.swapInNewTeamButton.click();
 	}

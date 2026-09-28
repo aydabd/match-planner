@@ -46,6 +46,14 @@
           </fieldset>
           <div class="field-grid">
             <div class="field">
+              <label class="field-label" for="periodsInput">Perioder</label>
+              <input id="periodsInput" type="number" inputmode="numeric" />
+            </div>
+            <div class="field">
+              <label class="field-label" for="periodMinutesInput">Minuter per period</label>
+              <input id="periodMinutesInput" type="number" inputmode="numeric" />
+            </div>
+            <div class="field">
               <label class="field-label" for="rotationMinutesInput">Minuter mellan byten</label>
               <input id="rotationMinutesInput" type="number" inputmode="numeric" aria-describedby="rotationMinutesHelp" />
               <span class="field-help" id="rotationMinutesHelp">Hela laget roteras så här ofta.</span>
@@ -70,6 +78,29 @@
           </div>
         </li>
       </ol>
+
+      <details class="card disclosure" id="matchDetailsSection">
+        <summary>Matchuppgifter (valfritt)</summary>
+        <p class="hint">Sparas i filen du delar, så att det syns vilken match truppen gällde och vem som gjorde den.</p>
+        <div class="field-grid">
+          <div class="field">
+            <label class="field-label" for="opponentInput">Motståndare</label>
+            <input id="opponentInput" type="text" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label class="field-label" for="venueInput">Plats</label>
+            <input id="venueInput" type="text" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label class="field-label" for="matchDateInput">Datum och avspark</label>
+            <input id="matchDateInput" type="datetime-local" />
+          </div>
+          <div class="field">
+            <label class="field-label" for="coachNameInput">Ditt namn (tränare)</label>
+            <input id="coachNameInput" type="text" autocomplete="name" />
+          </div>
+        </div>
+      </details>
 
       <details class="card disclosure">
         <summary>Spara eller hämta en trupp</summary>
@@ -125,17 +156,18 @@
         <div class="match-col match-col-main">
         <section class="card clock" id="clockCard" aria-label="Klocka">
           <div class="clock-head">
-            <!-- Only the rotation number is live: fairnessLabel changes every clock tick -->
-            <span class="clock-period" role="status" aria-live="polite" aria-atomic="true">Byte <strong id="rotationLabel">1</strong></span>
-            <span id="fairnessLabel" class="clock-fairness"></span>
+            <!-- Only period and swap number are live: periodTime changes every clock tick -->
+            <span class="clock-period" role="status" aria-live="polite" aria-atomic="true"><span id="periodLabel"></span>, byte <strong id="rotationLabel">1</strong></span>
+            <span id="periodTime" class="clock-fairness"></span>
           </div>
           <div class="timer" id="timerDisplay">00:00</div>
           <div class="progress" aria-hidden="true"><div class="progress-fill" id="timerProgress"></div></div>
           <p class="clock-remaining" id="timerRemaining"></p>
           <div class="controls">
-            <button type="button" class="btn btn-primary btn-big" id="startBtn">Starta klockan</button>
+            <button type="button" class="btn btn-primary btn-big" id="startBtn">Starta matchen</button>
             <button type="button" class="btn btn-secondary btn-big" id="pauseBtn" disabled>Pausa</button>
             <button type="button" class="btn btn-newteam btn-big" id="newTeamBtn">Byt in nya laget</button>
+            <button type="button" class="btn btn-primary btn-big" id="nextPeriodBtn" disabled></button>
           </div>
         </section>
 
@@ -166,7 +198,10 @@
         </section>
 
         <section class="card playtime-card" aria-labelledby="playtimeTitle">
-          <h2 id="playtimeTitle">Speltid</h2>
+          <div class="card-head">
+            <h2 id="playtimeTitle">Speltid</h2>
+            <span class="card-note" id="fairnessLabel"></span>
+          </div>
           <div id="playtimeList" class="playtime-list"></div>
         </section>
         </div>

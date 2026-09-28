@@ -7,14 +7,14 @@ test.describe("Resuming after the page reloads", () => {
 		page,
 	}) => {
 		await match.playRotationAndSwap();
-		await match.startClock();
 		await match.play(4);
 
 		await page.reload();
 
 		await expect(match.root).toBeVisible();
-		await expect(match.swapNumber).toHaveText("2");
+		await expect(match.periodAndSwap).toHaveText("Period 1 av 3, byte 2");
 		await expect(match.time).toHaveText("04:00");
+		await expect(match.periodTimeLeft).toHaveText("06:00 kvar av perioden");
 		await expect(match.pitchPlayers).toHaveText(SECOND_SWAP.pitch);
 		// Paused after a reload, so no time is counted while the coach is away.
 		await expect(match.continueButton).toBeVisible();

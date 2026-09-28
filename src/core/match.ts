@@ -56,29 +56,6 @@ export function generateRotationSafe(
 	}
 }
 
-export interface ClockStatus {
-	/** The rotation time is up and the next lineup should go on. */
-	due: boolean;
-	/** 0-1 share of the rotation that has been played. */
-	progress: number;
-	remainingSeconds: number;
-}
-
-export function clockStatus(
-	elapsedSeconds: number,
-	rotationSeconds: number,
-): ClockStatus {
-	// A zero or negative length (e.g. a corrupted saved session) is due at once.
-	if (rotationSeconds <= 0)
-		return { due: true, progress: 1, remainingSeconds: 0 };
-	const due = elapsedSeconds >= rotationSeconds;
-	return {
-		due,
-		progress: Math.min(1, Math.max(0, elapsedSeconds / rotationSeconds)),
-		remainingSeconds: Math.max(0, rotationSeconds - elapsedSeconds),
-	};
-}
-
 /** Who enters and who leaves the pitch when going from `current` to `next`. */
 export function lineupChanges(
 	current: MutableAssignment | RotationAssignment,

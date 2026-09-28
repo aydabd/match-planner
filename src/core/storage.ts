@@ -1,4 +1,4 @@
-import { getFormat, TEAM_SIZES, type TeamSizeId } from "./formations.js";
+import { getFormat, TEAM_SIZES, teamSizeOf } from "./formations.js";
 import { LIMITS } from "./limits.js";
 import type { Player } from "./types.js";
 
@@ -66,10 +66,6 @@ export class StorageError extends Error {
 }
 
 const NO_MATCH_DETAILS: MatchDetails = { opponent: "", venue: "", date: "" };
-
-function teamSizeOf(formatId: string): TeamSizeId {
-	return getFormat(formatId).id.split(":")[0] as TeamSizeId;
-}
 
 /**
  * A new team setup. Anything not given comes from the team size's defaults:
