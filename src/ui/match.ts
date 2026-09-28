@@ -165,12 +165,16 @@ function benchChip(id: string, idx: number): HTMLElement {
 	if (isSelected) wrap.classList.add("selected");
 	else if (live?.selected) wrap.classList.add("is-target");
 	wrap.setAttribute("aria-pressed", String(isSelected));
-	wrap.textContent = nameOf(id);
-	const activeTemp = live?.tempSwaps.find((t) => t.inId === id);
+	const name = document.createElement("span");
+	name.className = "bench-name";
+	name.textContent = nameOf(id);
+	wrap.appendChild(name);
+	// A player resting on a temporary swap shows when they go back on.
+	const activeTemp = live?.tempSwaps.find((t) => t.outId === id);
 	if (activeTemp) {
 		const cd = document.createElement("span");
 		cd.className = "bench-countdown";
-		cd.textContent = `vilar för ${nameOf(activeTemp.outId)}, ${formatTime(activeTemp.remainingSeconds)}`;
+		cd.textContent = `tillbaka om ${formatTime(activeTemp.remainingSeconds)}`;
 		wrap.appendChild(cd);
 	}
 	wrap.addEventListener("click", () => onBenchClick(idx));

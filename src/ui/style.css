@@ -12,6 +12,8 @@
 	/* white on --grass is 5.4:1 */
 	--grass: #127a3e;
 	--on-grass: #ffffff;
+	/* grass as text colour: 5.4:1 on --surface (light), 8.9:1 (dark) */
+	--grass-text: #127a3e;
 	--pitch: #1f8a45;
 	--pitch-2: #25954d;
 	--pitch-line: rgba(255, 255, 255, 0.65);
@@ -43,6 +45,7 @@
 		--ink: #eaf5ec;
 		--ink-2: #a9c5b2;
 		--line: #2b4535;
+		--grass-text: #74d69a;
 		--pitch: #1a7a3c;
 		--pitch-2: #1f8544;
 		--secondary: #25402f;
@@ -62,6 +65,7 @@
 	--ink: #eaf5ec;
 	--ink-2: #a9c5b2;
 	--line: #2b4535;
+	--grass-text: #74d69a;
 	--pitch: #1a7a3c;
 	--pitch-2: #1f8544;
 	--secondary: #25402f;
@@ -736,6 +740,10 @@ button:disabled {
 	font-weight: 500;
 	font-size: 0.9375rem;
 }
+/* --ink-2 is too faint on the tinted "In" column in dark mode */
+.next-in .next-empty {
+	color: var(--ink);
+}
 .next-lineup {
 	margin-top: 4px;
 }
@@ -987,7 +995,7 @@ button:disabled {
 .pt-status {
 	font-size: 0.75rem;
 	font-weight: 600;
-	color: var(--grass);
+	color: var(--grass-text);
 	margin-left: 6px;
 }
 .pt-time {

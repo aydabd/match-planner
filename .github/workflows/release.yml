@@ -1,7 +1,8 @@
 name: Release
 
 # One pipeline for every push to main:
-#   build (check + test + build once) -> release (tag + GitHub Release) -> deploy (that same build)
+#   build (check + unit tests + build once + e2e on that build) -> release (tag + GitHub Release)
+#   -> deploy (that same build)
 # Nothing is tagged or deployed unless the build job is green, and the deployed
 # artifact is the exact one that was tested. The release PR is maintained last.
 on:
@@ -53,12 +54,32 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm run typecheck
-      - run: npm test
+      - run: npm run test:coverage
 
       - name: Build (base path = repo name, for project pages)
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
         run: npm run build
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # Runs against the dist/ built above, so the deployed build is the tested one.
+      - name: End-to-end tests on the release build
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
+          E2E_USE_EXISTING_BUILD: "1"
+        run: npm run test:e2e
+
+      - name: Upload e2e report on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
 
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         if: steps.plan.outputs.release == 'true'

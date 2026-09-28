@@ -6,9 +6,14 @@
 npm ci
 npm run check
 npm run typecheck
-npm test
+npm run test:coverage   # unit tests with coverage thresholds
 npm run build
+npx playwright install chromium   # once
+npm run test:e2e        # end-to-end tests, see e2e/README.md
 ```
+
+Put logic in `src/core` and cover it with unit tests in `tests/`. Use e2e tests only for what a
+unit test cannot see: what the screen shows, how it is wired, reloads and files, and accessibility.
 
 Use Conventional Commit messages, for example `fix: preserve fair rotation`. Every commit must
 include a `Signed-off-by` trailer:

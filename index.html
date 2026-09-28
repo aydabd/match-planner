@@ -32,15 +32,15 @@
         <li class="card step">
           <h2 class="step-title"><span class="step-num" aria-hidden="true">1</span>Matchinställningar</h2>
           <div class="field-grid">
-            <label class="field">
-              <span class="field-label">Format</span>
+            <div class="field">
+              <label class="field-label" for="formatSelect">Format</label>
               <select id="formatSelect"></select>
-            </label>
-            <label class="field">
-              <span class="field-label">Minuter mellan byten</span>
-              <input id="rotationMinutesInput" type="number" inputmode="numeric" min="1" max="30" value="10" />
-              <span class="field-help">Hela laget roteras så här ofta.</span>
-            </label>
+            </div>
+            <div class="field">
+              <label class="field-label" for="rotationMinutesInput">Minuter mellan byten</label>
+              <input id="rotationMinutesInput" type="number" inputmode="numeric" min="1" max="30" value="10" aria-describedby="rotationMinutesHelp" />
+              <span class="field-help" id="rotationMinutesHelp">Hela laget roteras så här ofta.</span>
+            </div>
           </div>
         </li>
 
