@@ -1,15 +1,10 @@
-import type { SchedulerState } from "../core/types.js";
+import type {
+	MutableAssignment,
+	SchedulerState,
+	TempSwap,
+} from "../core/types.js";
 
-/**
- * The UI keeps a mutable working copy of a rotation so manual swaps (an
- * injury sub, a late arrival) can edit it in place. core/scheduler.ts's
- * own RotationAssignment is intentionally readonly - it is a pure
- * calculation result - so this is a deliberately separate, mutable shape.
- */
-export interface MutableAssignment {
-	zones: Record<string, string[]>;
-	bench: string[];
-}
+export type { MutableAssignment, TempSwap };
 
 /**
  * Everything needed to resume a match exactly where it was left off after
@@ -28,14 +23,6 @@ export interface MatchSession {
 	elapsedSeconds: number;
 	currentAssignment: MutableAssignment | null;
 	tempSwaps: TempSwap[];
-}
-
-export interface TempSwap {
-	zoneId: string;
-	idx: number;
-	outId: string;
-	inId: string;
-	remainingSeconds: number;
 }
 
 const KEY = "matchplanner:session:v1";

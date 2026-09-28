@@ -70,3 +70,22 @@ export interface SchedulerState {
 	/** Order players were added in, used for stable tie-breaking. */
 	order: string[];
 }
+
+/**
+ * The coach's live lineup. RotationAssignment is readonly because it is a
+ * pure calculation result; this mutable copy lets manual swaps (an injury
+ * sub, a late arrival) edit it in place.
+ */
+export interface MutableAssignment {
+	zones: Record<string, string[]>;
+	bench: string[];
+}
+
+/** A temporary swap that the clock undoes when its time runs out. */
+export interface TempSwap {
+	zoneId: string;
+	idx: number;
+	outId: string;
+	inId: string;
+	remainingSeconds: number;
+}

@@ -1,5 +1,17 @@
 import { getFormat } from "../core/formations.js";
 import {
+	clockStatus,
+	cloneAssignment,
+	formatTime,
+	generateRotationSafe,
+	lineupChanges,
+	resetPlayers,
+	swapWithBench,
+	takeOutForMatch,
+	tickTempSwaps,
+	undoTempSwaps,
+} from "../core/match.js";
+import {
 	applyElapsed,
 	createSchedulerState,
 	fairnessSpread,
@@ -22,23 +34,6 @@ import {
 	saveSession,
 	type TempSwap,
 } from "./sessionStorage.js";
-
-function cloneAssignment(a: RotationAssignment): MutableAssignment {
-	const zones: Record<string, string[]> = {};
-	for (const zoneId of Object.keys(a.zones))
-		zones[zoneId] = [...(a.zones[zoneId] ?? [])];
-	return { zones, bench: [...a.bench] };
-}
-
-function formatTime(totalSeconds: number): string {
-	const m = Math.floor(totalSeconds / 60)
-		.toString()
-		.padStart(2, "0");
-	const s = Math.floor(totalSeconds % 60)
-		.toString()
-		.padStart(2, "0");
-	return `${m}:${s}`;
-}
 
 interface Els {
 	formatLabel: HTMLElement;
@@ -125,20 +120,6 @@ let live: LiveMatch | null = null;
 let els: Els | null = null;
 let callbacksRef: MatchCallbacks | null = null;
 let wired = false;
-
-function generateRotationSafe(state: SchedulerState): RotationAssignment {
-	try {
-		return generateRotation(state);
-	} catch (err) {
-		if (err instanceof SchedulingError) {
-			return {
-				zones: Object.fromEntries(state.format.zones.map((z) => [z.id, []])),
-				bench: [...state.order],
-			};
-		}
-		throw err;
-	}
-}
 
 function nameOf(id: string): string {
 	return live?.playerNames.get(id) ?? id;
@@ -432,12 +413,7 @@ function renderPreview(): void {
 		els.previewBody.appendChild(p);
 		return;
 	}
-	const currentOnPitch = new Set(
-		Object.values(live.currentAssignment.zones).flat(),
-	);
-	const nextOnPitch = new Set(Object.values(next.zones).flat());
-	const comingIn = [...nextOnPitch].filter((id) => !currentOnPitch.has(id));
-	const goingOut = [...currentOnPitch].filter((id) => !nextOnPitch.has(id));
+	const { comingIn, goingOut } = lineupChanges(live.currentAssignment, next);
 
 	const summary = document.createElement("div");
 	summary.className = "next-summary";
@@ -588,21 +564,15 @@ function onBenchClick(idx: number): void {
 function commitTempSwap(durationSeconds: number | null): void {
 	if (!live?.selected || live.pendingBenchIdx === null) return;
 	const { zoneId, idx } = live.selected;
-	const zonePlayers = live.currentAssignment.zones[zoneId];
-	const outId = zonePlayers?.[idx];
-	const inId = live.currentAssignment.bench[live.pendingBenchIdx];
-	if (!zonePlayers || outId === undefined || inId === undefined) return;
-	zonePlayers[idx] = inId;
-	live.currentAssignment.bench[live.pendingBenchIdx] = outId;
-	if (durationSeconds !== null) {
-		live.tempSwaps.push({
-			zoneId,
-			idx,
-			outId,
-			inId,
-			remainingSeconds: durationSeconds,
-		});
-	}
+	const swap = swapWithBench(
+		live.currentAssignment,
+		zoneId,
+		idx,
+		live.pendingBenchIdx,
+		durationSeconds,
+	);
+	if (swap === undefined) return;
+	if (swap) live.tempSwaps.push(swap);
 	live.selected = null;
 	live.pendingBenchIdx = null;
 	render();
@@ -610,42 +580,10 @@ function commitTempSwap(durationSeconds: number | null): void {
 
 function markUnavailable(zoneId: string, idx: number): void {
 	if (!live) return;
-	const currentLive = live;
-	const zonePlayers = currentLive.currentAssignment.zones[zoneId];
-	const outId = zonePlayers?.[idx];
-	if (!zonePlayers || outId === undefined) return;
-	setUnavailable(currentLive.schedulerState, outId, true);
-	const benchCandidates = currentLive.currentAssignment.bench.filter(
-		(id) => !currentLive.schedulerState.players[id]?.unavailable,
-	);
-	benchCandidates.sort((a, b) => {
-		const playerA = currentLive.schedulerState.players[a];
-		const playerB = currentLive.schedulerState.players[b];
-		if (!playerA || !playerB) return 0;
-		return playerA.totalSeconds - playerB.totalSeconds;
-	});
-	const cover = benchCandidates[0];
-	if (cover !== undefined) {
-		zonePlayers[idx] = cover;
-		currentLive.currentAssignment.bench =
-			currentLive.currentAssignment.bench.filter((id) => id !== cover);
-	} else {
-		currentLive.currentAssignment.zones[zoneId]?.splice(idx, 1);
-	}
-	currentLive.selected = null;
-	currentLive.pendingBenchIdx = null;
+	takeOutForMatch(live.schedulerState, live.currentAssignment, zoneId, idx);
+	live.selected = null;
+	live.pendingBenchIdx = null;
 	render();
-}
-
-function revertTempSwap(t: TempSwap): void {
-	if (!live) return;
-	const arr = live.currentAssignment.zones[t.zoneId];
-	if (arr && arr[t.idx] === t.inId) {
-		const benchIdx = live.currentAssignment.bench.indexOf(t.inId);
-		arr[t.idx] = t.outId;
-		if (benchIdx !== -1) live.currentAssignment.bench[benchIdx] = t.outId;
-		else live.currentAssignment.bench.push(t.outId);
-	}
 }
 
 // ---------------- clock ----------------
@@ -653,14 +591,7 @@ function revertTempSwap(t: TempSwap): void {
 function tick(): void {
 	if (!live || !els) return;
 	applyElapsed(live.schedulerState, live.currentAssignment, 1);
-	live.tempSwaps = live.tempSwaps.filter((t) => {
-		t.remainingSeconds -= 1;
-		if (t.remainingSeconds <= 0) {
-			revertTempSwap(t);
-			return false;
-		}
-		return true;
-	});
+	live.tempSwaps = tickTempSwaps(live.currentAssignment, live.tempSwaps, 1);
 	live.elapsedSeconds += 1;
 	if (live.elapsedSeconds >= live.schedulerState.rotationSeconds) {
 		live.elapsedSeconds = live.schedulerState.rotationSeconds;
@@ -673,15 +604,17 @@ function tick(): void {
 
 function updateTimerDisplay(): void {
 	if (!live || !els) return;
-	const total = live.schedulerState.rotationSeconds;
-	const due = live.elapsedSeconds >= total;
+	const { due, progress, remainingSeconds } = clockStatus(
+		live.elapsedSeconds,
+		live.schedulerState.rotationSeconds,
+	);
 	els.timerDisplay.textContent = formatTime(live.elapsedSeconds);
 	els.timerDisplay.classList.toggle("done", due);
 	els.clockCard.classList.toggle("is-due", due);
-	els.timerProgress.style.width = `${Math.min(100, (live.elapsedSeconds / total) * 100)}%`;
+	els.timerProgress.style.width = `${progress * 100}%`;
 	els.timerRemaining.textContent = due
 		? "Dags att byta!"
-		: `${formatTime(total - live.elapsedSeconds)} kvar till nästa byte`;
+		: `${formatTime(remainingSeconds)} kvar till nästa byte`;
 	els.startBtn.textContent =
 		live.elapsedSeconds > 0 ? "Fortsätt" : "Starta klockan";
 }
@@ -773,10 +706,8 @@ export function initMatchView(callbacks: MatchCallbacks): void {
 	els.newTeamBtn.addEventListener("click", advanceRotation);
 	els.undoBtn.addEventListener("click", () => {
 		if (!live) return;
-		live.tempSwaps = live.tempSwaps.filter((t) => {
-			revertTempSwap(t);
-			return false;
-		});
+		undoTempSwaps(live.currentAssignment, live.tempSwaps);
+		live.tempSwaps = [];
 		live.selected = null;
 		live.pendingBenchIdx = null;
 		render();
@@ -846,13 +777,7 @@ export function initMatchView(callbacks: MatchCallbacks): void {
 			els.matchMenu.open = false;
 			clearSession();
 			stopClock();
-			for (const id of live.schedulerState.order) {
-				const player = live.schedulerState.players[id];
-				if (!player) continue;
-				player.totalSeconds = 0;
-				player.zonesPlayed = [];
-				player.unavailable = false;
-			}
+			resetPlayers(live.schedulerState);
 			live.rotationIndex = 0;
 			live.elapsedSeconds = 0;
 			live.currentAssignment = cloneAssignment(
