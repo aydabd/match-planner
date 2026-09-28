@@ -1,6 +1,14 @@
 name: CI
 
-# Pull requests only. Pushes to main are built, tested and released by release.yml.
+# Pull requests only: this is where code is tested before it reaches main.
+# Merges to main are not re-tested (the ruleset requires up-to-date branches, so
+# main gets exactly what passed here); release.yml only checks and builds a release.
+#
+# Release PRs (release-please) only bump the version and changelog, so Check and
+# E2E are skipped for them. A job skipped by `if` still satisfies required checks.
+# "Detect changes" decides once whether a PR is a genuine release PR: the
+# release-please branch, opened by github-actions[bot], from this repository.
+# A branch name alone is not enough, so nobody can skip CI by naming a branch.
 on:
   pull_request:
 
@@ -10,6 +18,9 @@ permissions:
 jobs:
   test:
     name: Check
+    needs: changes
+    # Fail-safe: if Detect changes fails, its output is empty and Check still runs.
+    if: ${{ !cancelled() && needs.changes.outputs.release_pr != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -47,18 +58,37 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       e2e: ${{ steps.filter.outputs.e2e }}
+      release_pr: ${{ steps.release.outputs.release_pr }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+
+      - name: Check for a release PR
+        id: release
+        env:
+          RELEASE_PR: >-
+            ${{ startsWith(github.head_ref, 'release-please--')
+            && github.event.pull_request.user.login == 'github-actions[bot]'
+            && github.event.pull_request.head.repo.full_name == github.repository }}
+        run: |
+          echo "release_pr=$RELEASE_PR" >> "$GITHUB_OUTPUT"
+          if [ "$RELEASE_PR" = "true" ]; then
+            echo "Release PR (version and changelog only): Check and E2E will be skipped."
+          fi
 
       - name: Check for app, test or build changes
         id: filter
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RELEASE_PR: ${{ steps.release.outputs.release_pr }}
         run: |
           set -euo pipefail
+          if [ "$RELEASE_PR" = "true" ]; then
+            echo "e2e=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           changed=$(git diff --name-only "$BASE_SHA...$HEAD_SHA")
           echo "Changed files:"
           echo "$changed"
@@ -77,7 +107,8 @@ jobs:
   e2e:
     name: E2E
     needs: changes
-    if: needs.changes.outputs.e2e == 'true'
+    # Skip only on an explicit "false"; if Detect changes fails, E2E still runs.
+    if: ${{ !cancelled() && needs.changes.outputs.e2e != 'false' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -96,7 +127,10 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
+      # Same base path as GitHub Pages, so PRs test the configuration that ships.
       - name: End-to-end tests
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
         run: npm run test:e2e
 
       - name: Upload report on failure

@@ -13,11 +13,17 @@ The suite runs on pull requests that change app code, the e2e suite,
 build or runtime config, or dependencies (`src/`, `public/`, `e2e/`,
 `index.html`, `package*.json`, `mise.*`, `vite`/`playwright` config,
 `tsconfig.json`). Other PRs (docs, rulesets, unit tests, workflows) skip it,
-and the skipped **E2E** check still counts as passed. The suite always runs
-again in the release workflow. There it tests the exact `dist/` that gets deployed,
-served under the GitHub Pages base path:
+and the skipped **E2E** check still counts as passed. Release PRs (version
+and changelog only) skip it too.
+
+E2E runs only on pull requests. It is not repeated after merging or at
+release: the `main` ruleset requires branches to be up to date, so `main`
+gets exactly what passed here. CI builds with the GitHub Pages base path
+(`/match-planner/`), the same configuration that ships. To do the same
+locally, or to test a build you already made:
 
 ```sh
+BASE_PATH=/match-planner/ npm run test:e2e
 BASE_PATH=/match-planner/ npm run build
 BASE_PATH=/match-planner/ E2E_USE_EXISTING_BUILD=1 npm run test:e2e
 ```
