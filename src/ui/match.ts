@@ -297,10 +297,15 @@ function renderSwapPanel(): void {
 function renderAlertBanner(): void {
 	if (!live || !els) return;
 	const currentLive = live;
-	els.alertList.innerHTML = "";
 	const unavailableIds = currentLive.schedulerState.order.filter(
 		(id) => currentLive.schedulerState.players[id]?.unavailable,
 	);
+	// The banner is role="alert" and render() runs every clock tick; only
+	// rebuild when the list changes so screen readers don't re-announce it.
+	const key = unavailableIds.map((id) => `${id}:${nameOf(id)}`).join("|");
+	if (els.alertList.dataset.key === key) return;
+	els.alertList.dataset.key = key;
+	els.alertList.innerHTML = "";
 	if (unavailableIds.length === 0) {
 		els.alertBanner.classList.remove("show");
 		return;
@@ -314,7 +319,9 @@ function renderAlertBanner(): void {
 		const btn = document.createElement("button");
 		btn.textContent = "↩ Tillbaka i truppen";
 		btn.addEventListener("click", () => {
-			setUnavailable(currentLive.schedulerState, id, false);
+			// Rows outlive a single render now, so resolve the match at click time.
+			if (!live) return;
+			setUnavailable(live.schedulerState, id, false);
 			render();
 		});
 		row.appendChild(span);
@@ -408,7 +415,10 @@ function renderPlaytime(): void {
 
 function render(): void {
 	if (!live || !els) return;
-	els.rotationLabel.textContent = String(live.rotationIndex + 1);
+	// Inside a live region: skip identical writes so ticks don't re-announce.
+	const rotationText = String(live.rotationIndex + 1);
+	if (els.rotationLabel.textContent !== rotationText)
+		els.rotationLabel.textContent = rotationText;
 	els.fairnessLabel.textContent = `spridning ${formatTime(fairnessSpread(live.schedulerState))}`;
 	renderPitch();
 	renderBench();
