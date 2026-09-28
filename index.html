@@ -127,6 +127,14 @@
         <div id="reportList" class="report-list"></div>
       </details>
 
+      <section class="card" aria-labelledby="historyEntryTitle">
+        <h2 id="historyEntryTitle">Spelarhistorik</h2>
+        <p class="hint">Se hur ofta varje spelare har startat, hur mycket de har spelat och var, över flera matcher.</p>
+        <div class="row-buttons">
+          <button type="button" id="historyOpenBtn" class="btn btn-secondary">Visa spelarhistorik</button>
+        </div>
+      </section>
+
       <div class="sticky-cta">
         <button type="button" id="startMatchBtn" class="btn btn-cta">Starta match</button>
       </div>
@@ -268,12 +276,39 @@
       </section>
       <section class="card" aria-labelledby="reportShareTitle">
         <h2 id="reportShareTitle">Spara eller dela</h2>
+        <p class="hint">Matchfilen innehåller hela matchen och används i spelarhistoriken.</p>
         <div class="row-buttons">
           <button type="button" id="reportCopyBtn" class="btn btn-secondary">Kopiera som text</button>
-          <button type="button" id="reportSaveBtn" class="btn btn-secondary">Spara som fil</button>
+          <button type="button" id="reportSaveBtn" class="btn btn-secondary">Spara rapport som fil</button>
+          <button type="button" id="matchFileSaveBtn" class="btn btn-secondary">Spara matchfil</button>
         </div>
         <p class="hint" id="reportShareStatus" role="status"></p>
       </section>
+      <footer class="footer">MatchPlanner v<span data-app-version></span></footer>
+    </section>
+
+    <!-- ============ HISTORY VIEW ============ -->
+    <section id="historyView" class="view view-history hidden" aria-labelledby="historyTitle">
+      <header class="topbar">
+        <span class="brand"><span class="brand-ball" aria-hidden="true">⚽</span>MatchPlanner</span>
+        <button type="button" id="historyBackBtn" class="btn btn-ghost">Tillbaka</button>
+      </header>
+      <div class="intro">
+        <h1 id="historyTitle" tabindex="-1">Spelarhistorik</h1>
+        <p class="lede">Alla matcher du spelat med appen sparas här. Läs in matchfiler från andra matcher för att se hela säsongen. Samma match räknas aldrig två gånger, och ordningen spelar ingen roll. Spelare känns igen på namn.</p>
+      </div>
+      <section class="card" aria-labelledby="historyImportTitle">
+        <h2 id="historyImportTitle">Läs in matchfiler</h2>
+        <div class="row-buttons">
+          <label class="btn btn-secondary file-btn">
+            Välj matchfiler
+            <input id="historyImportInput" class="visually-hidden" type="file" accept="application/json" multiple />
+          </label>
+        </div>
+        <div class="hint" role="status"><ul class="history-messages" id="historyMessages"></ul></div>
+        <p class="hint" id="historyCount"></p>
+      </section>
+      <div id="historyResults" class="policy-rules"></div>
       <footer class="footer">MatchPlanner v<span data-app-version></span></footer>
     </section>
 

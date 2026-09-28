@@ -24,6 +24,12 @@ export const LIMITS = {
 	headsUpSeconds: 30,
 	/** Match reports kept on this device; the oldest is dropped first. */
 	storedReports: 10,
+	/** Most events one match file may hold. */
+	timelineEvents: 5000,
+	/** Most match files kept on this device. */
+	storedMatches: 200,
+	/** "Has started 2 of the last N matches" looks back this many matches. */
+	recentMatches: 8,
 	/** How long "tap again to reset" stays armed, in seconds. */
 	resetConfirmSeconds: 3,
 } as const;

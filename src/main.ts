@@ -1,4 +1,5 @@
 import "./ui/style.css";
+import { createHistoryView } from "./ui/history.js";
 import { createMatchView } from "./ui/match.js";
 import { createPolicyView } from "./ui/policy.js";
 import { createReportView } from "./ui/report.js";
@@ -20,6 +21,7 @@ const setupView = byId("setupView");
 const matchView = byId("matchView");
 const policyView = byId("policyView");
 const reportView = byId("reportView");
+const historyPage = byId("historyView");
 
 function showSetup(): void {
 	clearSession();
@@ -88,6 +90,13 @@ for (const [button, page] of [
 }
 byId("policyBackBtn").addEventListener("click", () => closePage(policyView));
 byId("reportBackBtn").addEventListener("click", () => closePage(reportView));
+
+const history = createHistoryView();
+byId("historyOpenBtn").addEventListener("click", () => {
+	history.refresh();
+	openOver(historyPage);
+});
+byId("historyBackBtn").addEventListener("click", () => closePage(historyPage));
 
 const report = createReportView({
 	onOpen: (stored) => {

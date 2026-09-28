@@ -1,5 +1,6 @@
 import type { FormationProblem } from "../core/formations.js";
 import { LIMITS } from "../core/limits.js";
+import type { MatchFileProblem } from "../core/matchFile.js";
 import { POLICY, type RuleId } from "../core/policy.js";
 import type { Feedback, PlayerStatus } from "../core/report.js";
 import type { SchedulingProblem } from "../core/scheduler.js";
@@ -225,6 +226,75 @@ export const TEXT = {
 				"Byten",
 				...(lines.swaps.length === 0 ? [TEXT.report.noSwaps] : lines.swaps),
 			].join("\n");
+		},
+	},
+
+	history: {
+		empty: "Inga matcher än. Spela en match eller läs in matchfiler.",
+		importResult: (fresh: number, known: number) =>
+			`${fresh} ${fresh === 1 ? "ny match" : "nya matcher"} lästes in${known > 0 ? `, ${known} fanns redan` : ""}.`,
+		refused: (fileName: string, reason: string) => `${fileName}: ${reason}`,
+		unreadable: "Filen kunde inte läsas. Välj en matchfil från MatchPlanner.",
+		matchesCount: (matches: number, months: number) =>
+			`${matches} ${matches === 1 ? "match" : "matcher"} över ${months} ${months === 1 ? "månad" : "månader"}.`,
+		recent: (started: number, of: number) => `${started} av ${of}`,
+		minutes: (seconds: number) => `${Math.round(seconds / 60)} min`,
+		startedHint: (name: string, started: number, of: number) =>
+			`${name} har startat ${started} av de senaste ${of} matcherna.`,
+		month(month: string): string {
+			const [year = "", number = "1"] = month.split("-");
+			const names = [
+				"januari",
+				"februari",
+				"mars",
+				"april",
+				"maj",
+				"juni",
+				"juli",
+				"augusti",
+				"september",
+				"oktober",
+				"november",
+				"december",
+			];
+			return `${names[Number(number) - 1] ?? month} ${year}`;
+		},
+		saveMatchFile: "Spara matchfil",
+		problem(problem: MatchFileProblem): string {
+			switch (problem.code) {
+				case "notObject":
+				case "schemaVersion":
+					return TEXT.history.unreadable;
+				case "audit":
+					return "Filen saknar giltigt match-id eller uppgifter om vem som sparade den och när.";
+				case "matchDetails":
+					return "Filen har ogiltiga matchuppgifter (motståndare, plats eller datum).";
+				case "setup":
+					return "Filen har ogiltiga matchinställningar (format, perioder eller tider).";
+				case "squad":
+					return "Filen har en ogiltig trupp.";
+				case "startingIds":
+					return "Filens startande spelare stämmer inte med första laguppställningen.";
+				case "noKickoff":
+					return "Matchen i filen har ingen startuppställning.";
+				case "endedAt":
+					return "Filens sluttid ligger utanför matchen.";
+				case "timelineNotList":
+					return "Filens tidslinje är ogiltig.";
+				case "tooManyEvents":
+					return `Filens tidslinje har fler än ${problem.max} händelser.`;
+				case "event": {
+					const reasons = {
+						unknown: "okänd händelse",
+						time: "ogiltig tid",
+						order: "tiden går bakåt",
+						period: "perioden stämmer inte",
+						player: "spelaren finns inte i truppen",
+						lineup: "laguppställningen stämmer inte",
+					} as const;
+					return `Händelse ${problem.position} i tidslinjen är ogiltig: ${reasons[problem.reason]}.`;
+				}
+			}
 		},
 	},
 
