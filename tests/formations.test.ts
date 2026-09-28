@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
 	buildFormat,
+	DEFAULT_FORMAT,
+	DEFAULT_TEAM_SIZE,
 	FORMATS,
+	formatChoice,
 	getFormat,
 	outfieldCount,
 	parseFormation,
@@ -152,6 +155,40 @@ describe("getFormat", () => {
 			expect(() => getFormat(id)).toThrow(/Okänt format/);
 		},
 	);
+});
+
+describe("default format", () => {
+	it("is the default team size's first quick pick", () => {
+		expect(DEFAULT_FORMAT).toEqual(
+			buildFormat(DEFAULT_TEAM_SIZE, TEAM_SIZES[DEFAULT_TEAM_SIZE].presets[0]),
+		);
+	});
+});
+
+describe("formatChoice", () => {
+	it("splits a quick pick into team size and formation", () => {
+		expect(formatChoice("9v9:3-3-2")).toEqual({
+			size: "9v9",
+			formation: "3-3-2",
+			custom: false,
+		});
+	});
+
+	it("marks a formation that is not a quick pick as custom", () => {
+		expect(formatChoice("11v11:4-2-1-2-1")).toEqual({
+			size: "11v11",
+			formation: "4-2-1-2-1",
+			custom: true,
+		});
+	});
+
+	it("reads the original 7v7 id as the 2-3-1 quick pick", () => {
+		expect(formatChoice("7v7")).toEqual({
+			size: "7v7",
+			formation: "2-3-1",
+			custom: false,
+		});
+	});
 });
 
 describe("quick-pick formats", () => {

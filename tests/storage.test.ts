@@ -99,6 +99,19 @@ describe("parseRosterFile - rejects malformed or hostile input", () => {
 		).toThrow(StorageError);
 	});
 
+	it("accepts an empty squad only when asked to (the setup draft)", () => {
+		const empty = {
+			schemaVersion: 1,
+			formatId: "7v7",
+			rotationSeconds: 600,
+			players: [],
+		};
+		expect(() => parseRosterFile(empty)).toThrow(StorageError);
+		expect(parseRosterFile(empty, { allowEmptySquad: true }).players).toEqual(
+			[],
+		);
+	});
+
 	it("rejects an empty squad", () => {
 		expect(() =>
 			parseRosterFile({

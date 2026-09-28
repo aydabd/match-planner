@@ -154,6 +154,15 @@ export const FORMATS: Record<string, FormatConfig> = Object.fromEntries(
 	),
 );
 
+/** The team size a new squad starts with. */
+export const DEFAULT_TEAM_SIZE: TeamSizeId = "7v7";
+
+/** A new squad's format: the default team size's most common formation. */
+export const DEFAULT_FORMAT = buildFormat(
+	DEFAULT_TEAM_SIZE,
+	TEAM_SIZES[DEFAULT_TEAM_SIZE].presets[0],
+);
+
 /** Format ids saved before formations were configurable. */
 const LEGACY_IDS: Record<string, string> = { "7v7": "7v7:2-3-1" };
 
@@ -171,6 +180,20 @@ export function getFormat(id: string): FormatConfig {
 	throw new Error(
 		`Okänt format: "${id}". Använd lagstorlek och formation, till exempel 7v7:2-3-1.`,
 	);
+}
+
+export interface FormatChoice {
+	size: TeamSizeId;
+	formation: string;
+	/** True when the formation is not one of the size's quick picks. */
+	custom: boolean;
+}
+
+/** Split a format id into what the coach chose on the setup screen. */
+export function formatChoice(id: string): FormatChoice {
+	const [size, formation] = getFormat(id).id.split(":") as [TeamSizeId, string];
+	const presets: readonly string[] = TEAM_SIZES[size].presets;
+	return { size, formation, custom: !presets.includes(formation) };
 }
 
 /** Total number of outfield players on the pitch at once for a format. */

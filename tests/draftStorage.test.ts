@@ -19,6 +19,12 @@ describe("squad draft storage", () => {
 		expect(loadDraft()).toEqual(draft);
 	});
 
+	it("keeps the chosen format and minutes before any player is added", () => {
+		const draft = serializeRoster("9v9:2-2-2-2", 480, []);
+		saveDraft(draft);
+		expect(loadDraft()).toEqual(draft);
+	});
+
 	it("restores the saved squad", () => {
 		const draft = serializeRoster("9v9:3-3-2", 480, [
 			{ id: "p1", name: "Alva" },

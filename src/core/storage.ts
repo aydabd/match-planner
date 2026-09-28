@@ -53,7 +53,18 @@ export function rosterToJson(roster: RosterFile): string {
  * this is the one place untrusted JSON enters the app, so every field
  * is checked before anything downstream (scheduler, DOM rendering) sees it.
  */
-export function parseRosterFile(data: unknown): RosterFile {
+export interface ParseOptions {
+	/**
+	 * The setup screen's own draft may have no players yet; a squad file
+	 * someone shares must not.
+	 */
+	allowEmptySquad?: boolean;
+}
+
+export function parseRosterFile(
+	data: unknown,
+	options: ParseOptions = {},
+): RosterFile {
 	if (typeof data !== "object" || data === null) {
 		throw new StorageError("Filen ar inte ett giltigt JSON-objekt.");
 	}
@@ -82,7 +93,7 @@ export function parseRosterFile(data: unknown): RosterFile {
 	if (!Array.isArray(obj.players)) {
 		throw new StorageError("players maste vara en lista.");
 	}
-	if (obj.players.length === 0) {
+	if (obj.players.length === 0 && !options.allowEmptySquad) {
 		throw new StorageError("Truppen ar tom.");
 	}
 	if (obj.players.length > MAX_PLAYERS) {

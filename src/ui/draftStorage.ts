@@ -1,3 +1,4 @@
+import { DEFAULT_FORMAT } from "../core/formations.js";
 import {
 	parseRosterFile,
 	type RosterFile,
@@ -12,11 +13,15 @@ const DRAFT_KEY = "matchplanner:draft:v1";
 export function loadDraft(): RosterFile {
 	try {
 		const raw = localStorage.getItem(DRAFT_KEY);
-		if (raw) return parseRosterFile(JSON.parse(raw));
+		if (raw) return parseRosterFile(JSON.parse(raw), { allowEmptySquad: true });
 	} catch {
 		// fall through to a fresh default below
 	}
-	return serializeRoster("7v7:2-3-1", 600, []);
+	return serializeRoster(
+		DEFAULT_FORMAT.id,
+		DEFAULT_FORMAT.defaultRotationSeconds,
+		[],
+	);
 }
 
 export function saveDraft(roster: RosterFile): void {
