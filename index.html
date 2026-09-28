@@ -51,7 +51,7 @@
           <button type="button" id="exportBtn" class="btn btn-secondary">⬇️ Exportera trupp (JSON)</button>
           <label class="btn btn-secondary file-btn">
             ⬆️ Importera trupp
-            <input id="importInput" type="file" accept="application/json" hidden />
+            <input id="importInput" class="visually-hidden" type="file" accept="application/json" />
           </label>
         </div>
         <p class="hint" id="importError"></p>
@@ -74,11 +74,12 @@
       </header>
 
       <div class="status-row">
-        <span>Byte <strong id="rotationLabel">1</strong></span>
+        <!-- Only the rotation number is live: fairnessLabel changes every clock tick -->
+        <span role="status" aria-live="polite" aria-atomic="true">Byte <strong id="rotationLabel">1</strong></span>
         <span id="fairnessLabel" class="muted"></span>
       </div>
 
-      <div class="alert-banner" id="alertBanner">
+      <div class="alert-banner" id="alertBanner" role="alert">
         <h3>🚑 Ute ur matchen</h3>
         <div id="alertList"></div>
       </div>

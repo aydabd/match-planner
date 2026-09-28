@@ -12,6 +12,16 @@
 	--gk-color: #ff8a3d;
 	--muted: #9fd8b3;
 	--danger: #ff6b6b;
+	--on-danger: #2a0000;
+	/* white on --primary is 5.02:1 (WCAG AA text) */
+	--primary: #15803d;
+	--on-primary: #ffffff;
+	--control-bg: #0e2015;
+	/* 3.37:1 vs --panel-bg, 4.39:1 vs --control-bg (WCAG 1.4.11) */
+	--control-border: rgba(255, 255, 255, 0.45);
+	--focus-ring: var(--accent);
+	--focus-halo: #0b1a10;
+	color-scheme: dark;
 	box-sizing: border-box;
 	padding-top: env(safe-area-inset-top, 0px);
 	padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -95,12 +105,16 @@ header h1 {
 .field select,
 .field input[type="number"],
 .field input[type="text"] {
-	background: #0e2015;
+	background: var(--control-bg);
 	color: var(--panel-text);
-	border: 1px solid rgba(255, 255, 255, 0.15);
+	border: 1px solid var(--control-border);
 	border-radius: 10px;
 	padding: 10px;
 	font-size: 1rem;
+}
+::placeholder {
+	color: var(--muted);
+	opacity: 1;
 }
 
 .player-list {
@@ -139,9 +153,9 @@ header h1 {
 }
 .add-player-form input {
 	flex: 1;
-	background: #0e2015;
+	background: var(--control-bg);
 	color: var(--panel-text);
-	border: 1px solid rgba(255, 255, 255, 0.15);
+	border: 1px solid var(--control-border);
 	border-radius: 10px;
 	padding: 10px;
 }
@@ -157,6 +171,17 @@ header h1 {
 	justify-content: center;
 	cursor: pointer;
 }
+.visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+	border: 0;
+}
 
 button,
 .btn {
@@ -168,10 +193,33 @@ button,
 	cursor: pointer;
 	font-family: inherit;
 	text-align: center;
+	transition: filter 0.15s ease;
 }
+/* Darken rather than brighten: brightness(1.08) would drop --primary below 4.5:1 */
+button:not(:disabled):hover,
+.btn:not(:disabled):hover {
+	filter: brightness(0.92);
+}
+button:not(:disabled):active,
+.btn:not(:disabled):active {
+	filter: brightness(0.88);
+}
+
+/* Layered focus ring: gold outline sandwiched by a dark halo so it reads on
+   dark panels and white chips alike. The outline survives forced-colors mode. */
+:focus-visible,
+.file-btn:focus-within {
+	outline: 3px solid var(--focus-ring);
+	outline-offset: 2px;
+	box-shadow: 0 0 0 7px var(--focus-halo);
+}
+:focus:not(:focus-visible) {
+	outline: none;
+}
+
 .btn-primary {
-	background: #2f9e44;
-	color: white;
+	background: var(--primary);
+	color: var(--on-primary);
 }
 .btn-secondary {
 	background: #37474f;
@@ -201,7 +249,7 @@ button,
 }
 .btn-settings.confirming {
 	background: var(--danger);
-	color: white;
+	color: var(--on-danger);
 }
 button:disabled {
 	opacity: 0.4;
@@ -263,8 +311,8 @@ button:disabled {
 	padding: 3px 0;
 }
 .alert-row button {
-	background: #2f9e44;
-	color: white;
+	background: var(--primary);
+	color: var(--on-primary);
 	font-size: 0.72rem;
 	padding: 5px 9px;
 	border-radius: 8px;
@@ -577,4 +625,49 @@ footer {
 	text-align: center;
 	font-size: 0.72rem;
 	padding-bottom: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	/* Keep the "NYA LAGET" cue visible with a static ring instead of a pulse */
+	.btn-newteam {
+		animation: none;
+		box-shadow: 0 0 0 4px rgba(255, 204, 51, 0.45);
+	}
+	.chip,
+	.bench-list,
+	.bench-chip,
+	button,
+	.btn {
+		transition: none;
+	}
+	.chip.selectable:active,
+	.fade-out .chip {
+		transform: none;
+	}
+}
+
+@media (prefers-contrast: more) {
+	:root {
+		--control-border: rgba(255, 255, 255, 0.85);
+		--muted: #d2f0dc;
+		--line: rgba(255, 255, 255, 0.9);
+	}
+	.card,
+	.status-row,
+	.timer-box,
+	.pitch-wrap,
+	.bench-wrap,
+	.playtime-wrap {
+		border: 1px solid var(--control-border);
+	}
+	.bench-chip {
+		border-style: solid;
+	}
+	.chip-ghost {
+		background: var(--card-bg);
+	}
+	:focus-visible,
+	.file-btn:focus-within {
+		outline-width: 4px;
+	}
 }
