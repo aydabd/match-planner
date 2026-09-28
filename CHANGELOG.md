@@ -3,6 +3,17 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.6.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.5.0...matchplanner-v0.6.0) (2026-09-28)
+
+
+### Features
+
+* **clock:** match clock with periods as pure core logic ([#39](https://github.com/aydabd/match-planner/issues/39)) ([b25fcce](https://github.com/aydabd/match-planner/commit/b25fcce7f2893de00b2c79c74aaeb4778ee89d95))
+* **goalkeepers:** pick goalkeepers, keep them in goal, change at breaks ([#42](https://github.com/aydabd/match-planner/issues/42)) ([797635f](https://github.com/aydabd/match-planner/commit/797635f119189b03773ce56ad16f9497a170d427))
+* **match:** match clock with periods on the match screen ([#41](https://github.com/aydabd/match-planner/issues/41)) ([f5c85b9](https://github.com/aydabd/match-planner/commit/f5c85b92ff77f77b65839d3079d1141140127910))
+* **storage:** squad file version 2 with match plan, goalkeepers and audit ([#40](https://github.com/aydabd/match-planner/issues/40)) ([d051d06](https://github.com/aydabd/match-planner/commit/d051d0667b4fa1a0079bf962f9bd45fa992fbc45))
+* **swaps:** 30-second swap warning, one-by-one substitutions and a match timeline ([#43](https://github.com/aydabd/match-planner/issues/43)) ([712adad](https://github.com/aydabd/match-planner/commit/712adad89daa73d37e60453fe41e1a68c5ccebfe))
+
 ## [0.5.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.4.0...matchplanner-v0.5.0) (2026-09-28)
 
 
