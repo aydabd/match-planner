@@ -27,6 +27,7 @@ import type {
 	RotationAssignment,
 	SchedulerState,
 } from "../core/types.js";
+import { confirmWithSecondTap } from "./confirmButton.js";
 import {
 	clearSession,
 	loadSession,
@@ -773,24 +774,10 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			input.focus();
 		});
 
-		let resetArmed = false;
-		let resetArmTimeout: ReturnType<typeof setTimeout> | null = null;
-		els.resetBtn.addEventListener("click", () => {
-			if (!live) return;
-			if (!resetArmed) {
-				resetArmed = true;
-				els.resetBtn.textContent = TEXT.match.confirmReset;
-				els.resetBtn.classList.add("confirming");
-				resetArmTimeout = setTimeout(() => {
-					resetArmed = false;
-					els.resetBtn.textContent = TEXT.match.reset;
-					els.resetBtn.classList.remove("confirming");
-				}, LIMITS.resetConfirmSeconds * 1000);
-			} else {
-				if (resetArmTimeout) clearTimeout(resetArmTimeout);
-				resetArmed = false;
-				els.resetBtn.textContent = TEXT.match.reset;
-				els.resetBtn.classList.remove("confirming");
+		confirmWithSecondTap(els.resetBtn, {
+			confirmLabel: TEXT.match.confirmReset,
+			onConfirm: () => {
+				if (!live) return;
 				els.matchMenu.open = false;
 				clearSession();
 				stopClock();
@@ -810,7 +797,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 				els.newTeamBtn.classList.remove("show");
 				updateTimerDisplay();
 				render();
-			}
+			},
 		});
 	}
 

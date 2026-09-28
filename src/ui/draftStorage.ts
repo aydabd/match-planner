@@ -7,7 +7,16 @@ import {
 } from "../core/storage.js";
 import { readItem, STORAGE_KEYS, writeItem } from "./appStorage.js";
 
-/** Load the saved draft, or an empty 7v7 (2-3-1) squad if there is none or it is unreadable. */
+/** A new squad: no players, the default format and its default minutes. */
+export function emptyDraft(): RosterFile {
+	return serializeRoster(
+		DEFAULT_FORMAT.id,
+		DEFAULT_FORMAT.defaultRotationSeconds,
+		[],
+	);
+}
+
+/** Load the saved draft, or an empty squad if there is none or it is unreadable. */
 export function loadDraft(): RosterFile {
 	const raw = readItem(STORAGE_KEYS.draft);
 	if (raw) {
@@ -17,11 +26,7 @@ export function loadDraft(): RosterFile {
 			// unreadable draft: fall through to a fresh default below
 		}
 	}
-	return serializeRoster(
-		DEFAULT_FORMAT.id,
-		DEFAULT_FORMAT.defaultRotationSeconds,
-		[],
-	);
+	return emptyDraft();
 }
 
 export function saveDraft(roster: RosterFile): void {

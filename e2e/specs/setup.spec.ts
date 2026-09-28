@@ -30,8 +30,10 @@ test.describe("Setting up a match", () => {
 			    - textbox "Spelarens namn"
 			    - button "Lägg till"
 			    - paragraph: Inga spelare än. Lägg till dem som är med idag.
+			    - button "Börja om med tom trupp"
 			- group: Spara eller hämta en trupp
 			- button "Lägg till 6 spelare till för att starta" [disabled]
+			- group: Om appen och sparad data
 		`);
 	});
 

@@ -492,6 +492,23 @@ button:disabled {
 	text-decoration: underline;
 	text-underline-offset: 3px;
 }
+.btn-danger-outline {
+	background: transparent;
+	color: var(--red-text);
+	border: 1.5px solid var(--red);
+}
+/* A destructive button waiting for its confirming second tap */
+.btn.confirming {
+	background: var(--red);
+	border-color: var(--red);
+	color: var(--on-red);
+	text-decoration: none;
+}
+.step-actions {
+	display: flex;
+	justify-content: flex-end;
+}
+
 .btn-cta {
 	width: 100%;
 	background: var(--grass);

@@ -7,8 +7,11 @@ import {
 	squadFile,
 } from "../core/storage.js";
 import type { Player } from "../core/types.js";
-import { loadDraft, saveDraft } from "./draftStorage.js";
+import { confirmWithSecondTap } from "./confirmButton.js";
+import { emptyDraft, loadDraft, saveDraft } from "./draftStorage.js";
 import { initFormationPicker } from "./formationPicker.js";
+import { clearAllSavedData } from "./resetData.js";
+import { clearSession } from "./sessionStorage.js";
 import { TEXT } from "./text.js";
 
 export interface RosterViewCallbacks {
@@ -214,6 +217,32 @@ export function createRosterView(callbacks: RosterViewCallbacks): void {
 			importError.classList.add("error");
 		}
 	});
+
+	confirmWithSecondTap(
+		document.getElementById("startOverBtn") as HTMLButtonElement,
+		{
+			confirmLabel: TEXT.setup.confirmStartOver,
+			onConfirm: () => {
+				draft = emptyDraft();
+				formationValid = true;
+				formationPicker.reset(draft.formatId);
+				importError.textContent = "";
+				clearSession();
+				persist();
+			},
+		},
+	);
+
+	confirmWithSecondTap(
+		document.getElementById("clearAllDataBtn") as HTMLButtonElement,
+		{
+			confirmLabel: TEXT.setup.confirmClearAll,
+			onConfirm: () => {
+				const appUrl = new URL(import.meta.env.BASE_URL, window.location.href);
+				void clearAllSavedData(appUrl).finally(() => window.location.reload());
+			},
+		},
+	);
 
 	startBtn.addEventListener("click", () => {
 		if (startBtn.disabled) return;

@@ -28,6 +28,8 @@ export const TEXT = {
 		startNeedsPlayers: (missing: number) =>
 			`Lägg till ${missing} spelare till för att starta`,
 		start: (players: number) => `Starta match med ${players} spelare`,
+		confirmStartOver: "Tryck igen för att tömma truppen",
+		confirmClearAll: "Tryck igen för att rensa allt",
 	},
 
 	formation: {
@@ -131,7 +133,6 @@ export const TEXT = {
 		lateArrivalLabel: "Namn på spelaren som kom sent",
 		lateArrivalPlaceholder: "Namn på spelaren som just kom",
 		add: "Lägg till",
-		reset: "Nollställ matchen",
 		confirmReset: "Tryck igen för att nollställa",
 	},
 } as const;
