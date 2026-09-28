@@ -302,7 +302,7 @@ function renderAlertBanner(): void {
 	);
 	// The banner is role="alert" and render() runs every clock tick; only
 	// rebuild when the list changes so screen readers don't re-announce it.
-	const key = unavailableIds.map((id) => `${id}:${nameOf(id)}`).join("|");
+	const key = JSON.stringify(unavailableIds.map((id) => [id, nameOf(id)]));
 	if (els.alertList.dataset.key === key) return;
 	els.alertList.dataset.key = key;
 	els.alertList.innerHTML = "";
