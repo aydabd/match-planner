@@ -74,6 +74,17 @@ describe("clockStatus", () => {
 		});
 	});
 
+	it.each([0, -60])(
+		"treats a %s-second rotation as already due instead of dividing by zero",
+		(rotationSeconds) => {
+			expect(clockStatus(0, rotationSeconds)).toEqual({
+				due: true,
+				progress: 1,
+				remainingSeconds: 0,
+			});
+		},
+	);
+
 	it("never goes past 100% or below zero seconds left", () => {
 		expect(clockStatus(700, 600)).toEqual({
 			due: true,
@@ -198,6 +209,24 @@ describe("temporary swaps", () => {
 		expect(assignment.zones.back).toEqual(["x2", "b2"]);
 	});
 
+	it("leaves the lineup alone if the original player is already back on the pitch elsewhere", () => {
+		const assignment = lineup();
+		const swap = swapWithBench(assignment, "fwd", 0, 0, 60);
+		if (!swap) throw new Error("expected a temporary swap");
+		// While f1 rests, the coach brings f1 back on in midfield for m1.
+		swapWithBench(assignment, "mid", 0, assignment.bench.indexOf("f1"), null);
+
+		revertTempSwap(assignment, swap);
+
+		expect(assignment.zones.fwd).toEqual(["x1"]);
+		expect(assignment.zones.mid).toEqual(["f1", "m2", "m3"]);
+		const everyone = [
+			...Object.values(assignment.zones).flat(),
+			...assignment.bench,
+		];
+		expect(new Set(everyone).size).toBe(everyone.length);
+	});
+
 	it("sends the substitute back to the bench without duplicating anyone", () => {
 		// Regression: the revert used to look for the substitute on the bench,
 		// so the original player ended up on the bench twice and the
@@ -220,6 +249,18 @@ describe("temporary swaps", () => {
 		revertTempSwap(assignment, swap);
 		expect(assignment.zones.fwd).toEqual(["f1"]);
 		expect(assignment.bench).toEqual(["x2", "x1"]);
+	});
+
+	it("returns updated swaps without changing the ones passed in", () => {
+		const assignment = lineup();
+		const swap = swapWithBench(assignment, "back", 0, 0, 60);
+		if (!swap) throw new Error("expected a temporary swap");
+		const original = Object.freeze({ ...swap });
+
+		const [running] = tickTempSwaps(assignment, [original], 10);
+
+		expect(running?.remainingSeconds).toBe(50);
+		expect(original.remainingSeconds).toBe(60);
 	});
 
 	it("undoes every running swap at once", () => {

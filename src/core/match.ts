@@ -68,10 +68,13 @@ export function clockStatus(
 	elapsedSeconds: number,
 	rotationSeconds: number,
 ): ClockStatus {
+	// A zero or negative length (e.g. a corrupted saved session) is due at once.
+	if (rotationSeconds <= 0)
+		return { due: true, progress: 1, remainingSeconds: 0 };
 	const due = elapsedSeconds >= rotationSeconds;
 	return {
 		due,
-		progress: Math.min(1, elapsedSeconds / rotationSeconds),
+		progress: Math.min(1, Math.max(0, elapsedSeconds / rotationSeconds)),
 		remainingSeconds: Math.max(0, rotationSeconds - elapsedSeconds),
 	};
 }
@@ -115,15 +118,19 @@ export function swapWithBench(
 /**
  * Put the original player back on the pitch and the substitute back on the
  * bench, in the original player's bench seat. Does nothing if the coach has
- * since moved someone else into that slot, so a manual change is never
- * overwritten.
+ * since changed that slot or already brought the original player back on
+ * elsewhere, so a manual change is never overwritten and nobody is doubled.
  */
 export function revertTempSwap(
 	assignment: MutableAssignment,
-	swap: TempSwap,
+	swap: Readonly<TempSwap>,
 ): void {
 	const arr = assignment.zones[swap.zoneId];
 	if (!arr || arr[swap.idx] !== swap.inId) return;
+	const outIsOnPitch = Object.values(assignment.zones).some((zone) =>
+		zone.includes(swap.outId),
+	);
+	if (outIsOnPitch) return;
 	arr[swap.idx] = swap.outId;
 	const benchIdx = assignment.bench.indexOf(swap.outId);
 	if (benchIdx !== -1) assignment.bench[benchIdx] = swap.inId;
@@ -132,27 +139,27 @@ export function revertTempSwap(
 
 /**
  * Count temporary swaps down by `seconds`, reverting any that run out.
- * Mutates the swaps' remaining time; returns the ones still running.
+ * Returns new swap objects for the ones still running; the input is not
+ * changed.
  */
 export function tickTempSwaps(
 	assignment: MutableAssignment,
-	swaps: readonly TempSwap[],
+	swaps: readonly Readonly<TempSwap>[],
 	seconds: number,
 ): TempSwap[] {
-	return swaps.filter((swap) => {
-		swap.remainingSeconds -= seconds;
-		if (swap.remainingSeconds <= 0) {
-			revertTempSwap(assignment, swap);
-			return false;
-		}
-		return true;
-	});
+	const running: TempSwap[] = [];
+	for (const swap of swaps) {
+		const remainingSeconds = swap.remainingSeconds - seconds;
+		if (remainingSeconds <= 0) revertTempSwap(assignment, swap);
+		else running.push({ ...swap, remainingSeconds });
+	}
+	return running;
 }
 
 /** Undo every running temporary swap at once. */
 export function undoTempSwaps(
 	assignment: MutableAssignment,
-	swaps: readonly TempSwap[],
+	swaps: readonly Readonly<TempSwap>[],
 ): void {
 	for (const swap of swaps) revertTempSwap(assignment, swap);
 }
