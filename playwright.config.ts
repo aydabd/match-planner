@@ -2,6 +2,12 @@ import { defineConfig, devices } from "@playwright/test";
 
 const PORT = 4173;
 const isCI = Boolean(process.env.CI);
+// Same variable the build uses; GitHub Pages serves the app under /<repo>/.
+const BASE_PATH = process.env.BASE_PATH ?? "/";
+// Set by the release workflow to test the exact dist/ it is about to deploy.
+const useExistingBuild = Boolean(process.env.E2E_USE_EXISTING_BUILD);
+const appUrl = `http://localhost:${PORT}${BASE_PATH}`;
+const preview = `npm run preview -- --port ${PORT} --strictPort`;
 
 /**
  * End-to-end tests run against the production build (vite preview), on the
@@ -18,7 +24,7 @@ export default defineConfig({
 	failOnFlakyTests: isCI,
 	reporter: isCI ? [["github"], ["html", { open: "never" }]] : "list",
 	use: {
-		baseURL: `http://localhost:${PORT}`,
+		baseURL: appUrl,
 		locale: "sv-SE",
 		// No CSS transitions: assertions and axe always see the final state.
 		contextOptions: { reducedMotion: "reduce" },
@@ -40,8 +46,8 @@ export default defineConfig({
 		},
 	],
 	webServer: {
-		command: `npm run build && npm run preview -- --port ${PORT} --strictPort`,
-		url: `http://localhost:${PORT}`,
+		command: useExistingBuild ? preview : `npm run build && ${preview}`,
+		url: appUrl,
 		reuseExistingServer: !isCI,
 		timeout: 120_000,
 	},

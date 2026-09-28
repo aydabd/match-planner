@@ -30,7 +30,8 @@ export class SetupPage {
 	}
 
 	async open(): Promise<void> {
-		await this.page.goto("/");
+		// Relative, so it also works when the app is served under a base path.
+		await this.page.goto("./");
 	}
 
 	async addPlayers(names: readonly string[]): Promise<void> {

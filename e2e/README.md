@@ -9,6 +9,15 @@ npx playwright test --ui               # watch and debug interactively
 npx playwright test --repeat-each=10   # check for flakiness before pushing
 ```
 
+The suite runs on every pull request (CI job **E2E**) and again in the
+release workflow. There it tests the exact `dist/` that gets deployed,
+served under the GitHub Pages base path:
+
+```sh
+BASE_PATH=/match-planner/ npm run build
+BASE_PATH=/match-planner/ E2E_USE_EXISTING_BUILD=1 npm run test:e2e
+```
+
 ## What belongs here
 
 Logic is unit-tested in `tests/`. It is faster and pinpoints failures. An
