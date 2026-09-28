@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FORMATS, getFormat, outfieldCount } from "../src/core/formations.js";
-import { changeKeeper } from "../src/core/match.js";
+import { assignKeeper, changeKeeper } from "../src/core/match.js";
 import {
 	applyElapsed,
 	createSchedulerState,
@@ -109,6 +109,26 @@ describe("changeKeeper", () => {
 		expect(assignment.bench).toEqual(["p9", "p1"]);
 	});
 
+	it("refuses the change when nobody may take the seat, instead of playing one short", () => {
+		const { state, assignment } = match();
+		// Old keeper and both bench players have played back and mid, so none
+		// may play in attack, where p7 would leave a seat.
+		for (const id of ["p1", "p8", "p9"]) {
+			state.players[id]?.zonesPlayed.push("back", "mid");
+		}
+		const before = structuredClone(assignment);
+
+		expect(changeKeeper(state, assignment, "p7")).toBe(false);
+
+		expect(state.keeperId).toBe("p1");
+		expect(assignment).toEqual(before);
+	});
+
+	it("reports a successful change", () => {
+		const { state, assignment } = match();
+		expect(changeKeeper(state, assignment, "p8")).toBe(true);
+	});
+
 	it("does nothing when the chosen player is already in goal", () => {
 		const { state, assignment } = match();
 		const before = structuredClone(assignment);
@@ -131,5 +151,27 @@ describe("changeKeeper", () => {
 			expect(new Set(everyone).size).toBe(everyone.length);
 			expect(everyone).toHaveLength(9);
 		}
+	});
+});
+
+describe("assignKeeper (at a period break, before the next lineup)", () => {
+	it("puts the player in goal and lets the old keeper join the rotation", () => {
+		const state = createSchedulerState(FORMAT_7V7, 600, ids(9), "p1");
+
+		expect(assignKeeper(state, "p4")).toBe(true);
+
+		expect(state.keeperId).toBe("p4");
+		const next = generateRotation(state);
+		expect([...onPitch(next), ...next.bench]).toContain("p1");
+		expect([...onPitch(next), ...next.bench]).not.toContain("p4");
+	});
+
+	it("refuses a player who is out of the match or unknown", () => {
+		const state = createSchedulerState(FORMAT_7V7, 600, ids(9), "p1");
+		if (state.players.p4) state.players.p4.unavailable = true;
+
+		expect(assignKeeper(state, "p4")).toBe(false);
+		expect(assignKeeper(state, "nobody")).toBe(false);
+		expect(state.keeperId).toBe("p1");
 	});
 });

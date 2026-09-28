@@ -318,7 +318,7 @@ export function parseRosterFile(
 		!players.some((p) => p.id === rawKeeper && p.goalkeeper)
 	) {
 		throw new StorageError(
-			`startingKeeperId "${String(startingKeeperId)}" is not a goalkeeper in the squad`,
+			`startingKeeperId ${JSON.stringify(rawKeeper)} is not a goalkeeper in the squad`,
 			{ code: "startingKeeper" },
 		);
 	}

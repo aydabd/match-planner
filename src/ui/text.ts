@@ -129,6 +129,8 @@ export const TEXT = {
 		inGoal: "i mål",
 		keeperInGoal: (name: string) => `${name} står i mål. Vem ska ta över?`,
 		goalkeeperOption: (name: string) => `${name} (målvakt)`,
+		keeperChangeBlocked: (name: string) =>
+			`${name} kan inte gå i mål just nu: ingen på bänken får ta hens plats på planen. Välj någon annan eller vänta till nästa byte.`,
 
 		// Pitch, bench and playtime
 		zoneName(zoneId: string): string {

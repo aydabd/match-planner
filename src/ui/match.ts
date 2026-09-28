@@ -1,6 +1,7 @@
 import { getFormat } from "../core/formations.js";
 import { LIMITS } from "../core/limits.js";
 import {
+	assignKeeper,
 	changeKeeper,
 	cloneAssignment,
 	formatTime,
@@ -341,7 +342,14 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 	function confirmKeeperChange(): void {
 		if (!live) return;
 		const next = els.keeperPanelSelect.value;
-		if (next) changeKeeper(live.schedulerState, live.currentAssignment, next);
+		if (!next) return;
+		if (!changeKeeper(live.schedulerState, live.currentAssignment, next)) {
+			// Nobody may take the new keeper's seat: say so, keep the panel open.
+			els.keeperPanelText.textContent = TEXT.match.keeperChangeBlocked(
+				nameOf(next),
+			);
+			return;
+		}
 		keeperPanelOpen = false;
 		renderKeeperPanel();
 		render();
@@ -888,7 +896,8 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			chosen &&
 			chosen !== live.schedulerState.keeperId
 		) {
-			changeKeeper(live.schedulerState, live.currentAssignment, chosen);
+			// The next lineup is built after this, so just choose the keeper.
+			assignKeeper(live.schedulerState, chosen);
 		}
 		live.nextKeeperId = null;
 		putNextLineupOn();
