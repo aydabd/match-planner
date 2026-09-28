@@ -39,8 +39,43 @@ jobs:
       - name: Build
         run: npm run build
 
+  # E2E is a required check, so it must always report. Filtering the workflow with
+  # `paths` would leave it missing and block the PR; a job skipped by `if` reports
+  # success instead. Only files that can change what the app does trigger it.
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      e2e: ${{ steps.filter.outputs.e2e }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Check for app, test or build changes
+        id: filter
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          changed=$(git diff --name-only "$BASE_SHA...$HEAD_SHA")
+          echo "Changed files:"
+          echo "$changed"
+          # App code, the e2e suite, build/runtime config and dependencies. Docs,
+          # rulesets, unit tests, lint config and workflows cannot change app behaviour.
+          pattern='^(src/|public/|e2e/|index\.html$|package(-lock)?\.json$|mise\.(toml|lock)$|(vite|playwright)\.config\.ts$|tsconfig\.json$)'
+          if echo "$changed" | grep -Eq "$pattern"; then
+            echo "e2e=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "e2e=false" >> "$GITHUB_OUTPUT"
+            echo "No behaviour-affecting changes: E2E will be skipped."
+          fi
+
   e2e:
     name: E2E
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
