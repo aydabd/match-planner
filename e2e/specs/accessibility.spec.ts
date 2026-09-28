@@ -4,6 +4,10 @@ import { expect, test } from "../fixtures.js";
 
 /** WCAG 2.1 A/AA violations on the current screen. */
 async function accessibilityViolations(page: Page) {
+	// axe schedules its own timers, so the paused fake clock must run while it
+	// scans. Call this last in a test: time assertions after it would not be
+	// deterministic.
+	await page.clock.resume();
 	const results = await new AxeBuilder({ page })
 		.withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
 		.analyze();
@@ -27,12 +31,18 @@ for (const colorScheme of ["light", "dark"] as const) {
 			expect(await accessibilityViolations(page)).toEqual([]);
 		});
 
-		test("the match screen has no WCAG A/AA violations, also when a swap is due", async ({
+		test("the match screen has no WCAG A/AA violations", async ({
 			startedMatch,
 			page,
 		}) => {
+			await expect(startedMatch.startClockButton).toBeVisible();
 			expect(await accessibilityViolations(page)).toEqual([]);
+		});
 
+		test("the match screen has no WCAG A/AA violations when a swap is due", async ({
+			startedMatch,
+			page,
+		}) => {
 			await startedMatch.startClock();
 			await startedMatch.play(10);
 			await expect(startedMatch.swapInNewTeamButton).toBeVisible();

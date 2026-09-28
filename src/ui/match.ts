@@ -738,16 +738,22 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 
 	function advanceRotation(): void {
 		if (!live) return;
-		els.pitch.classList.add("fade-out");
-		els.benchList.classList.add("fade-out");
-		setTimeout(() => {
+		const swap = () => {
 			if (!live) return;
 			putNextLineupOn();
 			refreshClock();
 			render();
 			els.pitch.classList.remove("fade-out");
 			els.benchList.classList.remove("fade-out");
-		}, 380);
+		};
+		// With reduced motion there is no fade to wait for.
+		if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+			swap();
+			return;
+		}
+		els.pitch.classList.add("fade-out");
+		els.benchList.classList.add("fade-out");
+		setTimeout(swap, 380);
 	}
 
 	/** After a break: next period, next lineup, clock running. */
