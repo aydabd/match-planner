@@ -46,7 +46,7 @@ describe("squad file problems in Swedish", () => {
 		],
 		[
 			{ code: "matchDetails" },
-			"Filen har ogiltiga matchuppgifter (motståndare, plats eller datum).",
+			"Filen har ogiltiga matchuppgifter (motståndare, plats, datum eller avsparkstid).",
 		],
 		[
 			{ code: "audit" },

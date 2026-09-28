@@ -71,7 +71,7 @@ export const TEXT = {
 				case "periods":
 					return "Filen har ett ogiltigt antal perioder eller en ogiltig periodlängd.";
 				case "matchDetails":
-					return "Filen har ogiltiga matchuppgifter (motståndare, plats eller datum).";
+					return "Filen har ogiltiga matchuppgifter (motståndare, plats, datum eller avsparkstid).";
 				case "audit":
 					return "Filen har ogiltiga uppgifter om vem som sparade den och när.";
 				case "notObject":

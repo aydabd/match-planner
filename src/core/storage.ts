@@ -164,10 +164,11 @@ function parseMatchDetails(raw: unknown): MatchDetails {
 	const m = raw as Record<string, unknown>;
 	const text = (value: unknown): string => {
 		if (value === undefined) return "";
-		if (typeof value !== "string" || value.length > LIMITS.matchDetailLength) {
-			throw fail();
-		}
-		return value.trim();
+		if (typeof value !== "string") throw fail();
+		// Measured after trimming, like player names.
+		const trimmed = value.trim();
+		if (trimmed.length > LIMITS.matchDetailLength) throw fail();
+		return trimmed;
 	};
 	const details = {
 		opponent: text(m.opponent),
@@ -190,7 +191,7 @@ function parseAudit(raw: unknown): FileAudit | undefined {
 		typeof a.createdAt !== "string" ||
 		Number.isNaN(Date.parse(a.createdAt)) ||
 		typeof a.createdBy !== "string" ||
-		a.createdBy.length > LIMITS.coachNameLength ||
+		a.createdBy.trim().length > LIMITS.coachNameLength ||
 		typeof a.appVersion !== "string" ||
 		a.appVersion === ""
 	) {

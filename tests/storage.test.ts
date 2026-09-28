@@ -358,6 +358,18 @@ describe("squad file version 2", () => {
 		expect(problemOf(file(overrides))).toBe(code);
 	});
 
+	it("measures text after trimming spaces, like player names", () => {
+		const padded = `  ${"x".repeat(60)}  `;
+		const roster = parseRosterFile(
+			file({
+				match: { opponent: padded, venue: "", date: "" },
+				audit: { ...AUDIT, createdBy: `  ${"y".repeat(40)}  ` },
+			}),
+		);
+		expect(roster.match.opponent).toBe("x".repeat(60));
+		expect(roster.audit?.createdBy).toBe("y".repeat(40));
+	});
+
 	it("accepts a kickoff time as well as a date", () => {
 		const withTime = file({
 			match: { opponent: "", venue: "", date: "2026-10-04T10:30" },
