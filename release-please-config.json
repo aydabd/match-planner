@@ -1,7 +1,7 @@
 {
 	"$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
 	"release-type": "node",
-	"signoff": true,
+	"signoff": "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
 	"packages": {
 		".": {
 			"package-name": "matchplanner",
