@@ -3,6 +3,13 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.3.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.2.2...matchplanner-v0.3.0) (2026-09-28)
+
+
+### Features
+
+* **ui:** redesign setup and match views for sideline use ([#8](https://github.com/aydabd/match-planner/issues/8)) ([2ae25ee](https://github.com/aydabd/match-planner/commit/2ae25ee6f71fa3c742f9e4f6a9ca94be3eb4ddc7))
+
 ## [0.2.2](https://github.com/aydabd/match-planner/compare/matchplanner-v0.2.1...matchplanner-v0.2.2) (2026-09-28)
 
 
