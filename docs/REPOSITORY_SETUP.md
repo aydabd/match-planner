@@ -59,8 +59,11 @@ gh api --method POST "repos/$OWNER/$REPO/rulesets" \
 ```
 
 Verify that both rulesets are active and that the main-branch ruleset requires signed commits,
-one approving review, resolved threads, linear history, squash merges, `Check`, `E2E`, and
-`Signed-off-by trailers`. Keep a maintainer bypass only for repository recovery.
+resolved review threads, linear history, squash merges, `Check`, `E2E`, and
+`Signed-off-by trailers`. No approving review is required while the repository has a single
+maintainer, because GitHub does not let authors approve their own pull requests; raise
+`required_approving_review_count` (and turn on code-owner and last-push approval) in
+`branch-main.json` once a second maintainer joins. Keep a maintainer bypass only for repository recovery.
 
 ## GitHub Pages
 
