@@ -63,9 +63,12 @@ export function recordLineup(
 		zones: structuredClone(assignment.zones),
 		keeperId,
 	};
-	const last = [...timeline]
-		.reverse()
-		.find((e): e is LineupEvent => e.type === "lineup");
+	let last: LineupEvent | undefined;
+	// Look from the end without copying: this runs on every lineup change.
+	for (let i = timeline.length - 1; i >= 0 && !last; i--) {
+		const event = timeline[i];
+		if (event?.type === "lineup") last = event;
+	}
 	if (last && sameLineup(last, snapshot)) return;
 	timeline.push({ type: "lineup", at, ...snapshot });
 }

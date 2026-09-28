@@ -23,6 +23,7 @@ import {
 	periodStatus,
 	rotationStatus,
 	startNextPeriod,
+	swapDueAt,
 	tick as tickClock,
 } from "../core/matchClock.js";
 import {
@@ -62,6 +63,7 @@ interface Els {
 	formatLabel: HTMLElement;
 	rotationLabel: HTMLElement;
 	fairnessLabel: HTMLElement;
+	swapAnnouncer: HTMLElement;
 	periodLabel: HTMLElement;
 	periodTime: HTMLElement;
 	nextPeriodBtn: HTMLButtonElement;
@@ -102,6 +104,7 @@ function getEls(): Els {
 		formatLabel: byId("formatLabel"),
 		rotationLabel: byId("rotationLabel"),
 		fairnessLabel: byId("fairnessLabel"),
+		swapAnnouncer: byId("swapAnnouncer"),
 		periodLabel: byId("periodLabel"),
 		periodTime: byId("periodTime"),
 		nextPeriodBtn: byId("nextPeriodBtn"),
@@ -569,24 +572,52 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		return col;
 	}
 
-	/** The warning before a swap: one row per substitution, each with Klart. */
+	/**
+	 * The warning before a swap: one row per substitution, each with Klart.
+	 * The rows are rebuilt only when the substitutions change, so keyboard
+	 * focus stays put while the countdown ticks, and the screen reader hears
+	 * the warning once when it starts and once when the swap is due.
+	 */
 	function renderSwapWarning(): void {
 		if (!live?.pendingSwap) return;
 		const { remainingSeconds, due } = rotationStatus(live.clock, live.plan);
-		const status = document.createElement("p");
-		status.className = "swap-warning-status";
+		const chains = pendingChains();
+		const rowsKey = JSON.stringify(chains);
+
+		let status = els.previewBody.querySelector<HTMLElement>(
+			".swap-warning-status",
+		);
+		if (!status || els.previewBody.dataset.rows !== rowsKey) {
+			els.previewBody.dataset.rows = rowsKey;
+			els.previewBody.replaceChildren();
+			status = document.createElement("p");
+			status.className = "swap-warning-status";
+			els.previewBody.append(status, swapRows(chains));
+		}
 		status.textContent = due
 			? TEXT.match.swapNow
 			: TEXT.match.swapIn(formatTime(remainingSeconds));
-		els.previewBody.appendChild(status);
 
-		const chains = pendingChains();
+		const announcement = due
+			? TEXT.match.swapNow
+			: TEXT.match.swapAnnouncement(
+					chains.map((c) =>
+						TEXT.match.substitution(nameOf(c.inId), nameOf(c.outId)),
+					),
+				);
+		const announceKey = due ? "due" : `warning:${rowsKey}`;
+		if (els.swapAnnouncer.dataset.key !== announceKey) {
+			els.swapAnnouncer.dataset.key = announceKey;
+			els.swapAnnouncer.textContent = announcement;
+		}
+	}
+
+	function swapRows(chains: readonly SubstitutionChain[]): HTMLElement {
 		if (chains.length === 0) {
 			const same = document.createElement("p");
 			same.className = "preview-none";
 			same.textContent = TEXT.match.sameTeam;
-			els.previewBody.appendChild(same);
-			return;
+			return same;
 		}
 		const list = document.createElement("ul");
 		list.className = "swap-list";
@@ -626,7 +657,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			item.append(text, done);
 			list.appendChild(item);
 		}
-		els.previewBody.appendChild(list);
+		return list;
 	}
 
 	function renderPreview(): void {
@@ -636,10 +667,11 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			live.pendingSwap !== null,
 		);
 		if (live.pendingSwap) {
-			els.previewBody.innerHTML = "";
 			renderSwapWarning();
 			return;
 		}
+		delete els.previewBody.dataset.rows;
+		delete els.swapAnnouncer.dataset.key;
 		// Keep the full-lineup disclosure open across clock ticks.
 		const wasOpen =
 			els.previewBody.querySelector<HTMLDetailsElement>(".next-lineup")?.open ??
@@ -864,11 +896,13 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 	function tick(): void {
 		if (live?.clock.phase !== "playing") return;
 		applyElapsed(live.schedulerState, live.currentAssignment, 1);
+		const restsBefore = live.tempSwaps.length;
 		live.tempSwaps = tickTempSwaps(live.currentAssignment, live.tempSwaps, 1);
+		const restEnded = live.tempSwaps.length < restsBefore;
 		const result = tickClock(live.clock, live.plan);
 		live.clock = result.clock;
 		// A rest that ended changed the lineup; record it from this second.
-		noteLineup();
+		if (restEnded) noteLineup();
 		for (const event of result.events) {
 			if (event.type === "periodEnded") {
 				live.timeline.push({
@@ -1039,7 +1073,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		const { remainingSeconds } = rotationStatus(live.clock, live.plan);
 		if (remainingSeconds > LIMITS.headsUpSeconds) return;
 		live.pendingSwap = {
-			plannedAt: now() + remainingSeconds,
+			plannedAt: swapDueAt(live.clock, live.plan),
 			next: cloneAssignment(generateRotationSafe(live.schedulerState)),
 		};
 	}

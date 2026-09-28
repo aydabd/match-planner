@@ -11,6 +11,7 @@ import {
 	periodStatus,
 	rotationStatus,
 	startNextPeriod,
+	swapDueAt,
 	tick,
 } from "../src/core/matchClock.js";
 
@@ -157,5 +158,25 @@ describe("default match length per team size", () => {
 			periods: 2,
 			periodMinutes: 40,
 		});
+	});
+});
+
+describe("swapDueAt", () => {
+	it("is when the swap timer reaches the swap interval", () => {
+		const { clock } = play(kickoff(NEW_CLOCK), 570);
+		expect(swapDueAt(clock, PLAN)).toBe(600);
+	});
+
+	it("stays in the past for a swap that is already late", () => {
+		const { clock } = play(kickoff(NEW_CLOCK), 640);
+		expect(swapDueAt(clock, PLAN)).toBe(600);
+	});
+
+	it("counts from the current lineup, not from kickoff", () => {
+		const { clock } = play(
+			lineupChanged(play(kickoff(NEW_CLOCK), 630).clock),
+			100,
+		);
+		expect(swapDueAt(clock, PLAN)).toBe(630 + 600);
 	});
 });

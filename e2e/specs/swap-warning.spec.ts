@@ -40,6 +40,33 @@ test.describe("The swap warning", () => {
 	});
 });
 
+test.describe("The swap warning with a screen reader or keyboard", () => {
+	test("is announced once, keeps focus on Klart, and announces when due", async ({
+		startedMatch: match,
+	}) => {
+		await match.startClock();
+		await match.play(9.5);
+		await expect(match.swapAnnouncement).toHaveText(
+			"Byte snart: Greta in för Ebba, Hugo in för Filip.",
+		);
+		const klart = match.swapRows.first().getByRole("button");
+		await klart.focus();
+
+		await match.play(5 / 60);
+
+		await expect(klart).toBeFocused();
+		await expect(match.swapStatus).toHaveText("Byte om 00:25");
+		await expect(match.swapAnnouncement).toHaveText(
+			"Byte snart: Greta in för Ebba, Hugo in för Filip.",
+		);
+
+		await match.play(25 / 60);
+		await expect(match.swapAnnouncement).toHaveText(
+			"Dags att byta, en i taget eller alla på en gång",
+		);
+	});
+});
+
 test.describe("Substituting one player at a time", () => {
 	test("each player's minutes change hands when their swap is made", async ({
 		startedMatch: match,

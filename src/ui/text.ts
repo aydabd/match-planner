@@ -124,6 +124,10 @@ export const TEXT = {
 		doneLabel: (inName: string, outName: string) =>
 			`Klart: ${inName} in för ${outName}`,
 		sameTeam: "Samma lag fortsätter.",
+		swapAnnouncement: (substitutions: readonly string[]) =>
+			substitutions.length === 0
+				? "Byte snart. Samma lag fortsätter."
+				: `Byte snart: ${substitutions.join(", ")}.`,
 
 		// Next swap
 		comingIn: "In på planen",
