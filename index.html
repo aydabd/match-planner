@@ -31,11 +31,20 @@
       <ol class="steps">
         <li class="card step">
           <h2 class="step-title"><span class="step-num" aria-hidden="true">1</span>Matchinställningar</h2>
-          <div class="field-grid">
-            <div class="field">
-              <label class="field-label" for="formatSelect">Format</label>
-              <select id="formatSelect"></select>
+          <fieldset class="choice-group">
+            <legend class="field-label">Lagstorlek</legend>
+            <div class="choices" id="teamSizeChoices"></div>
+          </fieldset>
+          <fieldset class="choice-group">
+            <legend class="field-label">Formation</legend>
+            <div class="choices" id="formationChoices"></div>
+            <div class="field custom-formation" id="customFormationField" hidden>
+              <label class="field-label" for="customFormationInput">Egen formation, från back till anfall</label>
+              <input id="customFormationInput" type="text" autocomplete="off" placeholder="till exempel 4-2-1-2-1" aria-describedby="customFormationMessage" />
+              <span class="field-help" id="customFormationMessage" role="status"></span>
             </div>
+          </fieldset>
+          <div class="field-grid">
             <div class="field">
               <label class="field-label" for="rotationMinutesInput">Minuter mellan byten</label>
               <input id="rotationMinutesInput" type="number" inputmode="numeric" min="1" max="30" value="10" aria-describedby="rotationMinutesHelp" />

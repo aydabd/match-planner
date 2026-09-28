@@ -1,4 +1,4 @@
-import { FORMATS, getFormat, outfieldCount } from "../core/formations.js";
+import { getFormat, outfieldCount } from "../core/formations.js";
 import {
 	parseRosterFile,
 	type RosterFile,
@@ -7,6 +7,7 @@ import {
 } from "../core/storage.js";
 import type { Player } from "../core/types.js";
 import { loadDraft, saveDraft } from "./draftStorage.js";
+import { initFormationPicker } from "./formationPicker.js";
 
 let draft: RosterFile = loadDraft();
 let nextIdCounter = 1;
@@ -24,9 +25,6 @@ export interface RosterViewCallbacks {
 }
 
 export function initRosterView(callbacks: RosterViewCallbacks): void {
-	const formatSelect = document.getElementById(
-		"formatSelect",
-	) as HTMLSelectElement;
 	const rotationInput = document.getElementById(
 		"rotationMinutesInput",
 	) as HTMLInputElement;
@@ -47,16 +45,22 @@ export function initRosterView(callbacks: RosterViewCallbacks): void {
 		"startMatchBtn",
 	) as HTMLButtonElement;
 
-	for (const format of Object.values(FORMATS)) {
-		const opt = document.createElement("option");
-		opt.value = format.id;
-		opt.textContent = format.label;
-		formatSelect.appendChild(opt);
-	}
+	/** False while the coach is typing a custom formation that isn't valid yet. */
+	let formationValid = true;
+	const formationPicker = initFormationPicker({
+		onChange: (formatId) => {
+			formationValid = formatId !== null;
+			if (formatId !== null && formatId !== draft.formatId) {
+				draft = { ...draft, formatId };
+				persist();
+			} else {
+				render();
+			}
+		},
+	});
 
 	function render(): void {
-		// Older squads saved "7v7"; show the quick pick it stands for.
-		formatSelect.value = getFormat(draft.formatId).id;
+		formationPicker.render(draft.formatId);
 		rotationInput.value = String(Math.round(draft.rotationSeconds / 60));
 
 		playerList.innerHTML = "";
@@ -96,11 +100,13 @@ export function initRosterView(callbacks: RosterViewCallbacks): void {
 		const format = getFormat(draft.formatId);
 		squadCount.textContent = `${draft.players.length} av minst ${outfieldCount(format)}`;
 
-		const canStart = draft.players.length >= outfieldCount(format);
-		startBtn.disabled = !canStart;
-		startBtn.textContent = canStart
-			? `Starta match med ${draft.players.length} spelare`
-			: `Lägg till ${outfieldCount(format) - draft.players.length} spelare till för att starta`;
+		const missing = outfieldCount(format) - draft.players.length;
+		startBtn.disabled = !formationValid || missing > 0;
+		startBtn.textContent = !formationValid
+			? "Välj en giltig formation för att starta"
+			: missing > 0
+				? `Lägg till ${missing} spelare till för att starta`
+				: `Starta match med ${draft.players.length} spelare`;
 	}
 
 	function persist(): void {
@@ -126,11 +132,6 @@ export function initRosterView(callbacks: RosterViewCallbacks): void {
 		draft = { ...draft, players: [...draft.players, player] };
 		persist();
 	}
-
-	formatSelect.addEventListener("change", () => {
-		draft = { ...draft, formatId: formatSelect.value };
-		persist();
-	});
 
 	rotationInput.addEventListener("change", () => {
 		const minutes = Math.max(
@@ -169,6 +170,8 @@ export function initRosterView(callbacks: RosterViewCallbacks): void {
 			const text = await file.text();
 			const imported = parseRosterFile(JSON.parse(text));
 			draft = imported;
+			formationValid = true;
+			formationPicker.reset(draft.formatId);
 			importError.textContent = "";
 			importError.classList.remove("error");
 			persist();
@@ -183,7 +186,7 @@ export function initRosterView(callbacks: RosterViewCallbacks): void {
 	});
 
 	startBtn.addEventListener("click", () => {
-		if (draft.players.length < outfieldCount(getFormat(draft.formatId))) return;
+		if (startBtn.disabled) return;
 		callbacks.onStartMatch(draft);
 	});
 

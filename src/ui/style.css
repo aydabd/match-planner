@@ -85,6 +85,7 @@ html {
 * {
 	box-sizing: border-box;
 }
+
 body {
 	margin: 0;
 	min-height: 100vh;
@@ -244,6 +245,70 @@ h3 {
 .field-help {
 	font-size: 0.8125rem;
 	color: var(--ink-2);
+}
+.field-help.error {
+	color: var(--red-text);
+	font-weight: 600;
+}
+
+/* ---------- team size and formation ---------- */
+.choice-group {
+	border: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	min-width: 0;
+}
+.choice-group legend {
+	padding: 0;
+	margin-bottom: 8px;
+}
+.choices {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+.choice {
+	position: relative;
+	display: inline-flex;
+	cursor: pointer;
+}
+/* The native radio stays in the page for keyboard and screen readers */
+.choice input {
+	position: absolute;
+	inset: 0;
+	opacity: 0;
+	margin: 0;
+	cursor: pointer;
+}
+.choice-label {
+	display: inline-flex;
+	align-items: center;
+	min-height: 44px;
+	padding: 8px 16px;
+	border-radius: 999px;
+	border: 1.5px solid var(--ink-2);
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+}
+.choice input:checked + .choice-label {
+	background: var(--grass);
+	border-color: var(--grass);
+	color: var(--on-grass);
+}
+.choice input:focus-visible + .choice-label {
+	outline: 3px solid var(--focus-ring);
+	outline-offset: 2px;
+	box-shadow: 0 0 0 6px var(--focus-halo);
+}
+.custom-formation {
+	margin-top: 4px;
+}
+/* .field sets display:flex, which would otherwise override the hidden attribute */
+.custom-formation[hidden] {
+	display: none;
 }
 select,
 input[type="number"],
@@ -843,20 +908,25 @@ button:disabled {
 	padding: 1px 8px;
 	border-radius: 999px;
 }
+/* Up to five players in a line fit side by side on a phone */
 .line-chips {
 	display: flex;
 	justify-content: center;
-	gap: 8px;
-	flex-wrap: wrap;
+	gap: 6px;
+	width: 100%;
 }
 .chip {
 	background: #ffffff;
 	color: #0f2a1c;
 	min-height: 44px;
-	min-width: 76px;
-	padding: 8px 12px;
+	flex: 0 1 88px;
+	min-width: 0;
+	padding: 8px 6px;
 	border-radius: 999px;
 	font-size: 0.9375rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 	font-weight: 700;
 	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 	transition:

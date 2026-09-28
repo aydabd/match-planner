@@ -3,7 +3,10 @@ import type { Download, Locator, Page } from "@playwright/test";
 /** The "Ny match" screen: match settings, today's squad and squad files. */
 export class SetupPage {
 	readonly root: Locator;
-	readonly format: Locator;
+	readonly teamSizes: Locator;
+	readonly formations: Locator;
+	readonly customFormation: Locator;
+	readonly customFormationMessage: Locator;
 	readonly minutesBetweenSwaps: Locator;
 	readonly squadCount: Locator;
 	readonly players: Locator;
@@ -16,7 +19,12 @@ export class SetupPage {
 
 	constructor(private readonly page: Page) {
 		this.root = page.locator("#setupView");
-		this.format = this.root.getByLabel("Format");
+		this.teamSizes = this.root.getByRole("group", { name: "Lagstorlek" });
+		this.formations = this.root.getByRole("group", { name: "Formation" });
+		this.customFormation = this.root.getByLabel(
+			"Egen formation, från back till anfall",
+		);
+		this.customFormationMessage = this.root.locator("#customFormationMessage");
 		this.minutesBetweenSwaps = this.root.getByLabel("Minuter mellan byten");
 		this.squadCount = this.root.locator("#squadCount");
 		this.players = this.root.getByRole("textbox", { name: /^Namn, spelare/ });
@@ -55,6 +63,21 @@ export class SetupPage {
 
 	async removePlayer(name: string): Promise<void> {
 		await this.root.getByRole("button", { name: `Ta bort ${name}` }).click();
+	}
+
+	async chooseTeamSize(size: "5v5" | "7v7" | "9v9" | "11v11"): Promise<void> {
+		await this.teamSizes.getByRole("radio", { name: size }).check();
+	}
+
+	/** Pick one of the quick-pick formations shown for the team size. */
+	async chooseFormation(formation: string): Promise<void> {
+		await this.formations.getByRole("radio", { name: formation }).check();
+	}
+
+	/** Opt in to a custom formation and type it. */
+	async enterCustomFormation(formation: string): Promise<void> {
+		await this.formations.getByRole("radio", { name: "Egen" }).check();
+		await this.customFormation.fill(formation);
 	}
 
 	async setMinutesBetweenSwaps(minutes: number): Promise<void> {

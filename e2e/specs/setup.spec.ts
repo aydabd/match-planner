@@ -14,7 +14,16 @@ test.describe("Setting up a match", () => {
 			- list:
 			  - listitem:
 			    - heading "Matchinställningar" [level=2]
-			    - combobox "Format"
+			    - group "Lagstorlek":
+			      - radio "5v5"
+			      - radio "7v7" [checked]
+			      - radio "9v9"
+			      - radio "11v11"
+			    - group "Formation":
+			      - radio "2-3-1" [checked]
+			      - radio "3-2-1"
+			      - radio "2-1-2-1"
+			      - radio "Egen"
 			    - spinbutton "Minuter mellan byten"
 			  - listitem:
 			    - heading "Dagens trupp" [level=2]
