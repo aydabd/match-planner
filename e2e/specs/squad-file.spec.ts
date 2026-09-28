@@ -1,9 +1,14 @@
+import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import type { Browser } from "@playwright/test";
 import { expect, test } from "../fixtures.js";
 import { MatchPage } from "../pages/MatchPage.js";
 import { SetupPage } from "../pages/SetupPage.js";
 import { SQUAD } from "../support/squads.js";
+
+const { version: APP_VERSION } = JSON.parse(
+	readFileSync("package.json", "utf8"),
+) as { version: string };
 
 const TEAM_11 = Array.from({ length: 13 }, (_, i) => `Spelare ${i + 1}`);
 
@@ -55,6 +60,10 @@ test.describe("Saving and loading a squad file", () => {
 		const download = await setup.saveSquadToFile();
 		expect(download.suggestedFilename()).toBe("trupp-11v11-4-2-1-2-1.json");
 		const contents = await readFile(await download.path(), "utf8");
+		const saved = JSON.parse(contents);
+		expect(saved.schemaVersion).toBe(2);
+		expect(saved.audit.appVersion).toBe(APP_VERSION);
+		expect(Date.parse(saved.audit.createdAt)).not.toBeNaN();
 
 		const other = await openOtherPhone(browser);
 		await other.setup.loadSquadFromFile({ name: "team.json", contents });

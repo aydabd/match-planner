@@ -68,6 +68,12 @@ export const TEXT = {
 					return "Filen har samma spelare två gånger.";
 				case "rotation":
 					return "Filen har ett ogiltigt antal minuter mellan byten.";
+				case "periods":
+					return "Filen har ett ogiltigt antal perioder eller en ogiltig periodlängd.";
+				case "matchDetails":
+					return "Filen har ogiltiga matchuppgifter (motståndare, plats eller datum).";
+				case "audit":
+					return "Filen har ogiltiga uppgifter om vem som sparade den och när.";
 				case "notObject":
 				case "schemaVersion":
 				case "playersNotList":

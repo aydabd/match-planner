@@ -12,6 +12,10 @@ export const LIMITS = {
 	periodMinutes: { min: 5, max: 45 },
 	/** Longest player name kept, in characters. */
 	playerNameLength: 40,
+	/** Longest coach name recorded in saved files, in characters. */
+	coachNameLength: 40,
+	/** Longest opponent, venue or date text in match details. */
+	matchDetailLength: 60,
 	/** Most players in one squad, on the setup screen and in squad files. */
 	squadSize: 30,
 	/** Rest lengths offered for a temporary swap, in seconds. */

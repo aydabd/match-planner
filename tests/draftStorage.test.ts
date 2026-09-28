@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { rosterToJson, serializeRoster } from "../src/core/storage.js";
+import { newRoster, rosterToJson } from "../src/core/storage.js";
 import { loadDraft, saveDraft } from "../src/ui/draftStorage.js";
 import { BrokenStorage, useMemoryStorage } from "./support/memoryStorage.js";
 
 const KEY = "matchplanner:draft:v1";
-const EMPTY_DRAFT = serializeRoster("7v7:2-3-1", 600, []);
+const EMPTY_DRAFT = newRoster({ formatId: "7v7:2-3-1", rotationSeconds: 600 });
 
 describe("squad draft storage", () => {
 	const { storage } = useMemoryStorage();
@@ -15,27 +15,43 @@ describe("squad draft storage", () => {
 
 	it("still loads a squad saved with the original 7v7 id, as 7v7 (2-3-1)", () => {
 		const players = [{ id: "p1", name: "Alva" }];
-		saveDraft(serializeRoster("7v7", 600, players));
-		expect(loadDraft()).toEqual(serializeRoster("7v7:2-3-1", 600, players));
+		saveDraft(
+			newRoster({ formatId: "7v7", rotationSeconds: 600, players: players }),
+		);
+		expect(loadDraft()).toEqual(
+			newRoster({
+				formatId: "7v7:2-3-1",
+				rotationSeconds: 600,
+				players: players,
+			}),
+		);
 	});
 
 	it("keeps the chosen format and minutes before any player is added", () => {
-		const draft = serializeRoster("9v9:2-2-2-2", 480, []);
+		const draft = newRoster({ formatId: "9v9:2-2-2-2", rotationSeconds: 480 });
 		saveDraft(draft);
 		expect(loadDraft()).toEqual(draft);
 	});
 
 	it("restores the saved squad", () => {
-		const draft = serializeRoster("9v9:3-3-2", 480, [
-			{ id: "p1", name: "Alva" },
-			{ id: "p2", name: "Bo" },
-		]);
+		const draft = newRoster({
+			formatId: "9v9:3-3-2",
+			rotationSeconds: 480,
+			players: [
+				{ id: "p1", name: "Alva" },
+				{ id: "p2", name: "Bo" },
+			],
+		});
 		saveDraft(draft);
 		expect(loadDraft()).toEqual(draft);
 	});
 
 	it("saves in the same format as an exported squad file", () => {
-		const draft = serializeRoster("7v7", 600, [{ id: "p1", name: "Alva" }]);
+		const draft = newRoster({
+			formatId: "7v7",
+			rotationSeconds: 600,
+			players: [{ id: "p1", name: "Alva" }],
+		});
 		saveDraft(draft);
 		expect(storage().getItem(KEY)).toBe(rosterToJson(draft));
 	});

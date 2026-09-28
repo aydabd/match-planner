@@ -40,6 +40,18 @@ describe("squad file problems in Swedish", () => {
 			{ code: "rotation" },
 			"Filen har ett ogiltigt antal minuter mellan byten.",
 		],
+		[
+			{ code: "periods" },
+			"Filen har ett ogiltigt antal perioder eller en ogiltig periodlängd.",
+		],
+		[
+			{ code: "matchDetails" },
+			"Filen har ogiltiga matchuppgifter (motståndare, plats eller datum).",
+		],
+		[
+			{ code: "audit" },
+			"Filen har ogiltiga uppgifter om vem som sparade den och när.",
+		],
 		[{ code: "notObject" }, TEXT.squadFile.unreadable],
 		[{ code: "schemaVersion" }, TEXT.squadFile.unreadable],
 		[{ code: "playersNotList" }, TEXT.squadFile.unreadable],
