@@ -21,5 +21,22 @@ export default defineConfig(({ mode }) => ({
 	test: {
 		environment: "node",
 		include: ["tests/**/*.test.ts"],
+		coverage: {
+			provider: "v8",
+			// Unit tests own the logic and storage modules. The DOM wiring in
+			// src/ui/{match,roster}.ts and main.ts is covered by the e2e suite.
+			include: [
+				"src/core/**/*.ts",
+				"src/ui/draftStorage.ts",
+				"src/ui/sessionStorage.ts",
+			],
+			reporter: ["text", "html"],
+			thresholds: {
+				statements: 90,
+				branches: 85,
+				functions: 100,
+				lines: 95,
+			},
+		},
 	},
 }));

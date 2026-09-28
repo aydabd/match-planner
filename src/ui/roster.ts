@@ -4,29 +4,9 @@ import {
 	type RosterFile,
 	rosterToJson,
 	StorageError,
-	serializeRoster,
 } from "../core/storage.js";
 import type { Player } from "../core/types.js";
-
-const DRAFT_KEY = "matchplanner:draft:v1";
-
-function loadDraft(): RosterFile {
-	try {
-		const raw = localStorage.getItem(DRAFT_KEY);
-		if (raw) return parseRosterFile(JSON.parse(raw));
-	} catch {
-		// fall through to a fresh default below
-	}
-	return serializeRoster("7v7", 600, []);
-}
-
-function saveDraft(roster: RosterFile): void {
-	try {
-		localStorage.setItem(DRAFT_KEY, rosterToJson(roster));
-	} catch {
-		// non-fatal - the in-memory draft still works for this session
-	}
-}
+import { loadDraft, saveDraft } from "./draftStorage.js";
 
 let draft: RosterFile = loadDraft();
 let nextIdCounter = 1;
