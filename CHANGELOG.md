@@ -3,6 +3,13 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.5.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.4.0...matchplanner-v0.5.0) (2026-09-28)
+
+
+### Features
+
+* **setup:** start over or clear all saved data; versioned offline cache ([#35](https://github.com/aydabd/match-planner/issues/35)) ([898f125](https://github.com/aydabd/match-planner/commit/898f1252564e16a6ea6dc820fc65839cb8f46561))
+
 ## [0.4.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.3.1...matchplanner-v0.4.0) (2026-09-28)
 
 
