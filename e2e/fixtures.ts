@@ -3,6 +3,7 @@ import {
 	expect as baseExpect,
 	type Locator,
 } from "@playwright/test";
+import { HistoryPage } from "./pages/HistoryPage.js";
 import { MatchPage } from "./pages/MatchPage.js";
 import { ReportPage } from "./pages/ReportPage.js";
 import { SetupPage } from "./pages/SetupPage.js";
@@ -15,6 +16,7 @@ interface Fixtures {
 	setup: SetupPage;
 	match: MatchPage;
 	report: ReportPage;
+	history: HistoryPage;
 	/** A match started with the test squad; the clock is not running yet. */
 	startedMatch: MatchPage;
 }
@@ -38,6 +40,9 @@ export const test = base.extend<Fixtures>({
 	},
 	match: async ({ page }, use) => {
 		await use(new MatchPage(page));
+	},
+	history: async ({ page }, use) => {
+		await use(new HistoryPage(page));
 	},
 	report: async ({ page }, use) => {
 		await use(new ReportPage(page));

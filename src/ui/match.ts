@@ -26,6 +26,12 @@ import {
 	swapDueAt,
 	tick as tickClock,
 } from "../core/matchClock.js";
+import {
+	type MatchFile,
+	matchFileToJson,
+	newMatchFile,
+	parseMatchFile,
+} from "../core/matchFile.js";
 import { buildReport, type StoredReport } from "../core/report.js";
 import {
 	applyElapsed,
@@ -50,6 +56,7 @@ import type {
 } from "../core/types.js";
 import { loadCoachName } from "./coachName.js";
 import { confirmWithSecondTap } from "./confirmButton.js";
+import { keepMatchFiles } from "./matchFileStorage.js";
 import { saveReport } from "./reportStorage.js";
 import {
 	clearSession,
@@ -964,11 +971,51 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		};
 	}
 
-	/** The match is over: keep its report on this device and show it. */
+	/** The match file: audit, setup, squad and the whole timeline. */
+	function currentMatchFile(): MatchFile | null {
+		if (!live) return null;
+		const { plan } = live;
+		return newMatchFile({
+			audit: {
+				matchId: live.matchId,
+				createdAt: new Date().toISOString(),
+				createdBy: loadCoachName(),
+				appVersion: __APP_VERSION__,
+			},
+			match: live.match,
+			setup: {
+				formatId: live.format.id,
+				periods: plan.periods,
+				periodSeconds: plan.periodSeconds,
+				rotationSeconds: plan.rotationSeconds,
+			},
+			players: live.schedulerState.order.map((id) => ({
+				id,
+				name: nameOf(id),
+				goalkeeper: live?.goalkeepers.includes(id) ?? false,
+			})),
+			timeline: live.timeline,
+			endedAt: now(),
+		});
+	}
+
+	/**
+	 * The match is over: keep its report and its match file on this device
+	 * (for the season history) and show the report. A match file that would
+	 * not pass the same checks as an imported one is not kept.
+	 */
 	function finishMatch(): void {
 		const stored = currentReport();
 		if (!stored) return;
 		saveReport(stored);
+		const file = currentMatchFile();
+		if (file) {
+			try {
+				keepMatchFiles([parseMatchFile(JSON.parse(matchFileToJson(file)))]);
+			} catch {
+				// Nothing to add to the history from a match that never kicked off.
+			}
+		}
 		callbacks.onShowReport(stored);
 	}
 

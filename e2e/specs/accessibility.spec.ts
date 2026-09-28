@@ -1,5 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
+import { matchFileToJson } from "../../src/core/matchFile.js";
+import { makeMatchFile } from "../../tests/support/matchFiles.js";
 import { expect, test } from "../fixtures.js";
 
 /** WCAG 2.1 A/AA violations on the current screen. */
@@ -49,6 +51,23 @@ for (const colorScheme of ["light", "dark"] as const) {
 			await startedMatch.confirmSwap("Greta");
 			await startedMatch.endMatch();
 			await expect(report.root).toBeVisible();
+			expect(await accessibilityViolations(page)).toEqual([]);
+		});
+
+		test("the season history has no WCAG A/AA violations", async ({
+			setup,
+			history,
+			page,
+		}) => {
+			await setup.open();
+			await history.open();
+			await history.importFiles([
+				{
+					name: "match.json",
+					contents: matchFileToJson(makeMatchFile({ seed: 3 })),
+				},
+			]);
+			await expect(history.count).toHaveText("1 match över 1 månad.");
 			expect(await accessibilityViolations(page)).toEqual([]);
 		});
 

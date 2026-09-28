@@ -1,5 +1,7 @@
 import { formatTime } from "../core/match.js";
+import { matchFileName, matchFileToJson } from "../core/matchFile.js";
 import type { StoredReport } from "../core/report.js";
+import { loadMatchFiles } from "./matchFileStorage.js";
 import { loadReports } from "./reportStorage.js";
 import { reportAsText, reportDetails, zoneBreakdown } from "./reportText.js";
 import { TEXT } from "./text.js";
@@ -58,6 +60,8 @@ export function createReportView(callbacks: {
 	function show(stored: StoredReport): void {
 		shown = stored;
 		status.textContent = "";
+		(byId("matchFileSaveBtn") as HTMLButtonElement).disabled =
+			!loadMatchFiles().some((f) => f.audit.matchId === stored.matchId);
 		const { report } = stored;
 		const nameOf = (id: string) =>
 			report.players.find((p) => p.id === id)?.name ?? id;
@@ -157,17 +161,30 @@ export function createReportView(callbacks: {
 		}
 	});
 
-	byId("reportSaveBtn").addEventListener("click", () => {
-		if (!shown) return;
-		const blob = new Blob([JSON.stringify(shown, null, 2)], {
-			type: "application/json",
-		});
+	function download(fileName: string, json: string): void {
+		const blob = new Blob([json], { type: "application/json" });
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement("a");
 		a.href = url;
-		a.download = `matchrapport-${shown.match.date.slice(0, 10) || shown.savedAt.slice(0, 10)}.json`;
+		a.download = fileName;
 		a.click();
 		URL.revokeObjectURL(url);
+	}
+
+	byId("reportSaveBtn").addEventListener("click", () => {
+		if (!shown) return;
+		download(
+			`matchrapport-${shown.match.date.slice(0, 10) || shown.savedAt.slice(0, 10)}.json`,
+			JSON.stringify(shown, null, 2),
+		);
+	});
+
+	// The match file for the shown report, if this device still keeps it.
+	byId("matchFileSaveBtn").addEventListener("click", () => {
+		const file = loadMatchFiles().find(
+			(f) => f.audit.matchId === shown?.matchId,
+		);
+		if (file) download(matchFileName(file), matchFileToJson(file));
 	});
 
 	return { show, refreshList };

@@ -101,7 +101,7 @@ export function newRoster(fields: {
 }
 
 /** Whole minutes within a range, as the setup screen allows. */
-function isWholeMinutesWithin(
+export function isWholeMinutesWithin(
 	seconds: unknown,
 	range: { min: number; max: number },
 ): seconds is number {
@@ -155,7 +155,7 @@ function isValidDate(value: string): boolean {
 	return value === "" || (DATE.test(value) && !Number.isNaN(Date.parse(value)));
 }
 
-function parseMatchDetails(raw: unknown): MatchDetails {
+export function parseMatchDetails(raw: unknown): MatchDetails {
 	if (raw === undefined) return { ...NO_MATCH_DETAILS };
 	const fail = () =>
 		new StorageError("match must hold opponent, venue and date strings", {
@@ -180,7 +180,7 @@ function parseMatchDetails(raw: unknown): MatchDetails {
 	return details;
 }
 
-function parseAudit(raw: unknown): FileAudit | undefined {
+export function parseAudit(raw: unknown): FileAudit | undefined {
 	if (raw === undefined) return undefined;
 	const fail = () =>
 		new StorageError("audit must hold createdAt, createdBy and appVersion", {
@@ -203,6 +203,44 @@ function parseAudit(raw: unknown): FileAudit | undefined {
 		createdBy: a.createdBy.trim(),
 		appVersion: a.appVersion,
 	};
+}
+
+/**
+ * The players of a squad file or match file, strictly checked: ids and names
+ * present, ids unique, names trimmed and shortened to the name limit.
+ */
+export function parsePlayers(list: readonly unknown[]): Player[] {
+	const seenIds = new Set<string>();
+	return list.map((raw, index) => {
+		const invalid = (why: string) =>
+			new StorageError(`Player at index ${index} ${why}`, {
+				code: "invalidPlayer",
+				position: index + 1,
+			});
+		if (typeof raw !== "object" || raw === null)
+			throw invalid("is not an object");
+		const p = raw as Record<string, unknown>;
+		if (typeof p.id !== "string" || p.id.trim() === "") {
+			throw invalid("has no valid id");
+		}
+		if (typeof p.name !== "string" || p.name.trim() === "") {
+			throw invalid("has no valid name");
+		}
+		if (p.goalkeeper !== undefined && typeof p.goalkeeper !== "boolean") {
+			throw invalid("has a goalkeeper flag that is not true or false");
+		}
+		if (seenIds.has(p.id)) {
+			throw new StorageError(`Duplicate player id "${p.id}"`, {
+				code: "duplicateId",
+			});
+		}
+		seenIds.add(p.id);
+		return {
+			id: p.id,
+			name: p.name.trim().slice(0, LIMITS.playerNameLength),
+			goalkeeper: p.goalkeeper === true,
+		};
+	});
 }
 
 /**
@@ -278,37 +316,7 @@ export function parseRosterFile(
 		});
 	}
 
-	const seenIds = new Set<string>();
-	const players: Player[] = obj.players.map((raw, index) => {
-		const invalid = (why: string) =>
-			new StorageError(`Player at index ${index} ${why}`, {
-				code: "invalidPlayer",
-				position: index + 1,
-			});
-		if (typeof raw !== "object" || raw === null)
-			throw invalid("is not an object");
-		const p = raw as Record<string, unknown>;
-		if (typeof p.id !== "string" || p.id.trim() === "") {
-			throw invalid("has no valid id");
-		}
-		if (typeof p.name !== "string" || p.name.trim() === "") {
-			throw invalid("has no valid name");
-		}
-		if (p.goalkeeper !== undefined && typeof p.goalkeeper !== "boolean") {
-			throw invalid("has a goalkeeper flag that is not true or false");
-		}
-		if (seenIds.has(p.id)) {
-			throw new StorageError(`Duplicate player id "${p.id}"`, {
-				code: "duplicateId",
-			});
-		}
-		seenIds.add(p.id);
-		return {
-			id: p.id,
-			name: p.name.trim().slice(0, LIMITS.playerNameLength),
-			goalkeeper: p.goalkeeper === true,
-		};
-	});
+	const players = parsePlayers(obj.players);
 
 	// Absent or null means nobody is tracked in goal.
 	const rawKeeper = isV1 ? null : (obj.startingKeeperId ?? null);
