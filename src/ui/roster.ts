@@ -11,22 +11,26 @@ import { loadDraft, saveDraft } from "./draftStorage.js";
 import { initFormationPicker } from "./formationPicker.js";
 import { TEXT } from "./text.js";
 
-let draft: RosterFile = loadDraft();
-let nextIdCounter = 1;
-
-function freshId(): string {
-	// Stable, human-inspectable ids (not shown to users) - avoids depending
-	// on crypto.randomUUID, which is fine to have but not worth requiring.
-	while (draft.players.some((p) => p.id === `p${nextIdCounter}`))
-		nextIdCounter++;
-	return `p${nextIdCounter++}`;
-}
-
 export interface RosterViewCallbacks {
 	onStartMatch: (roster: RosterFile) => void;
 }
 
-export function initRosterView(callbacks: RosterViewCallbacks): void {
+/**
+ * The setup screen. The squad being set up lives in this closure and is
+ * loaded when the view is created, not when the module is imported.
+ */
+export function createRosterView(callbacks: RosterViewCallbacks): void {
+	let draft: RosterFile = loadDraft();
+	let nextIdCounter = 1;
+
+	function freshId(): string {
+		// Stable, human-inspectable ids (not shown to users) - avoids depending
+		// on crypto.randomUUID, which is fine to have but not worth requiring.
+		while (draft.players.some((p) => p.id === `p${nextIdCounter}`))
+			nextIdCounter++;
+		return `p${nextIdCounter++}`;
+	}
+
 	const rotationInput = document.getElementById(
 		"rotationMinutesInput",
 	) as HTMLInputElement;

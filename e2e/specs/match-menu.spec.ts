@@ -21,6 +21,21 @@ test.describe("Match menu", () => {
 		await expect(setup.players).toHaveInputValues(SQUAD);
 	});
 
+	test("resetting while a swap is due lets the coach start the clock again", async ({
+		startedMatch: match,
+	}) => {
+		await match.startClock();
+		await match.play(10);
+		await expect(match.swapInNewTeamButton).toBeVisible();
+
+		await match.resetMatch();
+
+		await expect(match.time).toHaveText("00:00");
+		await expect(match.swapInNewTeamButton).toBeHidden();
+		await expect(match.startClockButton).toBeVisible();
+		await expect(match.startClockButton).toBeEnabled();
+	});
+
 	test("reset asks for a second tap, then starts the match over", async ({
 		startedMatch: match,
 	}) => {
