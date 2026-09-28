@@ -30,6 +30,16 @@ test.describe("Starting over", () => {
 		await expect(setup.emptySquadMessage).toBeVisible();
 	});
 
+	test("also clears an earlier squad-file error", async ({ setup }) => {
+		await setup.loadSquadFromFile({ name: "notes.json", contents: "not json" });
+		await expect(setup.squadFileMessage).toBeVisible();
+
+		await setup.startOver();
+
+		await expect(setup.squadFileMessage).toBeHidden();
+		await expect(setup.squadFileMessage).not.toHaveClass(/error/);
+	});
+
 	test("one tap only asks for confirmation, and the question expires", async ({
 		setup,
 		page,

@@ -142,6 +142,11 @@ export function createRosterView(callbacks: RosterViewCallbacks): void {
 				: TEXT.setup.start(draft.players.length);
 	}
 
+	function clearImportError(): void {
+		importError.textContent = "";
+		importError.classList.remove("error");
+	}
+
 	function persist(): void {
 		saveDraft(draft);
 		render();
@@ -205,8 +210,7 @@ export function createRosterView(callbacks: RosterViewCallbacks): void {
 			draft = imported;
 			formationValid = true;
 			formationPicker.reset(draft.formatId);
-			importError.textContent = "";
-			importError.classList.remove("error");
+			clearImportError();
 			persist();
 		} catch (err) {
 			const message =
@@ -226,7 +230,7 @@ export function createRosterView(callbacks: RosterViewCallbacks): void {
 				draft = emptyDraft();
 				formationValid = true;
 				formationPicker.reset(draft.formatId);
-				importError.textContent = "";
+				clearImportError();
 				clearSession();
 				persist();
 			},
