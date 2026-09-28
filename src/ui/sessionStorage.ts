@@ -3,13 +3,14 @@ import type {
 	SchedulerState,
 	TempSwap,
 } from "../core/types.js";
+import { readItem, removeItem, STORAGE_KEYS, writeItem } from "./appStorage.js";
 
 export type { MutableAssignment, TempSwap };
 
 /**
  * Everything needed to resume a match exactly where it was left off after
  * a page reload. Kept deliberately flat and small - it is written to
- * localStorage every second while the clock runs, so it must stay cheap
+ * browser storage (via appStorage) every second while the clock runs, so it must stay cheap
  * to serialize.
  */
 export interface MatchSession {
@@ -25,22 +26,14 @@ export interface MatchSession {
 	tempSwaps: TempSwap[];
 }
 
-const KEY = "matchplanner:session:v1";
-
 export function saveSession(session: MatchSession): void {
-	try {
-		localStorage.setItem(KEY, JSON.stringify(session));
-	} catch {
-		// Storage can be unavailable (private browsing, quota, disabled) -
-		// the app still works for the rest of this tab session, it just
-		// won't survive a reload. Not fatal.
-	}
+	writeItem(STORAGE_KEYS.session, JSON.stringify(session));
 }
 
 export function loadSession(): MatchSession | null {
+	const raw = readItem(STORAGE_KEYS.session);
+	if (!raw) return null;
 	try {
-		const raw = localStorage.getItem(KEY);
-		if (!raw) return null;
 		const parsed = JSON.parse(raw) as unknown;
 		if (typeof parsed !== "object" || parsed === null) return null;
 		if ((parsed as { schemaVersion?: unknown }).schemaVersion !== 1)
@@ -52,9 +45,5 @@ export function loadSession(): MatchSession | null {
 }
 
 export function clearSession(): void {
-	try {
-		localStorage.removeItem(KEY);
-	} catch {
-		// ignore
-	}
+	removeItem(STORAGE_KEYS.session);
 }

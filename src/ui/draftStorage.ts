@@ -5,17 +5,17 @@ import {
 	rosterToJson,
 	serializeRoster,
 } from "../core/storage.js";
-
-/** The squad being set up on the setup screen, kept across reloads. */
-const DRAFT_KEY = "matchplanner:draft:v1";
+import { readItem, STORAGE_KEYS, writeItem } from "./appStorage.js";
 
 /** Load the saved draft, or an empty 7v7 (2-3-1) squad if there is none or it is unreadable. */
 export function loadDraft(): RosterFile {
-	try {
-		const raw = localStorage.getItem(DRAFT_KEY);
-		if (raw) return parseRosterFile(JSON.parse(raw), { allowEmptySquad: true });
-	} catch {
-		// fall through to a fresh default below
+	const raw = readItem(STORAGE_KEYS.draft);
+	if (raw) {
+		try {
+			return parseRosterFile(JSON.parse(raw), { allowEmptySquad: true });
+		} catch {
+			// unreadable draft: fall through to a fresh default below
+		}
 	}
 	return serializeRoster(
 		DEFAULT_FORMAT.id,
@@ -25,9 +25,5 @@ export function loadDraft(): RosterFile {
 }
 
 export function saveDraft(roster: RosterFile): void {
-	try {
-		localStorage.setItem(DRAFT_KEY, rosterToJson(roster));
-	} catch {
-		// non-fatal - the in-memory draft still works for this session
-	}
+	writeItem(STORAGE_KEYS.draft, rosterToJson(roster));
 }
