@@ -6,6 +6,9 @@ name: CI
 #
 # Release PRs (release-please) only bump the version and changelog, so Check and
 # E2E are skipped for them. A job skipped by `if` still satisfies required checks.
+# "Detect changes" decides once whether a PR is a genuine release PR: the
+# release-please branch, opened by github-actions[bot], from this repository.
+# A branch name alone is not enough, so nobody can skip CI by naming a branch.
 on:
   pull_request:
 
@@ -15,7 +18,9 @@ permissions:
 jobs:
   test:
     name: Check
-    if: ${{ !startsWith(github.head_ref, 'release-please--') }}
+    needs: changes
+    # Fail-safe: if Detect changes fails, its output is empty and Check still runs.
+    if: ${{ !cancelled() && needs.changes.outputs.release_pr != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -53,22 +58,35 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       e2e: ${{ steps.filter.outputs.e2e }}
+      release_pr: ${{ steps.release.outputs.release_pr }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+
+      - name: Check for a release PR
+        id: release
+        env:
+          RELEASE_PR: >-
+            ${{ startsWith(github.head_ref, 'release-please--')
+            && github.event.pull_request.user.login == 'github-actions[bot]'
+            && github.event.pull_request.head.repo.full_name == github.repository }}
+        run: |
+          echo "release_pr=$RELEASE_PR" >> "$GITHUB_OUTPUT"
+          if [ "$RELEASE_PR" = "true" ]; then
+            echo "Release PR (version and changelog only): Check and E2E will be skipped."
+          fi
 
       - name: Check for app, test or build changes
         id: filter
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          HEAD_REF: ${{ github.head_ref }}
+          RELEASE_PR: ${{ steps.release.outputs.release_pr }}
         run: |
           set -euo pipefail
-          if [[ "$HEAD_REF" == release-please--* ]]; then
+          if [ "$RELEASE_PR" = "true" ]; then
             echo "e2e=false" >> "$GITHUB_OUTPUT"
-            echo "Release PR (version and changelog only): E2E will be skipped."
             exit 0
           fi
           changed=$(git diff --name-only "$BASE_SHA...$HEAD_SHA")
@@ -89,7 +107,8 @@ jobs:
   e2e:
     name: E2E
     needs: changes
-    if: needs.changes.outputs.e2e == 'true'
+    # Skip only on an explicit "false"; if Detect changes fails, E2E still runs.
+    if: ${{ !cancelled() && needs.changes.outputs.e2e != 'false' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
