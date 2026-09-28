@@ -140,6 +140,17 @@ export function periodStatus(clock: MatchClock, plan: MatchPlan): PeriodStatus {
 	};
 }
 
+/**
+ * When the current lineup's swap is due, in seconds since kickoff. Unlike
+ * rotationStatus it is not clamped, so a swap that is already late keeps its
+ * real due time and its delay is measured correctly.
+ */
+export function swapDueAt(clock: MatchClock, plan: MatchPlan): number {
+	return (
+		matchSecond(clock, plan) + plan.rotationSeconds - clock.rotationElapsed
+	);
+}
+
 /** Seconds of play since kickoff, across periods. Timeline events use this. */
 export function matchSecond(clock: MatchClock, plan: MatchPlan): number {
 	return (clock.period - 1) * plan.periodSeconds + clock.periodElapsed;

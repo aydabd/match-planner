@@ -2,6 +2,11 @@ import type { Locator, Page } from "@playwright/test";
 
 type SwapDuration = "1 min" | "2 min" | "5 min" | "Till nästa byte";
 
+/** A player name as literal text inside a regular expression. */
+function escapeRegExp(text: string): string {
+	return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /** The live match screen: clock, next swap, pitch, bench, playtime, menu. */
 export class MatchPage {
 	readonly root: Locator;
@@ -33,6 +38,12 @@ export class MatchPage {
 	readonly swapPanel: Locator;
 	readonly nextIn: Locator;
 	readonly nextOut: Locator;
+	/** "Byte om 00:25" / "Dags att byta ..." once the swap warning starts. */
+	readonly swapStatus: Locator;
+	/** One row per substitution in the swap warning. */
+	readonly swapRows: Locator;
+	/** Screen-reader announcement of the swap warning (visually hidden). */
+	readonly swapAnnouncement: Locator;
 	readonly outOfMatch: Locator;
 
 	private readonly pitch: Locator;
@@ -72,6 +83,9 @@ export class MatchPage {
 		this.swapPanel = this.root.locator("#swapPanel");
 		this.nextIn = this.root.locator(".next-in li");
 		this.nextOut = this.root.locator(".next-out li");
+		this.swapStatus = this.root.locator(".swap-warning-status");
+		this.swapRows = this.root.locator(".swap-item");
+		this.swapAnnouncement = this.root.locator("#swapAnnouncer");
 		this.outOfMatch = this.root.getByRole("alert");
 
 		this.menu = this.root.locator("#matchMenu");
@@ -144,6 +158,15 @@ export class MatchPage {
 		await this.outOfMatch
 			.locator(".alert-row", { hasText: name })
 			.getByRole("button", { name: "Tillbaka i truppen" })
+			.click();
+	}
+
+	/** Make one substitution from the swap warning. */
+	async confirmSwap(incoming: string): Promise<void> {
+		await this.root
+			.getByRole("button", {
+				name: new RegExp(`^Klart: ${escapeRegExp(incoming)} in för `),
+			})
 			.click();
 	}
 

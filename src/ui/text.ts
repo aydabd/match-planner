@@ -114,6 +114,21 @@ export const TEXT = {
 			}
 		},
 
+		// Swap warning and one-by-one substitutions
+		swapIn: (time: string) => `Byte om ${time}`,
+		swapNow: "Dags att byta, en i taget eller alla på en gång",
+		substitution: (inName: string, outName: string) =>
+			`${inName} in för ${outName}`,
+		moves: (name: string, zone: string) => `${name} flyttar till ${zone}`,
+		done: "Klart",
+		doneLabel: (inName: string, outName: string) =>
+			`Klart: ${inName} in för ${outName}`,
+		sameTeam: "Samma lag fortsätter.",
+		swapAnnouncement: (substitutions: readonly string[]) =>
+			substitutions.length === 0
+				? "Byte snart. Samma lag fortsätter."
+				: `Byte snart: ${substitutions.join(", ")}.`,
+
 		// Next swap
 		comingIn: "In på planen",
 		noneComingIn: "Ingen ny",

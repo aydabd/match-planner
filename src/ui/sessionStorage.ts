@@ -1,6 +1,7 @@
 import { getFormat } from "../core/formations.js";
 import type { MatchClock, MatchPlan } from "../core/matchClock.js";
 import { type MatchDetails, newRoster } from "../core/storage.js";
+import type { TimelineEvent } from "../core/timeline.js";
 import type {
 	MutableAssignment,
 	SchedulerState,
@@ -9,6 +10,13 @@ import type {
 import { readItem, removeItem, STORAGE_KEYS, writeItem } from "./appStorage.js";
 
 export type { MutableAssignment, TempSwap };
+
+/** A swap the coach has been warned about; its lineup no longer changes. */
+export interface PendingSwap {
+	/** When the swap is due, in seconds since kickoff. */
+	plannedAt: number;
+	next: MutableAssignment;
+}
 
 /**
  * Everything needed to resume a match exactly where it was left off after
@@ -30,6 +38,10 @@ export interface MatchSession {
 	/** Players marked as goalkeeper in the squad, offered first as keeper. */
 	goalkeepers: string[];
 	rotationIndex: number;
+	/** Everything that happened, for minutes per line and the history. */
+	timeline: TimelineEvent[];
+	/** The next lineup, fixed when the swap warning starts. */
+	pendingSwap: PendingSwap | null;
 	currentAssignment: MutableAssignment | null;
 	tempSwaps: TempSwap[];
 }
@@ -73,6 +85,8 @@ function fromVersion1(v1: Record<string, unknown>): MatchSession | null {
 		match: { ...defaults.match },
 		keeperId: null,
 		goalkeepers: [],
+		timeline: [],
+		pendingSwap: null,
 	};
 }
 

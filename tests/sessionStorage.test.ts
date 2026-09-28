@@ -33,6 +33,8 @@ function session(overrides: Partial<MatchSession> = {}): MatchSession {
 		schedulerOrder: ["p1"],
 		keeperId: null,
 		goalkeepers: [],
+		timeline: [],
+		pendingSwap: null,
 		rotationIndex: 2,
 		currentAssignment: { zones: { mid: ["p1"] }, bench: [] },
 		tempSwaps: [],

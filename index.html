@@ -214,6 +214,8 @@
         <div class="match-col match-col-side">
         <section class="card next" aria-labelledby="nextTitle">
           <h2 id="nextTitle">Nästa byte</h2>
+          <!-- Announces the swap warning once, not the countdown every second -->
+          <p class="visually-hidden" id="swapAnnouncer" role="status" aria-live="polite" aria-atomic="true"></p>
           <div id="previewBody"></div>
         </section>
 
