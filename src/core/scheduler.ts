@@ -34,12 +34,19 @@ export function createSchedulerState(
 	format: FormatConfig,
 	rotationSeconds: number,
 	playerIds: readonly string[],
+	keeperId: string | null = null,
 ): SchedulerState {
 	const players: Record<string, PlayerState> = {};
 	for (const id of playerIds) {
 		players[id] = { id, totalSeconds: 0, zonesPlayed: [], unavailable: false };
 	}
-	return { format, rotationSeconds, players, order: [...playerIds] };
+	return {
+		format,
+		rotationSeconds,
+		players,
+		order: [...playerIds],
+		keeperId: keeperId !== null && players[keeperId] ? keeperId : null,
+	};
 }
 
 /** Add a player mid-match (e.g. a late arrival). Safe at any point. */
@@ -131,7 +138,7 @@ function canPlay(state: SchedulerState, id: string, zoneId: string): boolean {
 function activePlayers(state: SchedulerState): string[] {
 	return state.order.filter((id) => {
 		const player = state.players[id];
-		return player !== undefined && !player.unavailable;
+		return player !== undefined && !player.unavailable && id !== state.keeperId;
 	});
 }
 
@@ -355,6 +362,9 @@ export function applyElapsed(
 			if (!p.zonesPlayed.includes(zoneId)) p.zonesPlayed.push(zoneId);
 		}
 	}
+	// The keeper plays too; goal is not an outfield zone for the zone rule.
+	const keeper = state.keeperId ? state.players[state.keeperId] : undefined;
+	if (keeper && !keeper.unavailable) keeper.totalSeconds += elapsedSeconds;
 }
 
 /** Spread between the most- and least-played active player, in seconds. */

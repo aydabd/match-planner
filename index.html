@@ -73,6 +73,11 @@
           </form>
           <p class="hint" id="squadFullMessage" role="status"></p>
           <div id="playerList" class="player-list"></div>
+          <div class="field" id="startingKeeperField" hidden>
+            <label class="field-label" for="startingKeeperSelect">Startande målvakt</label>
+            <select id="startingKeeperSelect"></select>
+            <span class="field-help">Målvakten är inte med i utespelarnas byten men får speltid.</span>
+          </div>
           <div class="step-actions">
             <button type="button" id="startOverBtn" class="btn btn-quiet">Börja om med tom trupp</button>
           </div>
@@ -169,6 +174,10 @@
             <button type="button" class="btn btn-newteam btn-big" id="newTeamBtn">Byt in nya laget</button>
             <button type="button" class="btn btn-primary btn-big" id="nextPeriodBtn" disabled></button>
           </div>
+          <div class="field break-keeper" id="breakKeeperField" hidden>
+            <label class="field-label" for="breakKeeperSelect">Målvakt i nästa period</label>
+            <select id="breakKeeperSelect"></select>
+          </div>
         </section>
 
 
@@ -178,6 +187,17 @@
             <span class="card-note">Tryck på en spelare för att byta</span>
           </div>
           <div class="pitch" id="pitch"></div>
+          <div class="swap-panel" id="keeperPanel">
+            <p id="keeperPanelText"></p>
+            <div class="field">
+              <label class="field-label" for="keeperPanelSelect">Ny målvakt</label>
+              <select id="keeperPanelSelect"></select>
+            </div>
+            <div class="row">
+              <button type="button" class="btn-chip" id="keeperPanelConfirm">Byt målvakt</button>
+              <button type="button" class="btn-cancel" id="keeperPanelCancel">Avbryt</button>
+            </div>
+          </div>
         </section>
 
         <section class="card bench-card" aria-labelledby="benchTitle">

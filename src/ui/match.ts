@@ -1,6 +1,7 @@
 import { getFormat } from "../core/formations.js";
 import { LIMITS } from "../core/limits.js";
 import {
+	changeKeeper,
 	cloneAssignment,
 	formatTime,
 	generateRotationSafe,
@@ -55,6 +56,13 @@ interface Els {
 	periodLabel: HTMLElement;
 	periodTime: HTMLElement;
 	nextPeriodBtn: HTMLButtonElement;
+	breakKeeperField: HTMLElement;
+	breakKeeperSelect: HTMLSelectElement;
+	keeperPanel: HTMLElement;
+	keeperPanelText: HTMLElement;
+	keeperPanelSelect: HTMLSelectElement;
+	keeperPanelConfirm: HTMLButtonElement;
+	keeperPanelCancel: HTMLButtonElement;
 	timerDisplay: HTMLElement;
 	timerProgress: HTMLElement;
 	timerRemaining: HTMLElement;
@@ -88,6 +96,13 @@ function getEls(): Els {
 		periodLabel: byId("periodLabel"),
 		periodTime: byId("periodTime"),
 		nextPeriodBtn: byId("nextPeriodBtn"),
+		breakKeeperField: byId("breakKeeperField"),
+		breakKeeperSelect: byId("breakKeeperSelect"),
+		keeperPanel: byId("keeperPanel"),
+		keeperPanelText: byId("keeperPanelText"),
+		keeperPanelSelect: byId("keeperPanelSelect"),
+		keeperPanelConfirm: byId("keeperPanelConfirm"),
+		keeperPanelCancel: byId("keeperPanelCancel"),
 		timerDisplay: byId("timerDisplay"),
 		timerProgress: byId("timerProgress"),
 		timerRemaining: byId("timerRemaining"),
@@ -129,6 +144,10 @@ interface LiveMatch {
 	plan: MatchPlan;
 	clock: MatchClock;
 	match: MatchDetails;
+	/** Players marked as goalkeeper in the squad, offered first as keeper. */
+	goalkeepers: string[];
+	/** Who is in goal next period, as chosen during a break. */
+	nextKeeperId: string | null;
 	/** The interval is ticking (the coach has not paused). */
 	running: boolean;
 	timerHandle: ReturnType<typeof setInterval> | null;
@@ -169,6 +188,8 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			playerNames: Object.fromEntries(live.playerNames.entries()),
 			schedulerPlayers: live.schedulerState.players,
 			schedulerOrder: live.schedulerState.order,
+			keeperId: live.schedulerState.keeperId,
+			goalkeepers: live.goalkeepers,
 			rotationIndex: live.rotationIndex,
 			currentAssignment: live.currentAssignment,
 			tempSwaps: live.tempSwaps,
@@ -238,6 +259,106 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			row.appendChild(chips);
 			els.pitch.appendChild(row);
 		}
+		const keeperId = live.schedulerState.keeperId;
+		if (keeperId !== null) {
+			const row = document.createElement("div");
+			row.className = "line-row";
+			const label = document.createElement("span");
+			label.className = "zone-label";
+			label.textContent = TEXT.match.keeperLine;
+			const chips = document.createElement("div");
+			chips.className = "line-chips";
+			const chip = document.createElement("button");
+			chip.type = "button";
+			chip.className = "chip gk";
+			chip.textContent = nameOf(keeperId);
+			chip.setAttribute("aria-expanded", String(keeperPanelOpen));
+			chip.addEventListener("click", toggleKeeperPanel);
+			chips.appendChild(chip);
+			row.appendChild(label);
+			row.appendChild(chips);
+			els.pitch.appendChild(row);
+		}
+	}
+
+	// ---------------- goalkeeper ----------------
+
+	let keeperPanelOpen = false;
+
+	/**
+	 * Who may take over in goal: available players other than the keeper,
+	 * marked goalkeepers first, then everyone else in squad order.
+	 */
+	function keeperCandidates(): string[] {
+		if (!live) return [];
+		const state = live.schedulerState;
+		const available = state.order.filter(
+			(id) => id !== state.keeperId && !state.players[id]?.unavailable,
+		);
+		const goalkeepers = available.filter((id) =>
+			live?.goalkeepers.includes(id),
+		);
+		return [
+			...goalkeepers,
+			...available.filter((id) => !goalkeepers.includes(id)),
+		];
+	}
+
+	function fillKeeperOptions(
+		select: HTMLSelectElement,
+		ids: readonly string[],
+		selected: string | null,
+	): void {
+		select.replaceChildren(
+			...ids.map((id) => {
+				const option = document.createElement("option");
+				option.value = id;
+				option.textContent = live?.goalkeepers.includes(id)
+					? TEXT.match.goalkeeperOption(nameOf(id))
+					: nameOf(id);
+				option.selected = id === selected;
+				return option;
+			}),
+		);
+	}
+
+	function toggleKeeperPanel(): void {
+		if (!live || live.schedulerState.keeperId === null) return;
+		keeperPanelOpen = !keeperPanelOpen;
+		renderKeeperPanel();
+		renderPitch();
+	}
+
+	function renderKeeperPanel(): void {
+		const keeperId = live?.schedulerState.keeperId ?? null;
+		const open = keeperPanelOpen && keeperId !== null;
+		els.keeperPanel.classList.toggle("show", open);
+		if (!open || keeperId === null) return;
+		els.keeperPanelText.textContent = TEXT.match.keeperInGoal(nameOf(keeperId));
+		fillKeeperOptions(els.keeperPanelSelect, keeperCandidates(), null);
+	}
+
+	function confirmKeeperChange(): void {
+		if (!live) return;
+		const next = els.keeperPanelSelect.value;
+		if (next) changeKeeper(live.schedulerState, live.currentAssignment, next);
+		keeperPanelOpen = false;
+		renderKeeperPanel();
+		render();
+	}
+
+	/** During a break: keep the keeper, or pick who plays in goal next period. */
+	function renderBreakKeeper(): void {
+		if (!live) return;
+		const keeperId = live.schedulerState.keeperId;
+		const show = live.clock.phase === "periodBreak" && keeperId !== null;
+		els.breakKeeperField.hidden = !show;
+		if (!show || keeperId === null) return;
+		const options = [keeperId, ...keeperCandidates()];
+		const selected = live.nextKeeperId ?? keeperId;
+		if (els.breakKeeperSelect.dataset.key === options.join()) return;
+		els.breakKeeperSelect.dataset.key = options.join();
+		fillKeeperOptions(els.breakKeeperSelect, options, selected);
 	}
 
 	function renderBench(): void {
@@ -534,9 +655,10 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		currentLive.schedulerState.order.forEach((id) => {
 			const p = currentLive.schedulerState.players[id];
 			if (!p) return;
+			const inGoal = id === currentLive.schedulerState.keeperId;
 			const status = p.unavailable
 				? "out"
-				: onPitch.has(id)
+				: onPitch.has(id) || inGoal
 					? "on-pitch"
 					: "on-bench";
 			const row = document.createElement("div");
@@ -547,7 +669,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			if (status === "on-pitch") {
 				const tag = document.createElement("span");
 				tag.className = "pt-status";
-				tag.textContent = TEXT.match.onPitch;
+				tag.textContent = inGoal ? TEXT.match.inGoal : TEXT.match.onPitch;
 				nameEl.appendChild(tag);
 			}
 			const timeEl = document.createElement("span");
@@ -576,6 +698,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			formatTime(fairnessSpread(live.schedulerState)),
 		);
 		renderPitch();
+		renderBreakKeeper();
 		renderBench();
 		renderSwapPanel();
 		renderAlertBanner();
@@ -759,6 +882,15 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 	/** After a break: next period, next lineup, clock running. */
 	function beginNextPeriod(): void {
 		if (live?.clock.phase !== "periodBreak") return;
+		const chosen = els.breakKeeperSelect.value;
+		if (
+			live.schedulerState.keeperId !== null &&
+			chosen &&
+			chosen !== live.schedulerState.keeperId
+		) {
+			changeKeeper(live.schedulerState, live.currentAssignment, chosen);
+		}
+		live.nextKeeperId = null;
 		putNextLineupOn();
 		live.clock = startNextPeriod(live.clock, live.plan);
 		startClock();
@@ -786,6 +918,15 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		els.testBtn.addEventListener("click", testByte);
 		els.newTeamBtn.addEventListener("click", advanceRotation);
 		els.nextPeriodBtn.addEventListener("click", beginNextPeriod);
+		els.breakKeeperSelect.addEventListener("change", () => {
+			if (live) live.nextKeeperId = els.breakKeeperSelect.value;
+		});
+		els.keeperPanelConfirm.addEventListener("click", confirmKeeperChange);
+		els.keeperPanelCancel.addEventListener("click", () => {
+			keeperPanelOpen = false;
+			renderKeeperPanel();
+			renderPitch();
+		});
 		els.undoBtn.addEventListener("click", () => {
 			if (!live) return;
 			undoTempSwaps(live.currentAssignment, live.tempSwaps);
@@ -877,6 +1018,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			format,
 			roster.rotationSeconds,
 			roster.players.map((p) => p.id),
+			roster.startingKeeperId,
 		);
 		loadLive({
 			schedulerState,
@@ -890,6 +1032,8 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			},
 			clock: NEW_CLOCK,
 			match: roster.match,
+			goalkeepers: roster.players.filter((p) => p.goalkeeper).map((p) => p.id),
+			nextKeeperId: null,
 			running: false,
 			timerHandle: null,
 			currentAssignment: cloneAssignment(generateRotationSafe(schedulerState)),
@@ -908,6 +1052,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			rotationSeconds: session.plan.rotationSeconds,
 			players: session.schedulerPlayers,
 			order: session.schedulerOrder,
+			keeperId: session.keeperId ?? null,
 		};
 		const playerNames = new Map(Object.entries(session.playerNames));
 		loadLive({
@@ -918,6 +1063,8 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			plan: session.plan,
 			clock: session.clock,
 			match: session.match,
+			goalkeepers: session.goalkeepers ?? [],
+			nextKeeperId: null,
 			running: false,
 			timerHandle: null,
 			currentAssignment:

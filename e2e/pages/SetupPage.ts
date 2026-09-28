@@ -19,6 +19,7 @@ export class SetupPage {
 	readonly newPlayerName: Locator;
 	readonly squadFullMessage: Locator;
 	readonly startOverButton: Locator;
+	readonly startingKeeper: Locator;
 	readonly clearAllButton: Locator;
 	readonly emptySquadMessage: Locator;
 	readonly startButton: Locator;
@@ -49,6 +50,7 @@ export class SetupPage {
 		this.newPlayerName = this.root.getByLabel("Spelarens namn");
 		this.squadFullMessage = this.root.locator("#squadFullMessage");
 		this.startOverButton = this.root.locator("#startOverBtn");
+		this.startingKeeper = this.root.getByLabel("Startande målvakt");
 		this.clearAllButton = this.root.locator("#clearAllDataBtn");
 		this.squadFileSection = this.root.getByRole("group").filter({
 			hasText: "Spara eller hämta en trupp",
@@ -77,6 +79,12 @@ export class SetupPage {
 	async renamePlayer(position: number, newName: string): Promise<void> {
 		await this.player(position).fill(newName);
 		await this.player(position).blur();
+	}
+
+	async markGoalkeeper(name: string): Promise<void> {
+		await this.root
+			.getByRole("checkbox", { name: `Målvakt: ${name}`, exact: true })
+			.check();
 	}
 
 	async removePlayer(name: string): Promise<void> {

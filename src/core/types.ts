@@ -73,6 +73,11 @@ export interface SchedulerState {
 	players: Record<string, PlayerState>;
 	/** Order players were added in, used for stable tie-breaking. */
 	order: string[];
+	/**
+	 * Who is in goal, or null when the coach does not track the keeper. The
+	 * keeper is left out of the outfield rotation but earns playtime.
+	 */
+	keeperId: string | null;
 }
 
 /**

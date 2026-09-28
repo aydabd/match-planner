@@ -60,6 +60,8 @@ export function createRosterView(callbacks: RosterViewCallbacks): void {
 	const venueInput = byId<HTMLInputElement>("venueInput");
 	const matchDateInput = byId<HTMLInputElement>("matchDateInput");
 	const coachNameInput = byId<HTMLInputElement>("coachNameInput");
+	const startingKeeperField = byId<HTMLElement>("startingKeeperField");
+	const startingKeeperSelect = byId<HTMLSelectElement>("startingKeeperSelect");
 
 	// Limits come from core/limits.ts, never from numbers written in the HTML.
 	rotationInput.min = String(LIMITS.rotationMinutes.min);
@@ -151,15 +153,36 @@ export function createRosterView(callbacks: RosterViewCallbacks): void {
 			);
 			removeBtn.addEventListener("click", () => removePlayer(player.id));
 
+			const keeperToggle = document.createElement("label");
+			keeperToggle.className = "keeper-toggle";
+			const keeperBox = document.createElement("input");
+			keeperBox.type = "checkbox";
+			keeperBox.className = "keeper-toggle-box";
+			keeperBox.checked = player.goalkeeper;
+			keeperBox.setAttribute(
+				"aria-label",
+				TEXT.setup.keeperToggleLabel(player.name),
+			);
+			keeperBox.addEventListener("change", () =>
+				setGoalkeeper(player.id, keeperBox.checked),
+			);
+			const keeperText = document.createElement("span");
+			keeperText.textContent = TEXT.setup.keeperToggle;
+			keeperText.setAttribute("aria-hidden", "true");
+			keeperToggle.append(keeperBox, keeperText);
+
 			row.appendChild(input);
+			row.appendChild(keeperToggle);
 			row.appendChild(removeBtn);
 			playerList.appendChild(row);
 		});
 
 		const format = getFormat(draft.formatId);
+		// A tracked keeper plays in goal, so the outfield needs one more player.
+		const needed = outfieldCount(format) + (draft.startingKeeperId ? 1 : 0);
 		squadCount.textContent = TEXT.setup.squadCount(
 			draft.players.length,
-			outfieldCount(format),
+			needed,
 		);
 
 		const squadFull = draft.players.length >= LIMITS.squadSize;
@@ -169,7 +192,19 @@ export function createRosterView(callbacks: RosterViewCallbacks): void {
 			? TEXT.setup.squadFull(LIMITS.squadSize)
 			: "";
 
-		const missing = outfieldCount(format) - draft.players.length;
+		const missing = needed - draft.players.length;
+
+		const keepers = draft.players.filter((p) => p.goalkeeper);
+		startingKeeperField.hidden = keepers.length === 0;
+		startingKeeperSelect.replaceChildren(
+			...keepers.map((p) => {
+				const option = document.createElement("option");
+				option.value = p.id;
+				option.textContent = p.name;
+				option.selected = p.id === draft.startingKeeperId;
+				return option;
+			}),
+		);
 		startBtn.disabled = !formationValid || missing > 0;
 		startBtn.textContent = !formationValid
 			? TEXT.setup.startNeedsFormation
@@ -196,8 +231,36 @@ export function createRosterView(callbacks: RosterViewCallbacks): void {
 		persist();
 	}
 
+	/**
+	 * The starting keeper must be a marked goalkeeper: keep the current one if
+	 * still marked, otherwise the first marked goalkeeper, or nobody.
+	 */
+	function withValidStartingKeeper(next: RosterFile): RosterFile {
+		const keepers = next.players.filter((p) => p.goalkeeper);
+		const stillKeeper = keepers.some((p) => p.id === next.startingKeeperId);
+		return {
+			...next,
+			startingKeeperId: stillKeeper
+				? next.startingKeeperId
+				: (keepers[0]?.id ?? null),
+		};
+	}
+
+	function setGoalkeeper(id: string, goalkeeper: boolean): void {
+		draft = withValidStartingKeeper({
+			...draft,
+			players: draft.players.map((p) =>
+				p.id === id ? { ...p, goalkeeper } : p,
+			),
+		});
+		persist();
+	}
+
 	function removePlayer(id: string): void {
-		draft = { ...draft, players: draft.players.filter((p) => p.id !== id) };
+		draft = withValidStartingKeeper({
+			...draft,
+			players: draft.players.filter((p) => p.id !== id),
+		});
 		persist();
 	}
 
@@ -238,6 +301,11 @@ export function createRosterView(callbacks: RosterViewCallbacks): void {
 			persist();
 		});
 	}
+
+	startingKeeperSelect.addEventListener("change", () => {
+		draft = { ...draft, startingKeeperId: startingKeeperSelect.value || null };
+		persist();
+	});
 
 	coachNameInput.addEventListener("change", () => {
 		coachNameInput.value = coachNameInput.value.trim();

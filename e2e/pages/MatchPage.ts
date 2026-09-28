@@ -17,6 +17,9 @@ export class MatchPage {
 	readonly pauseButton: Locator;
 	readonly swapInNewTeamButton: Locator;
 	readonly nextPeriodButton: Locator;
+	/** The player in goal (shown below the outfield lines). */
+	readonly keeper: Locator;
+	readonly nextPeriodKeeper: Locator;
 	/** "Period 1 av 3, byte 1" (a live region). */
 	readonly periodAndSwap: Locator;
 	/** "17:30 kvar av perioden". */
@@ -56,11 +59,14 @@ export class MatchPage {
 			name: /^Starta period \d$/,
 		});
 		this.periodAndSwap = this.root.locator(".clock-period");
+		this.keeper = this.root.locator("#pitch .chip.gk");
+		this.nextPeriodKeeper = this.root.getByLabel("Målvakt i nästa period");
 		this.periodTimeLeft = this.root.locator("#periodTime");
 
 		this.pitch = this.root.locator("#pitch");
 		this.bench = this.root.locator("#benchList");
-		this.pitchPlayers = this.pitch.getByRole("button");
+		// Outfield players only; the keeper has its own locator.
+		this.pitchPlayers = this.pitch.locator(".chip:not(.gk)");
 		this.zoneLabels = this.pitch.locator(".zone-label");
 		this.benchPlayers = this.bench.locator(".bench-name");
 		this.swapPanel = this.root.locator("#swapPanel");
@@ -139,6 +145,13 @@ export class MatchPage {
 			.locator(".alert-row", { hasText: name })
 			.getByRole("button", { name: "Tillbaka i truppen" })
 			.click();
+	}
+
+	/** Mid-period keeper change: tap the keeper, pick the new one. */
+	async changeKeeperTo(name: string): Promise<void> {
+		await this.keeper.click();
+		await this.root.getByLabel("Ny målvakt").selectOption({ label: name });
+		await this.root.getByRole("button", { name: "Byt målvakt" }).click();
 	}
 
 	async undoTemporarySwaps(): Promise<void> {

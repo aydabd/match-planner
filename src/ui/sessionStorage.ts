@@ -25,6 +25,10 @@ export interface MatchSession {
 	playerNames: Record<string, string>;
 	schedulerPlayers: SchedulerState["players"];
 	schedulerOrder: string[];
+	/** Who is in goal (null when the keeper is not tracked). */
+	keeperId: string | null;
+	/** Players marked as goalkeeper in the squad, offered first as keeper. */
+	goalkeepers: string[];
 	rotationIndex: number;
 	currentAssignment: MutableAssignment | null;
 	tempSwaps: TempSwap[];
@@ -67,6 +71,8 @@ function fromVersion1(v1: Record<string, unknown>): MatchSession | null {
 			rotationElapsed: elapsed,
 		},
 		match: { ...defaults.match },
+		keeperId: null,
+		goalkeepers: [],
 	};
 }
 

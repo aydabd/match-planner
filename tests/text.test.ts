@@ -49,6 +49,10 @@ describe("squad file problems in Swedish", () => {
 			"Filen har ogiltiga matchuppgifter (motståndare, plats, datum eller avsparkstid).",
 		],
 		[
+			{ code: "startingKeeper" },
+			"Filen anger en startande målvakt som inte är markerad som målvakt i truppen.",
+		],
+		[
 			{ code: "audit" },
 			"Filen har ogiltiga uppgifter om vem som sparade den och när.",
 		],

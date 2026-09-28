@@ -35,6 +35,8 @@ export interface RosterFile {
 	periodSeconds: number;
 	match: MatchDetails;
 	players: Player[];
+	/** Who starts in goal: a player marked as goalkeeper, or null. */
+	startingKeeperId: string | null;
 	/** Set when the setup is saved to a file; kept as read when loaded. */
 	audit?: FileAudit;
 }
@@ -48,6 +50,7 @@ export type SquadFileProblem =
 	| { code: "periods" }
 	| { code: "matchDetails" }
 	| { code: "audit" }
+	| { code: "startingKeeper" }
 	| { code: "playersNotList" }
 	| { code: "emptySquad" }
 	| { code: "tooManyPlayers"; max: number }
@@ -77,6 +80,7 @@ export function newRoster(fields: {
 	periods?: number;
 	periodSeconds?: number;
 	match?: MatchDetails;
+	startingKeeperId?: string | null;
 	players?: readonly (Omit<Player, "goalkeeper"> & { goalkeeper?: boolean })[];
 }): RosterFile {
 	const size = TEAM_SIZES[teamSizeOf(fields.formatId)];
@@ -92,6 +96,7 @@ export function newRoster(fields: {
 			name: p.name,
 			goalkeeper: p.goalkeeper ?? false,
 		})),
+		startingKeeperId: fields.startingKeeperId ?? null,
 	};
 }
 
@@ -305,6 +310,19 @@ export function parseRosterFile(
 		};
 	});
 
+	// Absent or null means nobody is tracked in goal.
+	const rawKeeper = isV1 ? null : (obj.startingKeeperId ?? null);
+	const startingKeeperId = typeof rawKeeper === "string" ? rawKeeper : null;
+	if (
+		rawKeeper !== null &&
+		!players.some((p) => p.id === rawKeeper && p.goalkeeper)
+	) {
+		throw new StorageError(
+			`startingKeeperId "${String(startingKeeperId)}" is not a goalkeeper in the squad`,
+			{ code: "startingKeeper" },
+		);
+	}
+
 	const roster: RosterFile = {
 		schemaVersion: CURRENT_SCHEMA_VERSION,
 		formatId,
@@ -313,6 +331,7 @@ export function parseRosterFile(
 		periodSeconds,
 		match,
 		players,
+		startingKeeperId,
 	};
 	if (audit) roster.audit = audit;
 	return roster;
