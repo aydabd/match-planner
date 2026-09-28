@@ -6,7 +6,11 @@
 
 /** A single zone on the pitch (e.g. "back", "mid", "fwd"). */
 export interface ZoneConfig {
-	/** Stable identifier, used as a map key. Never shown to the user. */
+	/**
+	 * Stable identifier ("back", "dmid", "mid", "amid", "fwd"), used as a map
+	 * key and saved in matches. The UI names the zone from it
+	 * (TEXT.match.zoneName in src/ui/text.ts); there is no separate label.
+	 */
 	readonly id: string;
 	/** How many players stand in this zone at once. */
 	readonly count: number;

@@ -2,6 +2,15 @@ import type { FormationProblem } from "../core/formations.js";
 import type { SchedulingProblem } from "../core/scheduler.js";
 import type { SquadFileProblem } from "../core/storage.js";
 
+/** Zone names by zone id (see ZoneConfig.id); built once, read on every render. */
+const ZONE_NAMES: Readonly<Record<string, string>> = {
+	back: "Back",
+	dmid: "Defensivt mittfält",
+	mid: "Mittfält",
+	amid: "Offensivt mittfält",
+	fwd: "Anfall",
+};
+
 /**
  * Every text the app writes from code, in Swedish. Core modules return
  * problem codes and data; this is the only place that turns them into
@@ -98,14 +107,7 @@ export const TEXT = {
 
 		// Pitch, bench and playtime
 		zoneName(zoneId: string): string {
-			const names: Record<string, string> = {
-				back: "Back",
-				dmid: "Defensivt mittfält",
-				mid: "Mittfält",
-				amid: "Offensivt mittfält",
-				fwd: "Anfall",
-			};
-			return names[zoneId] ?? zoneId;
+			return ZONE_NAMES[zoneId] ?? zoneId;
 		},
 		emptyBench: "Ingen på bänken just nu.",
 		onPitch: "på planen",
