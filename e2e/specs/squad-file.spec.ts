@@ -71,7 +71,7 @@ test.describe("Saving and loading a squad file", () => {
 		expect(download.suggestedFilename()).toBe("trupp-11v11-4-2-1-2-1.json");
 		const contents = await readFile(await download.path(), "utf8");
 		const saved = JSON.parse(contents);
-		expect(saved.schemaVersion).toBe(2);
+		expect(saved.schemaVersion).toBe(3);
 		expect(saved.audit.appVersion).toBe(APP_VERSION);
 		expect(Date.parse(saved.audit.createdAt)).not.toBeNaN();
 		expect(saved.audit.createdBy).toBe("Aydin");

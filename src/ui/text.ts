@@ -98,6 +98,8 @@ export const TEXT = {
 					return "Filen anger en startande målvakt som inte är markerad som målvakt i truppen.";
 				case "audit":
 					return "Filen har ogiltiga uppgifter om vem som sparade den och när.";
+				case "region":
+					return "Filen anger ett distrikt som appen inte känner igen.";
 				case "notObject":
 				case "schemaVersion":
 				case "playersNotList":

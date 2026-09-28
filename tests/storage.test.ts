@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	newRoster,
 	parseRosterFile,
+	policyOverrides,
 	rosterToJson,
 	StorageError,
 	squadFile,
@@ -59,6 +60,20 @@ describe("parseRosterFile - rejects malformed or hostile input", () => {
 				players: validPlayers,
 			}),
 		).toThrow(StorageError);
+	});
+
+	it("rejects a version 3 file with an unknown region", () => {
+		expect(
+			problemOf({
+				schemaVersion: 3,
+				formatId: "7v7",
+				rotationSeconds: 600,
+				periods: 3,
+				periodSeconds: 1200,
+				region: "narnia",
+				players: validPlayers,
+			}),
+		).toBe("region");
 	});
 
 	it.each([
@@ -264,7 +279,7 @@ describe("squadFile - what the coach saves to share the team", () => {
 	});
 });
 
-describe("squad file version 2", () => {
+describe("squad file version 3", () => {
 	const AUDIT = {
 		createdAt: "2026-09-28T10:15:00.000Z",
 		createdBy: "Aydin",
@@ -277,11 +292,12 @@ describe("squad file version 2", () => {
 
 	function file(overrides: Record<string, unknown> = {}) {
 		return {
-			schemaVersion: 2,
+			schemaVersion: 3,
 			formatId: "9v9:3-3-2",
 			rotationSeconds: 480,
 			periods: 3,
 			periodSeconds: 1500,
+			region: "national",
 			match: {
 				opponent: "IFK Lund",
 				venue: "Klostergården",
@@ -294,11 +310,11 @@ describe("squad file version 2", () => {
 		};
 	}
 
-	it("keeps the whole team setup, goalkeepers and audit", () => {
+	it("keeps the whole team setup, goalkeepers, region and audit", () => {
 		expect(parseRosterFile(file())).toEqual(file());
 	});
 
-	it("reads a version 1 file with the team size's match length and no keepers", () => {
+	it("reads a version 1 file with the team size's match length, no keepers and region national", () => {
 		expect(
 			parseRosterFile({
 				schemaVersion: 1,
@@ -307,15 +323,30 @@ describe("squad file version 2", () => {
 				players: [{ id: "p1", name: "Alva" }],
 			}),
 		).toEqual({
-			schemaVersion: 2,
+			schemaVersion: 3,
 			formatId: "11v11:4-4-2",
 			rotationSeconds: 600,
 			periods: 2,
 			periodSeconds: 2400,
+			region: "national",
 			match: { opponent: "", venue: "", date: "" },
 			players: [{ id: "p1", name: "Alva", goalkeeper: false }],
 			startingKeeperId: null,
 		});
+	});
+
+	it("reads a version 2 file (no region yet) as region national", () => {
+		const v2 = {
+			schemaVersion: 2,
+			formatId: "9v9:3-3-2",
+			rotationSeconds: 480,
+			periods: 3,
+			periodSeconds: 1500,
+			match: { opponent: "", venue: "", date: "" },
+			players: PLAYERS,
+			startingKeeperId: "p1",
+		};
+		expect(parseRosterFile(v2).region).toBe("national");
 	});
 
 	it("does not require match details or an audit record", () => {
@@ -391,17 +422,42 @@ describe("squad file version 2", () => {
 });
 
 describe("newRoster", () => {
-	it("fills the team size's defaults", () => {
+	it("fills the team size's defaults and defaults to region national", () => {
 		expect(newRoster({ formatId: "5v5:1-2-1" })).toEqual({
-			schemaVersion: 2,
+			schemaVersion: 3,
 			formatId: "5v5:1-2-1",
 			rotationSeconds: 300,
 			periods: 3,
 			periodSeconds: 900,
+			region: "national",
 			match: { opponent: "", venue: "", date: "" },
 			players: [],
 			startingKeeperId: null,
 		});
+	});
+
+	it("accepts an explicit region", () => {
+		expect(newRoster({ formatId: "5v5:1-2-1", region: "skane" }).region).toBe(
+			"skane",
+		);
+	});
+});
+
+describe("policyOverrides - which saved values differ from the region's policy", () => {
+	it("reports no overrides when the roster matches the region's policy formats", () => {
+		const roster = newRoster({ formatId: "9v9:3-3-2" });
+		expect(policyOverrides(roster)).toEqual([]);
+	});
+
+	it("flags periods and periodSeconds that differ from the region's policy", () => {
+		const roster = newRoster({
+			formatId: "9v9:3-3-2",
+			periods: 2,
+			periodSeconds: 600,
+		});
+		expect(policyOverrides(roster).sort()).toEqual(
+			["periodSeconds", "periods"].sort(),
+		);
 	});
 });
 
@@ -417,6 +473,6 @@ describe("squadFile audit", () => {
 		const saved = JSON.parse(squadFile(roster, audit).json);
 
 		expect(saved.audit).toEqual(audit);
-		expect(saved.schemaVersion).toBe(2);
+		expect(saved.schemaVersion).toBe(3);
 	});
 });

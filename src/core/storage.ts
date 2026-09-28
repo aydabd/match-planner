@@ -1,14 +1,17 @@
 import { getFormat, TEAM_SIZES, teamSizeOf } from "./formations.js";
 import { LIMITS } from "./limits.js";
+import { policyFor, REGIONS, type RegionId } from "./policy.js";
 import type { Player } from "./types.js";
 
 /**
  * The squad file: a team setup a coach saves and shares with another coach,
  * who loads it and can start a match at once. Version 2 adds the match plan
- * (periods), match details, goalkeepers and an audit record. Version 1 files
- * still load; add a migration branch in parseRosterFile if the shape changes.
+ * (periods), match details, goalkeepers and an audit record. Version 3 adds
+ * the region whose policy the squad was built under (src/core/policy.ts).
+ * Earlier versions still load, defaulting to region "national"; add a
+ * migration branch in parseRosterFile if the shape changes again.
  */
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 3;
 
 /** The match this setup is for. Every field is optional (empty string). */
 export interface MatchDetails {
@@ -28,11 +31,13 @@ export interface FileAudit {
 }
 
 export interface RosterFile {
-	schemaVersion: 2;
+	schemaVersion: 3;
 	formatId: string;
 	rotationSeconds: number;
 	periods: number;
 	periodSeconds: number;
+	/** Which federation's recommended policy this squad was built under. */
+	region: RegionId;
 	match: MatchDetails;
 	players: Player[];
 	/** Who starts in goal: a player marked as goalkeeper, or null. */
@@ -50,6 +55,7 @@ export type SquadFileProblem =
 	| { code: "periods" }
 	| { code: "matchDetails" }
 	| { code: "audit" }
+	| { code: "region" }
 	| { code: "startingKeeper" }
 	| { code: "playersNotList" }
 	| { code: "emptySquad" }
@@ -79,6 +85,7 @@ export function newRoster(fields: {
 	rotationSeconds?: number;
 	periods?: number;
 	periodSeconds?: number;
+	region?: RegionId;
 	match?: MatchDetails;
 	startingKeeperId?: string | null;
 	players?: readonly (Omit<Player, "goalkeeper"> & { goalkeeper?: boolean })[];
@@ -90,6 +97,7 @@ export function newRoster(fields: {
 		rotationSeconds: fields.rotationSeconds ?? size.defaultRotationSeconds,
 		periods: fields.periods ?? size.periods,
 		periodSeconds: fields.periodSeconds ?? size.periodMinutes * 60,
+		region: fields.region ?? "national",
 		match: { ...(fields.match ?? NO_MATCH_DETAILS) },
 		players: (fields.players ?? []).map((p) => ({
 			id: p.id,
@@ -260,13 +268,18 @@ export function parseRosterFile(
 	}
 	const obj = data as Record<string, unknown>;
 
-	if (obj.schemaVersion !== 1 && obj.schemaVersion !== 2) {
+	if (
+		obj.schemaVersion !== 1 &&
+		obj.schemaVersion !== 2 &&
+		obj.schemaVersion !== 3
+	) {
 		throw new StorageError(
-			`Unknown or missing schemaVersion (expected 1 or 2, got ${JSON.stringify(obj.schemaVersion)})`,
+			`Unknown or missing schemaVersion (expected 1, 2 or 3, got ${JSON.stringify(obj.schemaVersion)})`,
 			{ code: "schemaVersion" },
 		);
 	}
 	const isV1 = obj.schemaVersion === 1;
+	const isV1OrV2 = isV1 || obj.schemaVersion === 2;
 
 	const formatId =
 		typeof obj.formatId === "string" ? canonicalFormatId(obj.formatId) : null;
@@ -300,6 +313,15 @@ export function parseRosterFile(
 
 	const match = isV1 ? { ...NO_MATCH_DETAILS } : parseMatchDetails(obj.match);
 	const audit = isV1 ? undefined : parseAudit(obj.audit);
+
+	// Versions 1 and 2 predate regions: they always meant the national policy.
+	const rawRegion = isV1OrV2 ? "national" : obj.region;
+	if (typeof rawRegion !== "string" || !(rawRegion in REGIONS)) {
+		throw new StorageError(`Unknown region "${String(rawRegion)}"`, {
+			code: "region",
+		});
+	}
+	const region = rawRegion as RegionId;
 
 	if (!Array.isArray(obj.players)) {
 		throw new StorageError("players must be a list", {
@@ -337,10 +359,31 @@ export function parseRosterFile(
 		rotationSeconds: obj.rotationSeconds,
 		periods,
 		periodSeconds,
+		region,
 		match,
 		players,
 		startingKeeperId,
 	};
 	if (audit) roster.audit = audit;
 	return roster;
+}
+
+/**
+ * Which of the roster's own match-plan values differ from the region's
+ * policy for its team size (src/core/policy.ts) — a coach's deliberate
+ * override, shown to keep it visibly distinct from the recommended default.
+ * Nothing is stored to compute this: it is always derived, so it can never
+ * drift from the truth the way a stored "isOverride" flag could.
+ */
+export function policyOverrides(
+	roster: Pick<RosterFile, "formatId" | "region" | "periods" | "periodSeconds">,
+): ("periods" | "periodSeconds")[] {
+	const size = teamSizeOf(roster.formatId);
+	const plan = policyFor(roster.region).formats[size];
+	const overrides: ("periods" | "periodSeconds")[] = [];
+	if (roster.periods !== plan.periods) overrides.push("periods");
+	if (roster.periodSeconds !== plan.periodMinutes * 60) {
+		overrides.push("periodSeconds");
+	}
+	return overrides;
 }

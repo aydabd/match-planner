@@ -56,6 +56,10 @@ describe("squad file problems in Swedish", () => {
 			{ code: "audit" },
 			"Filen har ogiltiga uppgifter om vem som sparade den och när.",
 		],
+		[
+			{ code: "region" },
+			"Filen anger ett distrikt som appen inte känner igen.",
+		],
 		[{ code: "notObject" }, TEXT.squadFile.unreadable],
 		[{ code: "schemaVersion" }, TEXT.squadFile.unreadable],
 		[{ code: "playersNotList" }, TEXT.squadFile.unreadable],
