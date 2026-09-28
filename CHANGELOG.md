@@ -3,6 +3,13 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.2.1](https://github.com/aydabd/match-planner/compare/matchplanner-v0.2.0...matchplanner-v0.2.1) (2026-09-28)
+
+
+### Bug Fixes
+
+* **ui:** meet WCAG 2.1 AA contrast, focus, and motion requirements ([#4](https://github.com/aydabd/match-planner/issues/4)) ([16f348e](https://github.com/aydabd/match-planner/commit/16f348e2750b69b3ce1806fa8f22481dbb057f46))
+
 ## [0.2.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.1.0...matchplanner-v0.2.0) (2026-09-28)
 
 
