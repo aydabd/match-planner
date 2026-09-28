@@ -78,16 +78,24 @@ skriv commits enligt [Conventional Commits](https://www.conventionalcommits.org/
 uppdaterad `CHANGELOG.md` och version öppen. Vi kör inte commitlint/husky för att
 hålla `devDependencies` minimala - skriv commits enligt konventionen manuellt.
 
-Pipeline (`.github/workflows/release.yml`, körs vid varje push till `main`):
+Var testerna körs:
 
-1. **build** - `check`, `typecheck`, tester och `build` körs en enda gång.
-2. **release** - först när build är grön skapas tagg och GitHub Release
-   (`matchplanner-vX.Y.Z`) på exakt den testade committen.
-3. **deploy** - det redan byggda artefaktet publiceras till GitHub Pages.
-   Inget byggs eller testas om.
+- **Pull requests** (`.github/workflows/ci.yml`): `check`, `typecheck`,
+  enhetstester med täckningskrav, `build` och e2e-tester (Playwright, byggt med
+  GitHub Pages sökväg). Här testas koden innan den når `main`. Release-PR:er
+  (bara version och changelog) hoppar över dem.
+- **Merge till `main`**: inga tester körs igen. Regeluppsättningen för `main`
+  kräver att grenen är uppdaterad mot `main` innan merge, så `main` får exakt
+  den kod som testades. `release.yml` uppdaterar bara release-PR:en.
+- **Release** (när release-PR:en slås ihop, `.github/workflows/release.yml`):
+  1. **build** - `check`, `typecheck`, enhetstester och `build` en enda gång.
+     Inga e2e-tester, koden är redan testad.
+  2. **release** - först när build är grön skapas tagg och GitHub Release
+     (`matchplanner-vX.Y.Z`) på exakt den committen.
+  3. **deploy** - det redan byggda artefaktet publiceras till GitHub Pages.
 
-Misslyckas build/test skapas varken tagg, release eller deploy. Versionen visas
-i appens sidfot (kommer från `package.json`). Pull requests kontrolleras av `ci.yml`.
+Misslyckas build skapas varken tagg, release eller deploy. Versionen visas
+i appens sidfot (kommer från `package.json`).
 
 Node-versionen styrs av `mise.toml` (används både lokalt och i CI). Renovate
 öppnar en PR när en ny stabil Node släpps; att uppgradera är att slå ihop den.

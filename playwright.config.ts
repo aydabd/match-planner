@@ -4,7 +4,7 @@ const PORT = 4173;
 const isCI = Boolean(process.env.CI);
 // Same variable the build uses; GitHub Pages serves the app under /<repo>/.
 const BASE_PATH = process.env.BASE_PATH ?? "/";
-// Set by the release workflow to test the exact dist/ it is about to deploy.
+// Test an existing dist/ instead of building first, e.g. a local production build.
 const useExistingBuild = Boolean(process.env.E2E_USE_EXISTING_BUILD);
 const appUrl = `http://localhost:${PORT}${BASE_PATH}`;
 const preview = `npm run preview -- --port ${PORT} --strictPort`;

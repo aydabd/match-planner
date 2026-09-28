@@ -1,6 +1,11 @@
 name: CI
 
-# Pull requests only. Pushes to main are built, tested and released by release.yml.
+# Pull requests only: this is where code is tested before it reaches main.
+# Merges to main are not re-tested (the ruleset requires up-to-date branches, so
+# main gets exactly what passed here); release.yml only checks and builds a release.
+#
+# Release PRs (release-please) only bump the version and changelog, so Check and
+# E2E are skipped for them. A job skipped by `if` still satisfies required checks.
 on:
   pull_request:
 
@@ -10,6 +15,7 @@ permissions:
 jobs:
   test:
     name: Check
+    if: ${{ !startsWith(github.head_ref, 'release-please--') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -57,8 +63,14 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REF: ${{ github.head_ref }}
         run: |
           set -euo pipefail
+          if [[ "$HEAD_REF" == release-please--* ]]; then
+            echo "e2e=false" >> "$GITHUB_OUTPUT"
+            echo "Release PR (version and changelog only): E2E will be skipped."
+            exit 0
+          fi
           changed=$(git diff --name-only "$BASE_SHA...$HEAD_SHA")
           echo "Changed files:"
           echo "$changed"
@@ -96,7 +108,10 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
+      # Same base path as GitHub Pages, so PRs test the configuration that ships.
       - name: End-to-end tests
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
         run: npm run test:e2e
 
       - name: Upload report on failure
