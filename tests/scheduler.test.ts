@@ -10,7 +10,7 @@ import {
 	SchedulingError,
 	setUnavailable,
 } from "../src/core/scheduler.js";
-import type { SchedulerState } from "../src/core/types.js";
+import type { FormatConfig, SchedulerState } from "../src/core/types.js";
 
 const FORMAT_7V7 = getFormat("7v7");
 
@@ -163,5 +163,108 @@ describe("full-match simulation - property tests", () => {
 			state.players[id]?.zonesPlayed.push("back");
 		}
 		expect(() => generateRotation(state)).toThrow(SchedulingError);
+	});
+});
+
+/** A back-to-front line-up such as 4-3-3, built inline so this file needs no presets. */
+function formation(...lines: number[]): FormatConfig {
+	const names = (
+		{
+			2: ["back", "fwd"],
+			3: ["back", "mid", "fwd"],
+			4: ["back", "dmid", "amid", "fwd"],
+			5: ["back", "dmid", "mid", "amid", "fwd"],
+		} as Record<number, string[]>
+	)[lines.length];
+	if (!names) {
+		throw new Error(`formation() supports 2-5 lines, got ${lines.length}`);
+	}
+	return {
+		id: lines.join("-"),
+		label: lines.join("-"),
+		zones: lines.map((count, i) => ({
+			id: names[i] ?? `z${i}`,
+			label: names[i] ?? `z${i}`,
+			count,
+			adjacent: [names[i - 1], names[i + 1]].filter(
+				(z): z is string => z !== undefined,
+			),
+		})),
+		squadSizeHint: [0, 0],
+		defaultRotationSeconds: 600,
+	};
+}
+
+describe("any formation - full-match simulation", () => {
+	const FORMATIONS = [
+		[1, 2, 1],
+		[2, 1, 1],
+		[2, 2],
+		[1, 1, 1, 1],
+		[2, 3, 1],
+		[3, 2, 1],
+		[2, 1, 2, 1],
+		[1, 1, 2, 1, 1],
+		[3, 3, 2],
+		[3, 2, 3],
+		[3, 4, 1],
+		[2, 2, 2, 2],
+		[4, 4, 2],
+		[4, 3, 3],
+		[4, 2, 3, 1],
+		[4, 2, 1, 2, 1],
+		[3, 4, 2, 1],
+	];
+	/** From a full team with no bench up to five substitutes. */
+	const BENCH_SIZES = [0, 1, 2, 3, 4, 5];
+	const cases = FORMATIONS.flatMap((lines) =>
+		BENCH_SIZES.map((bench) => [lines.join("-"), bench, lines] as const),
+	);
+
+	it.each(cases)(
+		"%s with %i on the bench plays a full match fairly without breaking the zone rule",
+		(_, bench, lines) => {
+			const format = formation(...lines);
+			const state = createSchedulerState(
+				format,
+				600,
+				ids(outfieldCount(format) + bench),
+			);
+
+			expect(() => simulate(state, 6)).not.toThrow();
+
+			for (const player of Object.values(state.players)) {
+				expect(player.zonesPlayed.length).toBeLessThanOrEqual(2);
+				if (player.zonesPlayed.length === 2) {
+					const [a, b] = player.zonesPlayed as [string, string];
+					const zoneA = format.zones.find((z) => z.id === a);
+					expect(zoneA?.adjacent, `${player.id}: ${a} -> ${b}`).toContain(b);
+				}
+			}
+			expect(fairnessSpread(state)).toBeLessThanOrEqual(
+				2 * state.rotationSeconds,
+			);
+		},
+	);
+
+	it("ignores ids in the order that have no player record (e.g. a corrupted saved match)", () => {
+		const state = createSchedulerState(formation(2, 3, 1), 600, ids(7));
+		state.order.push("ghost");
+
+		const assignment = generateRotation(state);
+
+		const everyone = [
+			...Object.values(assignment.zones).flat(),
+			...assignment.bench,
+		];
+		expect(everyone).not.toContain("ghost");
+		expect(everyone).toHaveLength(7);
+	});
+
+	it("rests the players who have played the most", () => {
+		const state = createSchedulerState(formation(2, 3, 1), 600, ids(8));
+		applyElapsed(state, { zones: { mid: ["p1", "p2"] }, bench: [] }, 600);
+
+		expect(generateRotation(state).bench).toEqual(["p1", "p2"]);
 	});
 });
