@@ -50,4 +50,19 @@ test.describe("Page shells", () => {
 			page.getByRole("heading", { name: "Sidan är inte klar än" }),
 		).toBeVisible();
 	});
+
+	test("start also shows the shared nav, with itself marked current", async ({
+		setup,
+		page,
+	}) => {
+		await setup.open();
+		const nav = page.locator("#pageNav");
+		for (const label of ["Start", "Match", "Matchrapport", "Statistik", "Om"])
+			await expect(
+				nav.getByRole("link", { name: label, exact: true }),
+			).toBeVisible();
+		await expect(
+			nav.getByRole("link", { name: "Start", exact: true }),
+		).toHaveAttribute("aria-current", "page");
+	});
 });
