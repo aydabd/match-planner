@@ -3,6 +3,15 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.17.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.16.0...matchplanner-v0.17.0) (2026-09-29)
+
+
+### Features
+
+* **core:** add development checkpoint mechanism ([#110](https://github.com/aydabd/match-planner/issues/110)) ([ed5e6f1](https://github.com/aydabd/match-planner/commit/ed5e6f1dbad7b60f5f6aaec4b339b4ba47a6ac86))
+* **core:** record checkpoint progress in player notes and season report ([#111](https://github.com/aydabd/match-planner/issues/111)) ([2f071da](https://github.com/aydabd/match-planner/commit/2f071daf71180ac9c789b937cd4fc7e21f74923d))
+* **ui:** checkpoint ladders in player notes, season report and översikt ([#112](https://github.com/aydabd/match-planner/issues/112)) ([2c69303](https://github.com/aydabd/match-planner/commit/2c6930353cd97f274768bfa9770c5c2538b4b191))
+
 ## [0.16.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.15.1...matchplanner-v0.16.0) (2026-09-29)
 
 
