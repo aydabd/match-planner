@@ -133,8 +133,9 @@ h3 {
 /* ---------- top bar ---------- */
 .topbar {
 	display: flex;
+	flex-wrap: wrap;
 	align-items: center;
-	gap: 12px;
+	gap: 4px 12px;
 	min-height: 56px;
 	padding-top: 8px;
 }
@@ -158,8 +159,13 @@ h3 {
 	text-overflow: ellipsis;
 }
 /* Shared cross-page nav (src/ui/page.ts), rendered into #pageNav. */
+/* Always its own full-width row below whatever else is in the header
+ * (brand, and on some pages a page-specific action) - cramming it into
+ * the same row left it wrapping mid-word against a squeezed sibling
+ * button. */
 .page-nav {
-	flex: 1;
+	order: 3;
+	flex: 1 1 100%;
 	display: flex;
 	justify-content: flex-end;
 	flex-wrap: wrap;
@@ -515,6 +521,12 @@ button:not(:disabled):active,
 }
 button:disabled {
 	cursor: not-allowed;
+}
+/* A page-specific header action (e.g. Start's policy link) goes on the
+ * brand's row, pushed to the far right; the nav (.page-nav) always takes
+ * its own row below (see there). */
+.topbar > .btn {
+	margin-left: auto;
 }
 
 /* Layered focus ring: outline sandwiched by a halo so it reads on the pitch,
