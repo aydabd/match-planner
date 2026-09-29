@@ -20,6 +20,11 @@ import {
 	withAvailability,
 	withDevelopment,
 } from "../core/playerNotes.js";
+import {
+	developmentTimeline,
+	monthlyMinutes,
+	recentStartFrequency,
+} from "../core/visualizations.js";
 import { createDriveAuth } from "./driveAuth.js";
 import { createDriveBackup } from "./driveBackup.js";
 import { DRIVE_CLIENT_ID, DRIVE_SCOPE } from "./driveConfig.js";
@@ -104,6 +109,140 @@ function selectField(
 		select.append(opt);
 	}
 	return { wrap: field(labelText, select, id), select };
+}
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+const CHART_COLORS = ["#127a3e", "#f07a1a", "#1554d1", "#b81f35", "#7b3f98"];
+const chartColor = (index: number): string =>
+	CHART_COLORS[index % CHART_COLORS.length] ?? "#127a3e";
+
+function svgNode(name: string): SVGElement {
+	return document.createElementNS(SVG_NS, name);
+}
+
+function svgText(text: string, x: number, y: number): SVGTextElement {
+	const node = svgNode("text") as SVGTextElement;
+	node.setAttribute("x", String(x));
+	node.setAttribute("y", String(y));
+	node.textContent = text;
+	return node;
+}
+
+function monthlyMinutesChart(history: SeasonHistory): SVGSVGElement {
+	const model = monthlyMinutes(history);
+	const width = 360;
+	const left = 92;
+	const top = 22;
+	const rowHeight = 30;
+	const chartWidth = width - left - 8;
+	const monthWidth = chartWidth / Math.max(model.months.length, 1);
+	const height = top + model.series.length * rowHeight + 28;
+	const max = Math.max(1, ...model.series.flatMap((series) => series.minutes));
+	const svg = svgNode("svg") as SVGSVGElement;
+	svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+	svg.setAttribute("role", "img");
+	svg.setAttribute("aria-label", TEXT.history.visualizations.monthlyMinutes);
+
+	model.series.forEach((series, playerIndex) => {
+		const y = top + playerIndex * rowHeight;
+		svg.append(svgText(series.name, 4, y + 16));
+		series.minutes.forEach((minutes, monthIndex) => {
+			const bar = svgNode("rect");
+			bar.setAttribute("x", String(left + monthIndex * monthWidth + 2));
+			bar.setAttribute("y", String(y + 4));
+			bar.setAttribute("width", String(Math.max(1, monthWidth - 5)));
+			bar.setAttribute("height", String((minutes / max) * 18));
+			bar.setAttribute(
+				"transform",
+				`translate(0 ${18 - (minutes / max) * 18})`,
+			);
+			bar.setAttribute("fill", chartColor(playerIndex));
+			svg.append(bar);
+		});
+	});
+	model.months.forEach((month, index) => {
+		svg.append(
+			svgText(month.slice(5), left + index * monthWidth + 4, height - 4),
+		);
+	});
+	return svg;
+}
+
+function startFrequencyChart(history: SeasonHistory): SVGSVGElement {
+	const model = recentStartFrequency(history);
+	const width = 360;
+	const left = 92;
+	const top = 8;
+	const rowHeight = 28;
+	const barWidth = width - left - 34;
+	const height = top + model.length * rowHeight;
+	const svg = svgNode("svg") as SVGSVGElement;
+	svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+	svg.setAttribute("role", "img");
+	svg.setAttribute("aria-label", TEXT.history.visualizations.startFrequency);
+
+	model.forEach((player, index) => {
+		const y = top + index * rowHeight;
+		svg.append(svgText(player.name, 4, y + 16));
+		const bar = svgNode("rect");
+		bar.setAttribute("x", String(left));
+		bar.setAttribute("y", String(y + 4));
+		bar.setAttribute("width", String((player.percentage / 100) * barWidth));
+		bar.setAttribute("height", "18");
+		bar.setAttribute("fill", chartColor(index));
+		svg.append(
+			bar,
+			svgText(`${player.percentage}%`, left + barWidth + 4, y + 17),
+		);
+	});
+	return svg;
+}
+
+function buildVisualizationCard(history: SeasonHistory): HTMLElement {
+	const t = TEXT.history.visualizations;
+	const section = card(t.title);
+	const description = document.createElement("p");
+	description.className = "hint";
+	description.textContent = t.chartDescription;
+	section.append(description);
+
+	const monthly = document.createElement("div");
+	monthly.className = "history-chart";
+	const monthlyHeading = document.createElement("h3");
+	monthlyHeading.textContent = t.monthlyMinutes;
+	monthly.append(monthlyHeading, monthlyMinutesChart(history));
+	section.append(monthly);
+
+	const starts = document.createElement("div");
+	starts.className = "history-chart";
+	const startsHeading = document.createElement("h3");
+	startsHeading.textContent = t.startFrequency;
+	starts.append(startsHeading, startFrequencyChart(history));
+	section.append(starts);
+
+	const timeline = document.createElement("div");
+	timeline.className = "history-chart";
+	const timelineHeading = document.createElement("h3");
+	timelineHeading.textContent = t.developmentTimeline;
+	timeline.append(timelineHeading);
+	const entries = developmentTimeline(history, loadPlayerNotes());
+	if (entries.length === 0) {
+		const empty = document.createElement("p");
+		empty.className = "hint";
+		empty.textContent = t.noDevelopmentNotes;
+		timeline.append(empty);
+	} else {
+		const list = document.createElement("ol");
+		list.className = "development-timeline";
+		for (const entry of entries) {
+			const item = document.createElement("li");
+			item.textContent = `${entry.date} · ${entry.name} · ${TEXT.history.playerNotes.area[entry.area]}: ${entry.note}`;
+			list.append(item);
+		}
+		timeline.append(list);
+	}
+	section.append(timeline);
+	return section;
 }
 
 /** Wires the "backup to Google Drive" card; hidden when no client id is set. */
@@ -502,6 +641,8 @@ export function createHistoryView(): { refresh: () => void } {
 			),
 		);
 		results.append(months);
+
+		results.append(buildVisualizationCard(history));
 
 		results.append(
 			buildPlayerNotesCard(
