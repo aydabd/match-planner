@@ -18,6 +18,11 @@ const UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files";
 const FOLDER_NAME = "MatchPlanner-säkerhetskopia";
 const FOLDER_MIME = "application/vnd.google-apps.folder";
 const MATCH_FILE_SUFFIX = ".json";
+/** The pre-#70 manifest file name: excluded so an old one left in the
+ * folder from before this version is never mistaken for a match file
+ * (it also ends in ".json", but has no `audit`, so parsing it as one
+ * would fail). */
+const LEGACY_MANIFEST_NAME = "manifest.json";
 
 export interface DriveClient {
 	/** The app's backup folder in the coach's Drive, creating it if needed. */
@@ -73,19 +78,34 @@ export function createDriveClient(
 	}
 
 	async function listMatchFiles(folderId: string): Promise<DriveFileEntry[]> {
-		const token = await accessToken();
 		const query = `'${folderId}' in parents and trashed=false`;
-		const url = `${FILES_URL}?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name)&pageSize=1000`;
-		const response = await driveFetch(token, url);
-		const body = (await response.json()) as {
-			files?: { id: string; name: string }[];
-		};
-		return (body.files ?? [])
-			.filter((file) => file.name.endsWith(MATCH_FILE_SUFFIX))
-			.map((file) => ({
-				matchId: file.name.slice(0, -MATCH_FILE_SUFFIX.length),
-				fileId: file.id,
-			}));
+		const entries: DriveFileEntry[] = [];
+		let pageToken: string | undefined;
+		do {
+			const token = await accessToken();
+			const params = new URLSearchParams({
+				q: query,
+				spaces: "drive",
+				fields: "nextPageToken,files(id,name)",
+				pageSize: "1000",
+			});
+			if (pageToken !== undefined) params.set("pageToken", pageToken);
+			const response = await driveFetch(token, `${FILES_URL}?${params}`);
+			const body = (await response.json()) as {
+				files?: { id: string; name: string }[];
+				nextPageToken?: string;
+			};
+			for (const file of body.files ?? []) {
+				if (file.name === LEGACY_MANIFEST_NAME) continue;
+				if (!file.name.endsWith(MATCH_FILE_SUFFIX)) continue;
+				entries.push({
+					matchId: file.name.slice(0, -MATCH_FILE_SUFFIX.length),
+					fileId: file.id,
+				});
+			}
+			pageToken = body.nextPageToken;
+		} while (pageToken !== undefined);
+		return entries;
 	}
 
 	async function downloadJson(fileId: string): Promise<unknown> {
