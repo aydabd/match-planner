@@ -3,6 +3,18 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.9.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.8.0...matchplanner-v0.9.0) (2026-09-29)
+
+
+### Features
+
+* **history:** let a coach record availability and development notes ([#67](https://github.com/aydabd/match-planner/issues/67)) ([aec94ba](https://github.com/aydabd/match-planner/commit/aec94ba9df2490693cbec04b33ac2225dbb47fc8)), closes [#58](https://github.com/aydabd/match-planner/issues/58)
+
+
+### Bug Fixes
+
+* **match:** don't record an inconsistent lineup on a period-break keeper change ([#75](https://github.com/aydabd/match-planner/issues/75)) ([4a356a2](https://github.com/aydabd/match-planner/commit/4a356a27ebb111c881148609999d5d580abbb0a3)), closes [#68](https://github.com/aydabd/match-planner/issues/68)
+
 ## [0.8.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.7.0...matchplanner-v0.8.0) (2026-09-29)
 
 
