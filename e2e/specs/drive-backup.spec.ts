@@ -92,7 +92,20 @@ async function mockGoogle(
 					return false;
 				return true;
 			});
-			await json({ files: matches.map(([id]) => ({ id })) });
+			// Pages of 2, regardless of the requested pageSize, so a folder
+			// with more than one page of files (PAGED_MATCH_COUNT below)
+			// exercises listMatchFiles' nextPageToken loop, not just its
+			// single-page path.
+			const PAGE_SIZE = 2;
+			const offset = Number(url.searchParams.get("pageToken") ?? "0");
+			const page = matches.slice(offset, offset + PAGE_SIZE);
+			const nextOffset = offset + PAGE_SIZE;
+			await json({
+				files: page.map(([id, f]) => ({ id, name: f.name })),
+				...(nextOffset < matches.length
+					? { nextPageToken: String(nextOffset) }
+					: {}),
+			});
 			return;
 		}
 
@@ -193,6 +206,51 @@ test.describe("Google Drive backup and restore", () => {
 		await history.driveConnectButton.click();
 		await expect(history.driveStatus).toHaveText("Kopplad till Google Drive.");
 		expect(scriptRequests).toBe(2);
+	});
+
+	test("ignores a legacy manifest.json and pages through many files", async ({
+		history,
+		setup,
+		page,
+	}) => {
+		// A folder left over from before #70's listing-based sync: a
+		// manifest.json (which also ends in ".json", so must not be mistaken
+		// for a match file) alongside more match files than one Drive
+		// "page" (2, per the fake server above) holds, so restoring them
+		// exercises the nextPageToken loop, not just a single page.
+		const drive = createFakeDrive();
+		const folderId = "folder-1";
+		drive.files.set(folderId, {
+			name: "MatchPlanner-säkerhetskopia",
+			mimeType: "application/vnd.google-apps.folder",
+			content: "",
+		});
+		drive.files.set("legacy-manifest", {
+			name: "manifest.json",
+			parents: [folderId],
+			content: JSON.stringify({ schemaVersion: 1, files: {} }),
+		});
+		for (const suffix of ["a", "b", "c"]) {
+			drive.files.set(`seed-${suffix}`, {
+				name: `seed-${suffix}.json`,
+				parents: [folderId],
+				content: matchFileToJson(
+					makeMatchFile({
+						matchId: `seed-${suffix}`,
+						names: NAMES.slice(0, 9),
+					}),
+				),
+			});
+		}
+		await mockGoogle(page.context(), drive);
+
+		await setup.open();
+		await history.open();
+		await history.driveConnectButton.click();
+		await expect(history.driveStatus).toHaveText("Kopplad till Google Drive.");
+		await history.driveRestoreButton.click();
+		await expect(history.driveStatus).toHaveText("3 matcher lästes in.");
+		await expect(history.count).toHaveText("3 matcher över 1 månad.");
 	});
 
 	test("backs up on one phone and restores on another", async ({
