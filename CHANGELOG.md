@@ -3,6 +3,13 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.13.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.12.0...matchplanner-v0.13.0) (2026-09-29)
+
+
+### Features
+
+* **history:** recognise players by a stable uuidv5 id, not their name ([#90](https://github.com/aydabd/match-planner/issues/90)) ([1f1d6af](https://github.com/aydabd/match-planner/commit/1f1d6afc7a5b484e31e17b57b3672387b3c20ff3))
+
 ## [0.12.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.11.0...matchplanner-v0.12.0) (2026-09-29)
 
 
