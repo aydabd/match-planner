@@ -1,5 +1,9 @@
 import type { BrowserContext } from "@playwright/test";
 import { matchFileToJson } from "../../src/core/matchFile.js";
+import {
+	encryptJson,
+	securePackageToJson,
+} from "../../src/core/securePackage.js";
 import { makeMatchFile, NAMES } from "../../tests/support/matchFiles.js";
 import { expect, test } from "../fixtures.js";
 import { HistoryPage } from "../pages/HistoryPage.js";
@@ -253,29 +257,26 @@ test.describe("Google Drive backup and restore", () => {
 		// manifest.json (which also ends in ".json", so must not be mistaken
 		// for a match file) alongside more match files than one Drive
 		// "page" (2, per the fake server above) holds, so restoring them
-		// exercises the nextPageToken loop, not just a single page.
+		// exercises the nextPageToken loop, not just a single page. This
+		// test's fake picker (see GIS_SCRIPT) always "picks" folder id
+		// "folder-1", so that is the id these files are seeded under.
+		const password = "hemligt-lösenord";
 		const drive = createFakeDrive();
 		const folderId = "folder-1";
-		drive.files.set(folderId, {
-			name: "MatchPlanner-säkerhetskopia",
-			mimeType: "application/vnd.google-apps.folder",
-			content: "",
-		});
 		drive.files.set("legacy-manifest", {
 			name: "manifest.json",
 			parents: [folderId],
 			content: JSON.stringify({ schemaVersion: 1, files: {} }),
 		});
 		for (const suffix of ["a", "b", "c"]) {
+			const pkg = await encryptJson(
+				password,
+				makeMatchFile({ matchId: `seed-${suffix}`, names: NAMES.slice(0, 9) }),
+			);
 			drive.files.set(`seed-${suffix}`, {
 				name: `seed-${suffix}.json`,
 				parents: [folderId],
-				content: matchFileToJson(
-					makeMatchFile({
-						matchId: `seed-${suffix}`,
-						names: NAMES.slice(0, 9),
-					}),
-				),
+				content: securePackageToJson(pkg),
 			});
 		}
 		await mockGoogle(page.context(), drive);
@@ -284,6 +285,9 @@ test.describe("Google Drive backup and restore", () => {
 		await history.open();
 		await history.driveConnectButton.click();
 		await expect(history.driveStatus).toHaveText("Kopplad till Google Drive.");
+		await history.driveChooseFolderButton.click();
+		await expect(history.driveStatus).toHaveText("Mapp: MatchPlanner-mapp");
+		await history.drivePasswordInput.fill(password);
 		await history.driveRestoreButton.click();
 		await expect(history.driveStatus).toHaveText("3 matcher lästes in.");
 		await expect(history.count).toHaveText("3 matcher över 1 månad.");

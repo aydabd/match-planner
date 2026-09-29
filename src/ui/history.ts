@@ -329,7 +329,13 @@ function setUpDriveBackup(refresh: () => void): void {
 				showFolder(chosen.id, chosen.name);
 				status.textContent = t.folderLabel(chosen.name);
 			} else {
-				status.textContent = t.noFolderChosen;
+				// Cancelling "Byt mapp" leaves the previously chosen folder
+				// active (it is still in storage, and backup/restore still
+				// work against it) - only claim "no folder chosen" when
+				// that is actually true.
+				const currentName = readItem(STORAGE_KEYS.driveFolderName);
+				status.textContent =
+					currentName !== null ? t.folderLabel(currentName) : t.noFolderChosen;
 			}
 		} catch {
 			status.textContent = t.folderPickerFailed;
