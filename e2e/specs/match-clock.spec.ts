@@ -109,8 +109,9 @@ test.describe("Running the match clock", () => {
 		await expect(match.time).toHaveText("01:00");
 	});
 
-	test("after the last period the match is over", async ({
+	test("after the last period the match is over and the report opens by itself", async ({
 		startedMatch: match,
+		report,
 	}) => {
 		for (let period = 1; period <= 3; period++) {
 			if (period > 1) await match.nextPeriodButton.click();
@@ -118,10 +119,9 @@ test.describe("Running the match clock", () => {
 			await match.play(10);
 		}
 
-		await expect(match.timeLeft).toHaveText("Matchen är slut.");
-		await expect(match.nextPeriodButton).toBeHidden();
-		await expect(match.startClockButton).toBeHidden();
-		await expect(match.pauseButton).toBeHidden();
+		// The clock reaching the end of the last period is a real navigation
+		// to /report/ now (#93), not an in-page state to inspect on /match/.
+		await expect(report.root).toBeVisible();
 	});
 
 	test("playtime counts only for players on the pitch", async ({
