@@ -118,7 +118,7 @@ describe("parseRosterFile - rejects malformed or hostile input", () => {
 	it.each([
 		["under 1 minute", 30],
 		["over 30 minutes", 999 * 60],
-		["not whole minutes", 90],
+		["not a half-minute step", 70],
 	])("rejects minutes between swaps %s", (_, rotationSeconds) => {
 		expect(() =>
 			parseRosterFile({
@@ -130,15 +130,18 @@ describe("parseRosterFile - rejects malformed or hostile input", () => {
 		).toThrow(StorageError);
 	});
 
-	it.each([60, 600, 1800])("accepts %i seconds between swaps", (seconds) => {
-		const roster = parseRosterFile({
-			schemaVersion: 1,
-			formatId: "7v7",
-			rotationSeconds: seconds,
-			players: validPlayers,
-		});
-		expect(roster.rotationSeconds).toBe(seconds);
-	});
+	it.each([60, 90, 450, 600, 1800])(
+		"accepts %i seconds between swaps",
+		(seconds) => {
+			const roster = parseRosterFile({
+				schemaVersion: 1,
+				formatId: "7v7",
+				rotationSeconds: seconds,
+				players: validPlayers,
+			});
+			expect(roster.rotationSeconds).toBe(seconds);
+		},
+	);
 
 	it("rejects a non-positive rotationSeconds", () => {
 		expect(() =>

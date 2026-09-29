@@ -86,6 +86,18 @@ test.describe("Setting up a match", () => {
 		await expect(setup.minutesBetweenSwaps).toHaveValue("1");
 	});
 
+	test("minutes between swaps accepts a half minute", async ({
+		setup,
+		page,
+	}) => {
+		await setup.setMinutesBetweenSwaps(7.5);
+		await expect(setup.minutesBetweenSwaps).toHaveValue("7.5");
+
+		// A reload keeps the half-minute value exactly, not rounded away.
+		await page.reload();
+		await expect(setup.minutesBetweenSwaps).toHaveValue("7.5");
+	});
+
 	test("the team size sets the match length, and the coach can change it", async ({
 		setup,
 		match,

@@ -108,15 +108,21 @@ export function newRoster(fields: {
 	};
 }
 
-/** Whole minutes within a range, as the setup screen allows. */
+/**
+ * Minutes within a range, in steps of `stepMinutes` (default a whole
+ * minute - periods and period length stay whole-minutes-only; the rotation
+ * interval allows half minutes, see LIMITS.rotationMinutes's callers).
+ */
 export function isWholeMinutesWithin(
 	seconds: unknown,
 	range: { min: number; max: number },
+	stepMinutes = 1,
 ): seconds is number {
-	if (typeof seconds !== "number") return false;
+	if (typeof seconds !== "number" || !Number.isFinite(seconds)) return false;
 	const minutes = seconds / 60;
+	const stepSeconds = stepMinutes * 60;
 	return (
-		Number.isInteger(minutes) && minutes >= range.min && minutes <= range.max
+		seconds % stepSeconds === 0 && minutes >= range.min && minutes <= range.max
 	);
 }
 
@@ -290,10 +296,11 @@ export function parseRosterFile(
 	}
 	const size = TEAM_SIZES[teamSizeOf(formatId)];
 
-	if (!isWholeMinutesWithin(obj.rotationSeconds, LIMITS.rotationMinutes)) {
-		throw new StorageError("rotationSeconds must be whole minutes in range", {
-			code: "rotation",
-		});
+	if (!isWholeMinutesWithin(obj.rotationSeconds, LIMITS.rotationMinutes, 0.5)) {
+		throw new StorageError(
+			"rotationSeconds must be a half-minute step in range",
+			{ code: "rotation" },
+		);
 	}
 
 	// Version 1 files had no match plan: use the team size's defaults.

@@ -175,7 +175,7 @@ function parseSetup(raw: unknown): MatchSetup {
 		raw.periods < LIMITS.periods.min ||
 		raw.periods > LIMITS.periods.max ||
 		!isWholeMinutesWithin(raw.periodSeconds, LIMITS.periodMinutes) ||
-		!isWholeMinutesWithin(raw.rotationSeconds, LIMITS.rotationMinutes)
+		!isWholeMinutesWithin(raw.rotationSeconds, LIMITS.rotationMinutes, 0.5)
 	) {
 		return fail(problem, "periods and times must be in range");
 	}
