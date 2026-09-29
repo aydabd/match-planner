@@ -10,6 +10,7 @@ import {
 	MatchFileError,
 	parseMatchFile,
 } from "../core/matchFile.js";
+import { buildPlayerIdMap, type PlayerIdMap } from "../core/playerIdentity.js";
 import {
 	type AbsenceReason,
 	type AvailabilityEntry,
@@ -519,6 +520,7 @@ function buildSeasonReportCard(history: SeasonHistory): HTMLElement {
 function buildAvailabilityField(
 	notes: PlayerNotesFile,
 	player: PlayerHistory,
+	map: PlayerIdMap,
 	onSaved: () => void,
 ): HTMLElement {
 	const t = TEXT.history.playerNotes;
@@ -528,7 +530,7 @@ function buildAvailabilityField(
 	heading.textContent = t.availabilityTitle;
 	section.append(heading);
 
-	const matches = matchesForPlayer(loadMatchFiles(), player.key);
+	const matches = matchesForPlayer(loadMatchFiles(), map, player.key);
 	if (matches.length === 0) {
 		const none = document.createElement("p");
 		none.className = "hint";
@@ -604,7 +606,7 @@ function buildAvailabilityField(
 			entry.reason = reasonSelect.value as AbsenceReason;
 		}
 		if (noteInput.value.trim() !== "") entry.note = noteInput.value;
-		savePlayerNotes(withAvailability(loadPlayerNotes(), player.name, entry));
+		savePlayerNotes(withAvailability(loadPlayerNotes(), player.key, entry));
 		onSaved();
 	});
 	section.append(saveBtn);
@@ -654,7 +656,7 @@ function buildDevelopmentField(
 	addBtn.addEventListener("click", () => {
 		if (dateInput.value === "" || noteInput.value.trim() === "") return;
 		savePlayerNotes(
-			withDevelopment(loadPlayerNotes(), player.name, {
+			withDevelopment(loadPlayerNotes(), player.key, {
 				date: dateInput.value,
 				area: areaSelect.value as DevelopmentArea,
 				note: noteInput.value,
@@ -696,6 +698,7 @@ function buildDevelopmentField(
  */
 function buildPlayerNotesCard(
 	history: SeasonHistory,
+	map: PlayerIdMap,
 	selectedKey: string | null,
 	onSelect: (key: string) => void,
 	onSaved: () => void,
@@ -741,7 +744,7 @@ function buildPlayerNotesCard(
 	const player = key ? history.players.find((p) => p.key === key) : undefined;
 	if (player) {
 		section.append(
-			buildAvailabilityField(notes, player, onSaved),
+			buildAvailabilityField(notes, player, map, onSaved),
 			buildDevelopmentField(notes, player, onSaved),
 		);
 	}
@@ -758,8 +761,12 @@ export function createHistoryView(): { refresh: () => void } {
 	const input = byId("historyImportInput") as HTMLInputElement;
 	let selectedPlayerKey: string | null = null;
 
-	function refresh(): void {
-		const history = buildHistory(loadMatchFiles());
+	async function refresh(): Promise<void> {
+		const files = loadMatchFiles();
+		const map = await buildPlayerIdMap(
+			files.flatMap((f) => f.squad.players.map((p) => p.name)),
+		);
+		const history = buildHistory(files, map);
 		byId("historyCount").textContent =
 			history.matches === 0
 				? TEXT.history.empty
@@ -848,6 +855,7 @@ export function createHistoryView(): { refresh: () => void } {
 		results.append(
 			buildPlayerNotesCard(
 				history,
+				map,
 				selectedPlayerKey,
 				(key) => {
 					selectedPlayerKey = key;

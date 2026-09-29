@@ -1,5 +1,7 @@
 import { LIMITS } from "./limits.js";
 import { type MatchFile, matchFileToJson } from "./matchFile.js";
+import type { PlayerIdMap } from "./playerIdentity.js";
+import { playerId } from "./playerIdentity.js";
 import { secondsPlayed } from "./timeline.js";
 
 /**
@@ -11,9 +13,13 @@ import { secondsPlayed } from "./timeline.js";
  * - files can come in any order and give the same totals,
  * - minutes per position always add up to the total minutes.
  *
- * A player is recognised by name (trimmed, ignoring capitals): squad ids like
- * "p1" are only unique within one squad. Two players with the same name in
- * one squad count as one.
+ * A player is recognised by name (trimmed, ignoring capitals): squad ids
+ * like "p1" are only unique within one squad. Two players with the same
+ * name in one squad count as one. The recognition itself is
+ * playerIdentity.ts's stable uuidv5 (#81), not the name - buildHistory and
+ * matchesForPlayer take an already-built PlayerIdMap (see that module for
+ * why the id lookup is a separate, one-time async step) rather than
+ * hashing internally, so this module stays synchronous.
  */
 
 export interface MonthTotal {
@@ -58,14 +64,6 @@ export interface SeasonHistory {
 export function whenOf(file: MatchFile): string {
 	return file.match.date || file.audit.createdAt;
 }
-
-/**
- * How a player is recognised across match files (see the module comment):
- * exported so other season-scoped records (src/core/playerNotes.ts) key
- * themselves the same way and mean the same player.
- */
-export const nameKey = (name: string): string =>
-	name.trim().toLocaleLowerCase("sv");
 
 /**
  * Which of two files for the same match to keep: the later one, and if they
@@ -123,14 +121,18 @@ export function mergeMatchFiles(
  * The matches (id, opponent, date) a player was in the squad for, oldest
  * first, a match counted once however often its file is given - so a
  * player-notes screen can offer "which match" without its own dedup or
- * ordering rules (playerNotes.ts's key is history.ts's nameKey).
+ * ordering rules. `key` and `map` come from the same PlayerHistory this
+ * player was found in (playerNotes.ts's key is this module's id).
  */
 export function matchesForPlayer(
 	files: readonly MatchFile[],
+	map: PlayerIdMap,
 	key: string,
 ): { matchId: string; opponent: string; date: string }[] {
 	return mergeMatchFiles([], files)
-		.files.filter((f) => f.squad.players.some((p) => nameKey(p.name) === key))
+		.files.filter((f) =>
+			f.squad.players.some((p) => playerId(map, p.name) === key),
+		)
 		.map((f) => ({
 			matchId: f.audit.matchId,
 			opponent: f.match.opponent,
@@ -147,7 +149,10 @@ interface Appearance {
 }
 
 /** Each recognised player's part in one match. */
-function appearances(file: MatchFile): Map<string, Appearance> {
+function appearances(
+	file: MatchFile,
+	map: PlayerIdMap,
+): Map<string, Appearance> {
 	const played = secondsPlayed(file.timeline, file.endedAt);
 	const late = new Set(
 		file.timeline.flatMap((e) =>
@@ -157,7 +162,7 @@ function appearances(file: MatchFile): Map<string, Appearance> {
 	const starters = new Set(file.squad.startingIds);
 	const result = new Map<string, Appearance>();
 	for (const player of file.squad.players) {
-		const key = nameKey(player.name);
+		const key = playerId(map, player.name);
 		const entry = result.get(key) ?? {
 			name: player.name,
 			started: false,
@@ -179,7 +184,10 @@ function appearances(file: MatchFile): Map<string, Appearance> {
 	return result;
 }
 
-export function buildHistory(files: readonly MatchFile[]): SeasonHistory {
+export function buildHistory(
+	files: readonly MatchFile[],
+	map: PlayerIdMap,
+): SeasonHistory {
 	const unique = mergeMatchFiles([], files).files;
 	const ordered = chronological(unique);
 	const months = [...new Set(ordered.map((f) => whenOf(f).slice(0, 7)))];
@@ -189,7 +197,7 @@ export function buildHistory(files: readonly MatchFile[]): SeasonHistory {
 
 	for (const file of ordered) {
 		const month = whenOf(file).slice(0, 7);
-		for (const [key, part] of appearances(file)) {
+		for (const [key, part] of appearances(file, map)) {
 			const person = people.get(key) ?? {
 				key,
 				name: part.name,

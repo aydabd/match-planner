@@ -1,13 +1,14 @@
 import type { SeasonHistory } from "./history.js";
-import { nameKey } from "./history.js";
 import { LIMITS } from "./limits.js";
 
 /**
  * What the match timeline cannot see (#58): availability, injury and
  * development, coach-entered rather than computed. Kept as its own file,
- * one player per key (see history.ts's nameKey - the same recognition rule,
- * so a player's notes and their season history always mean the same
- * person), same strict-parsing discipline as squad and match files.
+ * one player per key (playerIdentity.ts's stable uuidv5, #81 - the same
+ * recognition rule as SeasonHistory's PlayerHistory.key, so a player's
+ * notes and their season history always mean the same person, and the
+ * file itself never reveals a name through its key), same strict-parsing
+ * discipline as squad and match files.
  *
  * This module only holds data and blind-spot flags derived from it and from
  * SeasonHistory - no scoring, no ranking between players. A flag here is a
@@ -35,7 +36,7 @@ export interface DevelopmentEntry {
 }
 
 export interface PlayerNotes {
-	/** Same recognition rule as PlayerHistory.key (history.ts's nameKey). */
+	/** Same recognition rule as PlayerHistory.key (playerIdentity.ts's id). */
 	key: string;
 	/** At most one entry per matchId; recording again replaces it. */
 	availability: AvailabilityEntry[];
@@ -214,17 +215,16 @@ function withPlayerNotes(
 }
 
 /**
- * Record one match's availability for a player, given by name (normalised
- * with history.ts's nameKey, so it always matches that player's
+ * Record one match's availability for a player, given by their
+ * playerIdentity.ts id (so it always matches that player's
  * PlayerHistory.key). Recording again for the same matchId replaces that
  * entry. The file given is left unchanged.
  */
 export function withAvailability(
 	file: PlayerNotesFile,
-	name: string,
+	key: string,
 	entry: AvailabilityEntry,
 ): PlayerNotesFile {
-	const key = nameKey(name);
 	const current = notesOf(file, key);
 	const trimmed: AvailabilityEntry = { ...entry };
 	if (trimmed.note !== undefined) {
@@ -238,16 +238,15 @@ export function withAvailability(
 }
 
 /**
- * Add a development note for a player, given by name (normalised with
- * history.ts's nameKey). Only the newest LIMITS.developmentNotesPerPlayer
- * are kept; the file given is left unchanged.
+ * Add a development note for a player, given by their playerIdentity.ts
+ * id. Only the newest LIMITS.developmentNotesPerPlayer are kept; the file
+ * given is left unchanged.
  */
 export function withDevelopment(
 	file: PlayerNotesFile,
-	name: string,
+	key: string,
 	entry: DevelopmentEntry,
 ): PlayerNotesFile {
-	const key = nameKey(name);
 	const current = notesOf(file, key);
 	const trimmed: DevelopmentEntry = {
 		...entry,
