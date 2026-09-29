@@ -6,6 +6,10 @@ const CACHE_NAME = "__CACHE_NAME__";
 // be deleted. Same rule as isOwnCache in src/ui/appStorage.ts (values injected).
 const CACHE_PREFIX = "__CACHE_PREFIX__";
 const LEGACY_CACHES = __LEGACY_CACHES__;
+// Every page's directory URL and index.html, plus the manifest: see
+// vite.config.ts (PAGE_DIRS), which keeps this in sync with the build's
+// actual page entries so it can't drift as pages are added or removed.
+const PRECACHE_PATHS = __PRECACHE_PATHS__;
 const isOwnCache = (name) =>
 	(name.startsWith(CACHE_PREFIX) && name.length > CACHE_PREFIX.length) ||
 	LEGACY_CACHES.includes(name);
@@ -13,11 +17,7 @@ const isOwnCache = (name) =>
 self.addEventListener("install", (event) => {
 	self.skipWaiting();
 	event.waitUntil(
-		caches
-			.open(CACHE_NAME)
-			.then((cache) =>
-				cache.addAll([".", "index.html", "manifest.webmanifest"]),
-			),
+		caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_PATHS)),
 	);
 });
 

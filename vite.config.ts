@@ -23,6 +23,17 @@ if (!licenseLine?.trim()) {
 }
 const copyright = licenseLine.trim();
 
+// The app's five real URLs (issue #93). Each has its own index.html and Vite
+// entry; "" is the root page. Kept in one place so the build input and the
+// service worker's precache list can never drift apart.
+const PAGE_DIRS = ["", "match/", "report/", "statistics/", "about/"];
+
+/** Precached so every page works fully offline after its first visit. */
+const precachePaths = [
+	...PAGE_DIRS.flatMap((dir) => [dir === "" ? "." : dir, `${dir}index.html`]),
+	"manifest.webmanifest",
+];
+
 // GitHub Pages project sites are served from https://<user>.github.io/<repo>/,
 // so the base path must match the repo name. Set BASE_PATH as a build-time
 // env var in CI (see .github/workflows/release.yml). Defaults to "/" for local
@@ -39,7 +50,8 @@ function serviceWorker(appVersion: string): Plugin {
 				source: template
 					.replace("__CACHE_NAME__", cacheName(appVersion))
 					.replace("__CACHE_PREFIX__", CACHE_PREFIX)
-					.replace("__LEGACY_CACHES__", JSON.stringify(LEGACY_CACHE_NAMES)),
+					.replace("__LEGACY_CACHES__", JSON.stringify(LEGACY_CACHE_NAMES))
+					.replace("__PRECACHE_PATHS__", JSON.stringify(precachePaths)),
 			});
 		},
 	};
@@ -57,6 +69,14 @@ export default defineConfig(({ mode }) => ({
 		target: "es2020",
 		sourcemap: mode !== "production",
 		outDir: "dist",
+		rollupOptions: {
+			input: Object.fromEntries(
+				PAGE_DIRS.map((dir) => [
+					dir === "" ? "main" : dir.replace(/\/$/, ""),
+					`${dir}index.html`,
+				]),
+			),
+		},
 	},
 	test: {
 		environment: "node",

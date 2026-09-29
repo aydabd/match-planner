@@ -152,6 +152,31 @@ h3 {
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
+/* Shared cross-page nav (src/ui/page.ts), rendered into #pageNav. */
+.page-nav {
+	flex: 1;
+	display: flex;
+	justify-content: flex-end;
+	flex-wrap: wrap;
+	gap: 4px 12px;
+}
+.page-nav-link {
+	color: var(--ink-2);
+	font-size: 0.8125rem;
+	font-weight: 600;
+	text-decoration: none;
+	padding: 4px 2px;
+}
+.page-nav-link:hover,
+.page-nav-link:focus-visible {
+	color: var(--ink);
+	text-decoration: underline;
+}
+.page-nav-link[aria-current="page"] {
+	color: var(--ink);
+	text-decoration: underline;
+	text-underline-offset: 3px;
+}
 
 /* ---------- intro ---------- */
 .intro h1 {
