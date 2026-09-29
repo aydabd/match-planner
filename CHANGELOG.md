@@ -3,6 +3,14 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.11.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.10.0...matchplanner-v0.11.0) (2026-09-29)
+
+
+### Features
+
+* **history:** add season report export ([#83](https://github.com/aydabd/match-planner/issues/83)) ([b2c9531](https://github.com/aydabd/match-planner/commit/b2c95316964fbb9aefbecf1bfaecaec3af26ec39))
+* **history:** add season visualizations ([#82](https://github.com/aydabd/match-planner/issues/82)) ([f611b42](https://github.com/aydabd/match-planner/commit/f611b42d5ff60e0ce6aa12f94a8929df1787bad8))
+
 ## [0.10.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.9.0...matchplanner-v0.10.0) (2026-09-29)
 
 
