@@ -332,6 +332,23 @@
         </div>
         <p class="hint" id="driveStatus" role="status"></p>
       </section>
+      <section class="card" aria-labelledby="secureExportTitle" id="secureExportCard">
+        <h2 id="secureExportTitle">Säker export och import</h2>
+        <p class="hint">Sparar truppen, alla matcher och spelaranteckningar i en enda krypterad fil, skyddad med ett lösenord du väljer. Bra för att flytta allt till en annan enhet utan Google Drive.</p>
+        <div class="field">
+          <label class="field-label" for="secureExportPasswordInput">Lösenord</label>
+          <input type="password" id="secureExportPasswordInput" autocomplete="off">
+        </div>
+        <div class="row-buttons">
+          <button type="button" id="secureExportBtn" class="btn btn-secondary">Exportera allt (krypterat)</button>
+          <label class="btn btn-secondary file-btn">
+            Välj krypterad fil
+            <input id="secureImportFileInput" class="visually-hidden" type="file" accept="application/json" />
+          </label>
+          <button type="button" id="secureImportBtn" class="btn btn-secondary" disabled>Importera</button>
+        </div>
+        <p class="hint" id="secureExportStatus" role="status"></p>
+      </section>
       <div id="historyResults" class="policy-rules"></div>
     </section>
 
