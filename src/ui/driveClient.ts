@@ -1,9 +1,4 @@
-import {
-	type DriveManifest,
-	EMPTY_MANIFEST,
-	manifestToJson,
-	parseManifest,
-} from "../core/driveSync.js";
+import type { DriveFileEntry } from "../core/driveSync.js";
 import { type MatchFile, matchFileToJson } from "../core/matchFile.js";
 
 /**
@@ -11,33 +6,30 @@ import { type MatchFile, matchFileToJson } from "../core/matchFile.js";
  * scope allows: create/find the app's own folder, and read/write JSON
  * files in it. No DOM here, but it depends on `fetch`, so - like
  * driveAuth.ts - it lives in src/ui, not src/core.
+ *
+ * Every match file is uploaded once and never edited again (#70's
+ * src/core/driveSync.ts comment explains why that matters for concurrent
+ * coaches), so there is no "update an existing file" case to handle here -
+ * every upload is a plain create.
  */
 
 const FILES_URL = "https://www.googleapis.com/drive/v3/files";
 const UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files";
 const FOLDER_NAME = "MatchPlanner-säkerhetskopia";
-const MANIFEST_NAME = "manifest.json";
 const FOLDER_MIME = "application/vnd.google-apps.folder";
+const MATCH_FILE_SUFFIX = ".json";
 
 export interface DriveClient {
 	/** The app's backup folder in the coach's Drive, creating it if needed. */
 	ensureFolder(): Promise<string>;
-	/** The manifest in `folderId`, and its own Drive file id (null if there is none yet). */
-	getManifest(
-		folderId: string,
-	): Promise<{ manifest: DriveManifest; fileId: string | null }>;
-	/** Create or update the manifest; returns its Drive file id. */
-	saveManifest(
-		folderId: string,
-		fileId: string | null,
-		manifest: DriveManifest,
-	): Promise<string>;
-	/** Upload one match file as `<matchId>.json`; returns its Drive file id. */
+	/** Every match file already in `folderId`, matchId read from its filename. */
+	listMatchFiles(folderId: string): Promise<DriveFileEntry[]>;
+	/** Upload one match file as `<matchId>.json`. */
 	uploadMatch(
 		folderId: string,
 		matchId: string,
 		file: MatchFile,
-	): Promise<string>;
+	): Promise<void>;
 	downloadJson(fileId: string): Promise<unknown>;
 }
 
@@ -80,6 +72,22 @@ export function createDriveClient(
 		return body.id;
 	}
 
+	async function listMatchFiles(folderId: string): Promise<DriveFileEntry[]> {
+		const token = await accessToken();
+		const query = `'${folderId}' in parents and trashed=false`;
+		const url = `${FILES_URL}?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name)&pageSize=1000`;
+		const response = await driveFetch(token, url);
+		const body = (await response.json()) as {
+			files?: { id: string; name: string }[];
+		};
+		return (body.files ?? [])
+			.filter((file) => file.name.endsWith(MATCH_FILE_SUFFIX))
+			.map((file) => ({
+				matchId: file.name.slice(0, -MATCH_FILE_SUFFIX.length),
+				fileId: file.id,
+			}));
+	}
+
 	async function downloadJson(fileId: string): Promise<unknown> {
 		const token = await accessToken();
 		const response = await driveFetch(
@@ -89,16 +97,16 @@ export function createDriveClient(
 		return response.json();
 	}
 
-	/** Only sets `parents` on create: Drive rejects it in an update's metadata. */
-	async function uploadJson(
-		folderId: string | null,
-		fileId: string | null,
-		name: string,
-		json: string,
-	): Promise<string> {
+	async function uploadMatch(
+		folderId: string,
+		matchId: string,
+		file: MatchFile,
+	): Promise<void> {
 		const token = await accessToken();
-		const metadata: Record<string, unknown> = { name };
-		if (folderId && !fileId) metadata.parents = [folderId];
+		const metadata = {
+			name: `${matchId}${MATCH_FILE_SUFFIX}`,
+			parents: [folderId],
+		};
 		const boundary = "matchplanner-drive-boundary";
 		const body = [
 			`--${boundary}`,
@@ -108,55 +116,15 @@ export function createDriveClient(
 			`--${boundary}`,
 			"Content-Type: application/json",
 			"",
-			json,
+			matchFileToJson(file),
 			`--${boundary}--`,
 		].join("\r\n");
-		const url = fileId
-			? `${UPLOAD_URL}/${fileId}?uploadType=multipart&fields=id`
-			: `${UPLOAD_URL}?uploadType=multipart&fields=id`;
-		const response = await driveFetch(token, url, {
-			method: fileId ? "PATCH" : "POST",
+		await driveFetch(token, `${UPLOAD_URL}?uploadType=multipart&fields=id`, {
+			method: "POST",
 			headers: { "Content-Type": `multipart/related; boundary=${boundary}` },
 			body,
 		});
-		const result = (await response.json()) as { id: string };
-		return result.id;
 	}
 
-	async function getManifest(folderId: string) {
-		const fileId = await findFile(
-			`name='${MANIFEST_NAME}' and '${folderId}' in parents and trashed=false`,
-		);
-		if (!fileId) return { manifest: EMPTY_MANIFEST, fileId: null };
-		return { manifest: parseManifest(await downloadJson(fileId)), fileId };
-	}
-
-	async function saveManifest(
-		folderId: string,
-		fileId: string | null,
-		manifest: DriveManifest,
-	): Promise<string> {
-		return uploadJson(
-			folderId,
-			fileId,
-			MANIFEST_NAME,
-			manifestToJson(manifest),
-		);
-	}
-
-	async function uploadMatch(
-		folderId: string,
-		matchId: string,
-		file: MatchFile,
-	): Promise<string> {
-		return uploadJson(folderId, null, `${matchId}.json`, matchFileToJson(file));
-	}
-
-	return {
-		ensureFolder,
-		getManifest,
-		saveManifest,
-		uploadMatch,
-		downloadJson,
-	};
+	return { ensureFolder, listMatchFiles, uploadMatch, downloadJson };
 }

@@ -92,7 +92,9 @@ async function mockGoogle(
 					return false;
 				return true;
 			});
-			await json({ files: matches.map(([id]) => ({ id })) });
+			await json({
+				files: matches.map(([id, f]) => ({ id, name: f.name })),
+			});
 			return;
 		}
 

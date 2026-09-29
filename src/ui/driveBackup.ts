@@ -1,8 +1,4 @@
-import {
-	matchesToBackUp,
-	matchesToRestore,
-	withManifestEntry,
-} from "../core/driveSync.js";
+import { matchesToBackUp, matchesToRestore } from "../core/driveSync.js";
 import { type MatchFile, parseMatchFile } from "../core/matchFile.js";
 import type { DriveAuth } from "./driveAuth.js";
 import { createDriveClient } from "./driveClient.js";
@@ -14,9 +10,9 @@ import { keepMatchFiles, loadMatchFiles } from "./matchFileStorage.js";
  * files in matchFileStorage.ts.
  */
 export interface DriveBackup {
-	/** Upload every local match not yet in the Drive manifest. */
+	/** Upload every local match not yet in the Drive folder. */
 	backup(): Promise<{ uploaded: number }>;
-	/** Download every manifest entry not already kept on this device. */
+	/** Download every match in the Drive folder not already kept on this device. */
 	restore(): Promise<{ downloaded: number }>;
 }
 
@@ -25,28 +21,19 @@ export function createDriveBackup(auth: DriveAuth): DriveBackup {
 
 	async function backup(): Promise<{ uploaded: number }> {
 		const folderId = await client.ensureFolder();
-		const { manifest, fileId } = await client.getManifest(folderId);
-		const toUpload = matchesToBackUp(loadMatchFiles(), manifest);
-		let current = manifest;
+		const remote = await client.listMatchFiles(folderId);
+		const toUpload = matchesToBackUp(loadMatchFiles(), remote);
 		for (const file of toUpload) {
-			const driveFileId = await client.uploadMatch(
-				folderId,
-				file.audit.matchId,
-				file,
-			);
-			current = withManifestEntry(current, file.audit.matchId, driveFileId);
-		}
-		if (toUpload.length > 0) {
-			await client.saveManifest(folderId, fileId, current);
+			await client.uploadMatch(folderId, file.audit.matchId, file);
 		}
 		return { uploaded: toUpload.length };
 	}
 
 	async function restore(): Promise<{ downloaded: number }> {
 		const folderId = await client.ensureFolder();
-		const { manifest } = await client.getManifest(folderId);
+		const remote = await client.listMatchFiles(folderId);
 		const localIds = new Set(loadMatchFiles().map((f) => f.audit.matchId));
-		const toDownload = matchesToRestore(manifest, localIds);
+		const toDownload = matchesToRestore(remote, localIds);
 		const files: MatchFile[] = [];
 		for (const { fileId } of toDownload) {
 			files.push(parseMatchFile(await client.downloadJson(fileId)));
