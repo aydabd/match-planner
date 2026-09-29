@@ -1283,6 +1283,34 @@ button:disabled {
 	font-weight: 600;
 }
 
+.history-chart {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.history-chart h3 {
+	font-size: 0.95rem;
+}
+.history-chart svg {
+	width: 100%;
+	height: auto;
+	min-height: 80px;
+	overflow: visible;
+}
+.history-chart svg text {
+	fill: var(--ink);
+	font:
+		12px system-ui,
+		sans-serif;
+}
+.development-timeline {
+	margin: 0;
+	padding-left: 24px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
 /* ---------- rest time ---------- */
 .bench-rest {
 	display: block;

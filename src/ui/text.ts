@@ -262,6 +262,17 @@ export const TEXT = {
 			`${matches} ${matches === 1 ? "match" : "matcher"} över ${months} ${months === 1 ? "månad" : "månader"}.`,
 		recent: (started: number, of: number) => `${started} av ${of}`,
 		minutes: (seconds: number) => `${Math.round(seconds / 60)} min`,
+		visualizations: {
+			title: "Översikt",
+			monthlyMinutes: "Speltid månad för månad",
+			startFrequency: "Startfrekvens i de senaste matcherna",
+			developmentTimeline: "Utvecklingsanteckningar över tid",
+			noDevelopmentNotes: "Inga utvecklingsanteckningar att visa än.",
+			chartDescription: "Samma uppgifter finns i tabellerna nedan.",
+			minutes: (name: string, minutes: number) => `${name}: ${minutes} minuter`,
+			starts: (name: string, started: number, of: number, percentage: number) =>
+				`${name}: ${started} av ${of} starter (${percentage} procent)`,
+		},
 		startedHint: (name: string, started: number, of: number) =>
 			`${name} har startat ${started} av de senaste ${of} matcherna.`,
 		month(month: string): string {
