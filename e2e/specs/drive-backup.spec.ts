@@ -1,5 +1,9 @@
 import type { BrowserContext } from "@playwright/test";
 import { matchFileToJson } from "../../src/core/matchFile.js";
+import {
+	encryptJson,
+	securePackageToJson,
+} from "../../src/core/securePackage.js";
 import { makeMatchFile, NAMES } from "../../tests/support/matchFiles.js";
 import { expect, test } from "../fixtures.js";
 import { HistoryPage } from "../pages/HistoryPage.js";
@@ -28,7 +32,10 @@ function createFakeDrive() {
 // Every test's page runs on a paused fake clock (see fixtures.ts), so this
 // resolves synchronously rather than via setTimeout - a real setTimeout
 // would never fire without the test advancing match time, which is
-// unrelated to what this is testing.
+// unrelated to what this is testing. The `picker` stand-in fakes Google's
+// hosted folder-picker iframe: build().setVisible() immediately "picks"
+// one fixed fake folder, since driving the real Picker UI is not something
+// Playwright can do without a live Google account.
 const GIS_SCRIPT = `window.google = {
 	accounts: {
 		oauth2: {
@@ -41,7 +48,33 @@ const GIS_SCRIPT = `window.google = {
 			},
 		},
 	},
+	picker: {
+		DocsView: function () {
+			return { setSelectFolderEnabled() { return this; }, setIncludeFolders() { return this; } };
+		},
+		PickerBuilder: function () {
+			let callback = null;
+			return {
+				addView() { return this; },
+				setOAuthToken() { return this; },
+				setAppId() { return this; },
+				setDeveloperKey() { return this; },
+				setCallback(cb) { callback = cb; return this; },
+				build() {
+					return {
+						setVisible() {
+							callback({ action: "picked", docs: [{ id: "folder-1", name: "MatchPlanner-mapp" }] });
+						},
+					};
+				},
+			};
+		},
+		ViewId: { FOLDERS: "folders" },
+		Action: { PICKED: "picked", CANCEL: "cancel" },
+	},
 };`;
+
+const GAPI_SCRIPT = `window.gapi = { load(api, cb) { cb(); } };`;
 
 const BOUNDARY = "matchplanner-drive-boundary";
 const CORS_HEADERS = { "Access-Control-Allow-Origin": "*" };
@@ -55,6 +88,13 @@ async function mockGoogle(
 			contentType: "application/javascript",
 			headers: CORS_HEADERS,
 			body: GIS_SCRIPT,
+		}),
+	);
+	await context.route("https://apis.google.com/js/api.js", (route) =>
+		route.fulfill({
+			contentType: "application/javascript",
+			headers: CORS_HEADERS,
+			body: GAPI_SCRIPT,
 		}),
 	);
 
@@ -217,29 +257,26 @@ test.describe("Google Drive backup and restore", () => {
 		// manifest.json (which also ends in ".json", so must not be mistaken
 		// for a match file) alongside more match files than one Drive
 		// "page" (2, per the fake server above) holds, so restoring them
-		// exercises the nextPageToken loop, not just a single page.
+		// exercises the nextPageToken loop, not just a single page. This
+		// test's fake picker (see GIS_SCRIPT) always "picks" folder id
+		// "folder-1", so that is the id these files are seeded under.
+		const password = "hemligt-lösenord";
 		const drive = createFakeDrive();
 		const folderId = "folder-1";
-		drive.files.set(folderId, {
-			name: "MatchPlanner-säkerhetskopia",
-			mimeType: "application/vnd.google-apps.folder",
-			content: "",
-		});
 		drive.files.set("legacy-manifest", {
 			name: "manifest.json",
 			parents: [folderId],
 			content: JSON.stringify({ schemaVersion: 1, files: {} }),
 		});
 		for (const suffix of ["a", "b", "c"]) {
+			const pkg = await encryptJson(
+				password,
+				makeMatchFile({ matchId: `seed-${suffix}`, names: NAMES.slice(0, 9) }),
+			);
 			drive.files.set(`seed-${suffix}`, {
 				name: `seed-${suffix}.json`,
 				parents: [folderId],
-				content: matchFileToJson(
-					makeMatchFile({
-						matchId: `seed-${suffix}`,
-						names: NAMES.slice(0, 9),
-					}),
-				),
+				content: securePackageToJson(pkg),
 			});
 		}
 		await mockGoogle(page.context(), drive);
@@ -248,6 +285,9 @@ test.describe("Google Drive backup and restore", () => {
 		await history.open();
 		await history.driveConnectButton.click();
 		await expect(history.driveStatus).toHaveText("Kopplad till Google Drive.");
+		await history.driveChooseFolderButton.click();
+		await expect(history.driveStatus).toHaveText("Mapp: MatchPlanner-mapp");
+		await history.drivePasswordInput.fill(password);
 		await history.driveRestoreButton.click();
 		await expect(history.driveStatus).toHaveText("3 matcher lästes in.");
 		await expect(history.count).toHaveText("3 matcher över 1 månad.");
@@ -267,8 +307,13 @@ test.describe("Google Drive backup and restore", () => {
 		await history.importFiles([{ name: "match.json", contents: MATCH }]);
 		await expect(history.count).toHaveText("1 match över 1 månad.");
 
+		const password = "hemligt-lösenord";
+
 		await history.driveConnectButton.click();
 		await expect(history.driveStatus).toHaveText("Kopplad till Google Drive.");
+		await history.driveChooseFolderButton.click();
+		await expect(history.driveStatus).toHaveText("Mapp: MatchPlanner-mapp");
+		await history.drivePasswordInput.fill(password);
 		await expect(history.driveBackupButton).toBeVisible();
 
 		await history.driveBackupButton.click();
@@ -282,7 +327,9 @@ test.describe("Google Drive backup and restore", () => {
 			"Allt var redan säkerhetskopierat.",
 		);
 
-		// A second phone, empty, connected to the same Drive account.
+		// A second phone, empty, connected to the same shared Drive folder -
+		// each coach signs in and picks the folder on their own device (#70);
+		// this test's fake picker always "picks" the same fixed folder id.
 		const otherContext = await browser.newContext({
 			reducedMotion: "reduce",
 			serviceWorkers: "block",
@@ -301,6 +348,19 @@ test.describe("Google Drive backup and restore", () => {
 		await expect(otherHistory.driveStatus).toHaveText(
 			"Kopplad till Google Drive.",
 		);
+		await otherHistory.driveChooseFolderButton.click();
+		await expect(otherHistory.driveStatus).toHaveText(
+			"Mapp: MatchPlanner-mapp",
+		);
+
+		// The wrong password refuses to decrypt instead of importing garbage.
+		await otherHistory.drivePasswordInput.fill("fel lösenord");
+		await otherHistory.driveRestoreButton.click();
+		await expect(otherHistory.driveStatus).toHaveText(
+			"Fel lösenord, eller filen har ändrats. Kontrollera lösenordet och försök igen.",
+		);
+
+		await otherHistory.drivePasswordInput.fill(password);
 		await otherHistory.driveRestoreButton.click();
 		await expect(otherHistory.driveStatus).toHaveText("1 match lästes in.");
 		await expect(otherHistory.count).toHaveText("1 match över 1 månad.");

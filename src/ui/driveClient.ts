@@ -1,22 +1,19 @@
 import type { DriveFileEntry } from "../core/driveSync.js";
-import { type MatchFile, matchFileToJson } from "../core/matchFile.js";
 
 /**
- * The Drive REST calls backup (#56) needs, kept to exactly the drive.file
- * scope allows: create/find the app's own folder, and read/write JSON
- * files in it. No DOM here, but it depends on `fetch`, so - like
- * driveAuth.ts - it lives in src/ui, not src/core.
+ * The Drive REST calls backup (#56, #70) needs, kept to exactly the
+ * `drive.file` scope allows: read/write JSON files in a folder the coach
+ * picked (src/ui/drivePicker.ts). No DOM here, but it depends on `fetch`,
+ * so - like driveAuth.ts - it lives in src/ui, not src/core.
  *
  * Every match file is uploaded once and never edited again (#70's
  * src/core/driveSync.ts comment explains why that matters for concurrent
- * coaches), so there is no "update an existing file" case to handle here -
- * every upload is a plain create.
+ * coaches), so there is no "update an existing file" case to handle here
+ * any more - every upload is a plain create.
  */
 
 const FILES_URL = "https://www.googleapis.com/drive/v3/files";
 const UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files";
-const FOLDER_NAME = "MatchPlanner-säkerhetskopia";
-const FOLDER_MIME = "application/vnd.google-apps.folder";
 const MATCH_FILE_SUFFIX = ".json";
 /** The pre-#70 manifest file name: excluded so an old one left in the
  * folder from before this version is never mistaken for a match file
@@ -25,16 +22,15 @@ const MATCH_FILE_SUFFIX = ".json";
 const LEGACY_MANIFEST_NAME = "manifest.json";
 
 export interface DriveClient {
-	/** The app's backup folder in the coach's Drive, creating it if needed. */
-	ensureFolder(): Promise<string>;
 	/** Every match file already in `folderId`, matchId read from its filename. */
 	listMatchFiles(folderId: string): Promise<DriveFileEntry[]>;
-	/** Upload one match file as `<matchId>.json`. */
+	/** Create `<matchId>.json` in `folderId` holding `contents` verbatim. */
 	uploadMatch(
 		folderId: string,
 		matchId: string,
-		file: MatchFile,
+		contents: string,
 	): Promise<void>;
+	/** The raw parsed JSON of a file by its Drive id. */
 	downloadJson(fileId: string): Promise<unknown>;
 }
 
@@ -54,29 +50,6 @@ async function driveFetch(
 export function createDriveClient(
 	accessToken: () => Promise<string>,
 ): DriveClient {
-	async function findFile(query: string): Promise<string | null> {
-		const token = await accessToken();
-		const url = `${FILES_URL}?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id)`;
-		const response = await driveFetch(token, url);
-		const body = (await response.json()) as { files?: { id: string }[] };
-		return body.files?.[0]?.id ?? null;
-	}
-
-	async function ensureFolder(): Promise<string> {
-		const existing = await findFile(
-			`name='${FOLDER_NAME}' and mimeType='${FOLDER_MIME}' and trashed=false`,
-		);
-		if (existing) return existing;
-		const token = await accessToken();
-		const response = await driveFetch(token, `${FILES_URL}?fields=id`, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ name: FOLDER_NAME, mimeType: FOLDER_MIME }),
-		});
-		const body = (await response.json()) as { id: string };
-		return body.id;
-	}
-
 	async function listMatchFiles(folderId: string): Promise<DriveFileEntry[]> {
 		const query = `'${folderId}' in parents and trashed=false`;
 		const entries: DriveFileEntry[] = [];
@@ -120,7 +93,7 @@ export function createDriveClient(
 	async function uploadMatch(
 		folderId: string,
 		matchId: string,
-		file: MatchFile,
+		contents: string,
 	): Promise<void> {
 		const token = await accessToken();
 		const metadata = {
@@ -136,7 +109,7 @@ export function createDriveClient(
 			`--${boundary}`,
 			"Content-Type: application/json",
 			"",
-			matchFileToJson(file),
+			contents,
 			`--${boundary}--`,
 		].join("\r\n");
 		await driveFetch(token, `${UPLOAD_URL}?uploadType=multipart&fields=id`, {
@@ -146,5 +119,5 @@ export function createDriveClient(
 		});
 	}
 
-	return { ensureFolder, listMatchFiles, uploadMatch, downloadJson };
+	return { listMatchFiles, uploadMatch, downloadJson };
 }

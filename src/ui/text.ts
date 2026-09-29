@@ -310,6 +310,11 @@ export const TEXT = {
 		drive: {
 			signedIn: "Kopplad till Google Drive.",
 			connecting: "Kopplar till Google Drive …",
+			choosingFolder: "Öppnar mappväljaren …",
+			chooseFolder: "Välj mapp",
+			changeFolder: "Byt mapp",
+			folderLabel: (name: string) => `Mapp: ${name}`,
+			noFolderChosen: "Ingen mapp vald än.",
 			backingUp: "Säkerhetskopierar …",
 			restoring: "Läser in från Google Drive …",
 			backedUp: (count: number) =>
@@ -320,8 +325,12 @@ export const TEXT = {
 				count === 0
 					? "Inget nytt att läsa in."
 					: `${count} ${count === 1 ? "match" : "matcher"} lästes in.`,
+			needPassword: "Ange ett lösenord för säkerhetskopian först.",
+			wrongPassword:
+				"Fel lösenord, eller filen har ändrats. Kontrollera lösenordet och försök igen.",
 			failed: "Det gick inte att nå Google Drive just nu. Försök igen senare.",
 			signInFailed: "Inloggningen misslyckades eller avbröts.",
+			folderPickerFailed: "Det gick inte att öppna mappväljaren.",
 		},
 		playerNotes: {
 			title: "Anteckningar per spelare",

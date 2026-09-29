@@ -17,3 +17,22 @@ export const DRIVE_CLIENT_ID: string =
  * verification review does not apply.
  */
 export const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+
+/**
+ * The same Cloud project's number, needed as the Picker API's `appId`
+ * (#70). Also a public identifier, same reasoning as DRIVE_CLIENT_ID.
+ */
+export const DRIVE_APP_ID = "283349306270";
+
+/**
+ * Optional: an API key restricted to the Picker API and this site's origin
+ * (Cloud Console: APIs & Services → Credentials → Create credentials → API
+ * key, then "Restrict key" to the Google Picker API and the site's HTTP
+ * referrer). The picker (drivePicker.ts) authenticates with the coach's
+ * own Drive OAuth token, so it works without this key too - set one to
+ * raise the picker's own request quota. Also needs the Picker API itself
+ * enabled for the project if set - the same "enable this API" step #56's
+ * Drive API needed; see driveClient.ts's `driveFetch` for what that
+ * failure looks like when a step like this is missed.
+ */
+export const DRIVE_PICKER_API_KEY = "";

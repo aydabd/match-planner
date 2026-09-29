@@ -19,7 +19,15 @@ export const STORAGE_KEYS = {
 	matches: "matchplanner:matches:v1",
 	/** Availability and development notes per player, for the history (#58). */
 	playerNotes: "matchplanner:playerNotes:v1",
+	/** Drive folder id chosen via the Picker for backup/restore (#70). */
+	driveFolderId: "matchplanner:driveFolderId:v1",
+	/** That folder's display name, so the coach can see where it is (#70). */
+	driveFolderName: "matchplanner:driveFolderName:v1",
 } as const;
+
+// Deliberately absent from STORAGE_KEYS, and never written to localStorage:
+// the Drive backup password (#81). It lives only in memory for the length
+// of one backup/restore call - see driveBackup.ts.
 
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
 
