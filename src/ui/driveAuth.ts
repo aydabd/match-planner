@@ -16,6 +16,40 @@ interface TokenClient {
 	requestAccessToken(options?: { prompt?: string }): void;
 }
 
+/**
+ * The Google Picker classes drivePicker.ts uses (#70). Declared here,
+ * alongside `accounts`, because TypeScript requires every declaration of
+ * `Window.google` across the project to agree on one shape - see
+ * drivePicker.ts's own comment.
+ */
+interface PickerDoc {
+	id: string;
+	name: string;
+}
+
+interface PickerResponse {
+	action: string;
+	docs?: PickerDoc[];
+}
+
+interface PickerView {
+	setSelectFolderEnabled(enabled: boolean): PickerView;
+	setIncludeFolders(include: boolean): PickerView;
+}
+
+interface Picker {
+	setVisible(visible: boolean): void;
+}
+
+interface PickerBuilder {
+	addView(view: PickerView): PickerBuilder;
+	setOAuthToken(token: string): PickerBuilder;
+	setDeveloperKey(key: string): PickerBuilder;
+	setAppId(appId: string): PickerBuilder;
+	setCallback(callback: (response: PickerResponse) => void): PickerBuilder;
+	build(): Picker;
+}
+
 declare global {
 	interface Window {
 		google?: {
@@ -28,6 +62,15 @@ declare global {
 					}): TokenClient;
 				};
 			};
+			picker?: {
+				DocsView: new (viewId: string) => PickerView;
+				PickerBuilder: new () => PickerBuilder;
+				ViewId: { FOLDERS: string };
+				Action: { PICKED: string; CANCEL: string };
+			};
+		};
+		gapi?: {
+			load(api: string, callback: () => void): void;
 		};
 	}
 }

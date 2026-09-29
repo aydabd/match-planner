@@ -7,6 +7,8 @@ export class HistoryPage {
 	readonly messages: Locator;
 	readonly backButton: Locator;
 	readonly driveConnectButton: Locator;
+	readonly driveChooseFolderButton: Locator;
+	readonly drivePasswordInput: Locator;
 	readonly driveBackupButton: Locator;
 	readonly driveRestoreButton: Locator;
 	readonly driveStatus: Locator;
@@ -21,6 +23,12 @@ export class HistoryPage {
 		this.driveConnectButton = this.root.getByRole("button", {
 			name: "Koppla Google Drive",
 		});
+		this.driveChooseFolderButton = this.root.getByRole("button", {
+			name: /Välj mapp|Byt mapp/,
+		});
+		this.drivePasswordInput = this.root.getByLabel(
+			"Lösenord för säkerhetskopian",
+		);
 		this.driveBackupButton = this.root.getByRole("button", {
 			name: "Säkerhetskopiera",
 		});

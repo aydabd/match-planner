@@ -25,14 +25,22 @@ import {
 	type SeasonReport,
 	seasonReportToJson,
 } from "../core/seasonReport.js";
+import { SecurePackageError } from "../core/securePackage.js";
 import {
 	developmentTimeline,
 	monthlyMinutes,
 	recentStartFrequency,
 } from "../core/visualizations.js";
+import { readItem, STORAGE_KEYS, writeItem } from "./appStorage.js";
 import { createDriveAuth } from "./driveAuth.js";
 import { createDriveBackup } from "./driveBackup.js";
-import { DRIVE_CLIENT_ID, DRIVE_SCOPE } from "./driveConfig.js";
+import {
+	DRIVE_APP_ID,
+	DRIVE_CLIENT_ID,
+	DRIVE_PICKER_API_KEY,
+	DRIVE_SCOPE,
+} from "./driveConfig.js";
+import { pickFolder } from "./drivePicker.js";
 import { keepMatchFiles, loadMatchFiles } from "./matchFileStorage.js";
 import { loadPlayerNotes, savePlayerNotes } from "./playerNotesStorage.js";
 import { lineName } from "./reportText.js";
@@ -250,13 +258,25 @@ function buildVisualizationCard(history: SeasonHistory): HTMLElement {
 	return section;
 }
 
-/** Wires the "backup to Google Drive" card; hidden when no client id is set. */
+/**
+ * Wires the "backup to Google Drive" card; hidden when no client id is
+ * set. The folder is chosen via drivePicker.ts (#70) rather than the app
+ * silently creating one, both so it is easy to find and so a folder
+ * shared between coaches can be picked by each of them. Every file is
+ * encrypted with a password the coach types in for each call (#81); it is
+ * never saved anywhere.
+ */
 function setUpDriveBackup(refresh: () => void): void {
 	const card = byId("historyBackupCard");
 	if (DRIVE_CLIENT_ID === "") return;
 	card.hidden = false;
 
 	const connectBtn = byId("driveConnectBtn") as HTMLButtonElement;
+	const chooseFolderBtn = byId("driveChooseFolderBtn") as HTMLButtonElement;
+	const folderStatus = byId("driveFolderStatus");
+	const folderLink = byId("driveFolderLink") as HTMLAnchorElement;
+	const passwordField = byId("drivePasswordField");
+	const passwordInput = byId("drivePasswordInput") as HTMLInputElement;
 	const backupBtn = byId("driveBackupBtn") as HTMLButtonElement;
 	const restoreBtn = byId("driveRestoreBtn") as HTMLButtonElement;
 	const status = byId("driveStatus");
@@ -265,41 +285,102 @@ function setUpDriveBackup(refresh: () => void): void {
 	const auth = createDriveAuth(DRIVE_CLIENT_ID, DRIVE_SCOPE);
 	const backup = createDriveBackup(auth);
 
+	function showFolder(id: string, name: string): void {
+		writeItem(STORAGE_KEYS.driveFolderId, id);
+		writeItem(STORAGE_KEYS.driveFolderName, name);
+		folderLink.textContent = name;
+		folderLink.href = `https://drive.google.com/drive/folders/${id}`;
+		folderStatus.hidden = false;
+		chooseFolderBtn.textContent = t.changeFolder;
+		passwordField.hidden = false;
+		backupBtn.hidden = false;
+		restoreBtn.hidden = false;
+	}
+
+	const storedFolderId = readItem(STORAGE_KEYS.driveFolderId);
+	const storedFolderName = readItem(STORAGE_KEYS.driveFolderName);
+	if (storedFolderId !== null && storedFolderName !== null) {
+		showFolder(storedFolderId, storedFolderName);
+	}
+
 	connectBtn.addEventListener("click", async () => {
 		status.textContent = t.connecting;
 		try {
 			await auth.accessToken();
 			connectBtn.hidden = true;
-			backupBtn.hidden = false;
-			restoreBtn.hidden = false;
+			chooseFolderBtn.hidden = false;
 			status.textContent = t.signedIn;
 		} catch {
 			status.textContent = t.signInFailed;
 		}
 	});
 
+	chooseFolderBtn.addEventListener("click", async () => {
+		status.textContent = t.choosingFolder;
+		chooseFolderBtn.disabled = true;
+		try {
+			const token = await auth.accessToken();
+			const chosen = await pickFolder(
+				token,
+				DRIVE_PICKER_API_KEY,
+				DRIVE_APP_ID,
+			);
+			if (chosen) {
+				showFolder(chosen.id, chosen.name);
+				status.textContent = t.folderLabel(chosen.name);
+			} else {
+				status.textContent = t.noFolderChosen;
+			}
+		} catch {
+			status.textContent = t.folderPickerFailed;
+		} finally {
+			chooseFolderBtn.disabled = false;
+		}
+	});
+
+	function currentFolderId(): string | null {
+		return readItem(STORAGE_KEYS.driveFolderId);
+	}
+
 	backupBtn.addEventListener("click", async () => {
+		const folderId = currentFolderId();
+		if (folderId === null) return;
+		if (passwordInput.value === "") {
+			status.textContent = t.needPassword;
+			return;
+		}
 		status.textContent = t.backingUp;
 		backupBtn.disabled = true;
 		try {
-			const { uploaded } = await backup.backup();
+			const { uploaded } = await backup.backup(folderId, passwordInput.value);
 			status.textContent = t.backedUp(uploaded);
-		} catch {
-			status.textContent = t.failed;
+		} catch (err) {
+			status.textContent =
+				err instanceof SecurePackageError ? t.wrongPassword : t.failed;
 		} finally {
 			backupBtn.disabled = false;
 		}
 	});
 
 	restoreBtn.addEventListener("click", async () => {
+		const folderId = currentFolderId();
+		if (folderId === null) return;
+		if (passwordInput.value === "") {
+			status.textContent = t.needPassword;
+			return;
+		}
 		status.textContent = t.restoring;
 		restoreBtn.disabled = true;
 		try {
-			const { downloaded } = await backup.restore();
+			const { downloaded } = await backup.restore(
+				folderId,
+				passwordInput.value,
+			);
 			status.textContent = t.restored(downloaded);
 			refresh();
-		} catch {
-			status.textContent = t.failed;
+		} catch (err) {
+			status.textContent =
+				err instanceof SecurePackageError ? t.wrongPassword : t.failed;
 		} finally {
 			restoreBtn.disabled = false;
 		}

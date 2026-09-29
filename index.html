@@ -316,9 +316,17 @@
       </section>
       <section class="card" aria-labelledby="historyBackupTitle" id="historyBackupCard" hidden>
         <h2 id="historyBackupTitle">Säkerhetskopiera till Google Drive</h2>
-        <p class="hint">Kopplas till ditt eget Google-konto. Appen sparar bara sina egna filer i Drive - aldrig resten av din Drive.</p>
+        <p class="hint">Kopplas till ditt eget Google-konto. Appen sparar bara sina egna filer i Drive - aldrig resten av din Drive. Filerna krypteras med ett lösenord du väljer, så en mapp du delar med andra ledare är säker även om Drive-behörigheten inte är det.</p>
         <div class="row-buttons">
           <button type="button" id="driveConnectBtn" class="btn btn-secondary">Koppla Google Drive</button>
+          <button type="button" id="driveChooseFolderBtn" class="btn btn-secondary" hidden>Välj mapp</button>
+        </div>
+        <p class="hint" id="driveFolderStatus" hidden>Mapp: <a id="driveFolderLink" href="https://drive.google.com/drive/my-drive" target="_blank" rel="noopener">Google Drive</a></p>
+        <div class="field" id="drivePasswordField" hidden>
+          <label class="field-label" for="drivePasswordInput">Lösenord för säkerhetskopian</label>
+          <input type="password" id="drivePasswordInput" autocomplete="off">
+        </div>
+        <div class="row-buttons">
           <button type="button" id="driveBackupBtn" class="btn btn-secondary" hidden>Säkerhetskopiera</button>
           <button type="button" id="driveRestoreBtn" class="btn btn-secondary" hidden>Återställ</button>
         </div>
