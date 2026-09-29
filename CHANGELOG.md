@@ -3,6 +3,19 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.12.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.11.0...matchplanner-v0.12.0) (2026-09-29)
+
+
+### Features
+
+* **core:** add WebCrypto-based secure package and UUIDv5 identity ([#85](https://github.com/aydabd/match-planner/issues/85)) ([4744ca2](https://github.com/aydabd/match-planner/commit/4744ca216542590cac1a2483359c756b969f8d86))
+* **history:** pick a shared Drive folder and encrypt what's backed up ([#87](https://github.com/aydabd/match-planner/issues/87)) ([1b9c326](https://github.com/aydabd/match-planner/commit/1b9c326e8319ce7e140f364ee9abe4bcd5f9310a))
+
+
+### Bug Fixes
+
+* **ui:** back up and restore by listing the Drive folder ([#86](https://github.com/aydabd/match-planner/issues/86)) ([e611f05](https://github.com/aydabd/match-planner/commit/e611f05fa0443d54f4f75447c8cf44b1ae023b7f))
+
 ## [0.11.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.10.0...matchplanner-v0.11.0) (2026-09-29)
 
 

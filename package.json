@@ -1,6 +1,6 @@
 {
 	"name": "matchplanner",
-	"version": "0.11.0",
+	"version": "0.12.0",
 	"private": true,
 	"description": "Rattvis byteshanterare for ungdomsfotboll (5v5/7v7/9v9/11v11). Ren statisk PWA, inga runtime-beroenden.",
 	"type": "module",
