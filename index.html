@@ -47,6 +47,10 @@
           </fieldset>
           <div class="field-grid">
             <div class="field">
+              <label class="field-label" for="regionSelect">Distrikt</label>
+              <select id="regionSelect"></select>
+            </div>
+            <div class="field">
               <label class="field-label" for="periodsInput">Perioder</label>
               <input id="periodsInput" type="number" inputmode="numeric" />
             </div>
@@ -60,6 +64,7 @@
               <span class="field-help" id="rotationMinutesHelp">Hela laget roteras så här ofta.</span>
             </div>
           </div>
+          <p class="field-help" id="regionOverrideNote" role="status" hidden></p>
         </li>
 
         <li class="card step">
