@@ -48,17 +48,49 @@ function table(
 export interface ReportView {
 	/** Fill the report screen from a report (the caller shows the screen). */
 	show: (stored: StoredReport) => void;
+}
+
+export interface ReportList {
 	/** Rebuild the list of kept reports on the setup screen. */
 	refreshList: () => void;
 }
 
 /**
- * The match report screen and the list of kept reports on the setup screen.
- * Every number comes from the report; nothing is calculated here.
+ * The list of kept reports on the setup screen: its own factory, so Start
+ * can offer it without pulling in the full report display (and the DOM it
+ * requires) that only the standalone /report/ page needs.
  */
-export function createReportView(callbacks: {
+export function createReportList(callbacks: {
 	onOpen: (stored: StoredReport) => void;
-}): ReportView {
+}): ReportList {
+	function refreshList(): void {
+		const reports = loadReports();
+		const section = byId("reportsSection");
+		section.hidden = reports.length === 0;
+		const list = byId("reportList");
+		list.replaceChildren();
+		for (const stored of reports) {
+			const button = document.createElement("button");
+			button.type = "button";
+			button.className = "btn btn-secondary";
+			const when = (stored.match.date || stored.savedAt).slice(0, 10);
+			button.textContent = TEXT.report.listItem(
+				when,
+				stored.match.opponent || TEXT.report.unnamedMatch,
+			);
+			button.addEventListener("click", () => callbacks.onOpen(stored));
+			list.append(button);
+		}
+	}
+
+	return { refreshList };
+}
+
+/**
+ * The match report screen: shows one report and lets the coach copy or
+ * save it. Every number comes from the report; nothing is calculated here.
+ */
+export function createReportView(): ReportView {
 	let shown: StoredReport | null = null;
 	const status = byId("reportShareStatus");
 
@@ -156,26 +188,6 @@ export function createReportView(callbacks: {
 		);
 	}
 
-	function refreshList(): void {
-		const reports = loadReports();
-		const section = byId("reportsSection");
-		section.hidden = reports.length === 0;
-		const list = byId("reportList");
-		list.replaceChildren();
-		for (const stored of reports) {
-			const button = document.createElement("button");
-			button.type = "button";
-			button.className = "btn btn-secondary";
-			const when = (stored.match.date || stored.savedAt).slice(0, 10);
-			button.textContent = TEXT.report.listItem(
-				when,
-				stored.match.opponent || TEXT.report.unnamedMatch,
-			);
-			button.addEventListener("click", () => callbacks.onOpen(stored));
-			list.append(button);
-		}
-	}
-
 	byId("reportCopyBtn").addEventListener("click", async () => {
 		if (!shown) return;
 		try {
@@ -212,5 +224,5 @@ export function createReportView(callbacks: {
 		if (file) download(matchFileName(file), matchFileToJson(file));
 	});
 
-	return { show, refreshList };
+	return { show };
 }
