@@ -127,9 +127,13 @@ export async function decryptJson(
 	password: string,
 	pkg: SecurePackage,
 ): Promise<unknown> {
-	const key = await deriveKey(password, fromBase64(pkg.salt));
 	let plaintext: ArrayBuffer;
 	try {
+		// The salt decode lives in this try too: parseSecurePackage only
+		// guarantees `salt` is a non-empty string, not valid base64, so a
+		// corrupted or tampered file must fail the same way a wrong password
+		// does, not escape as a raw atob() exception.
+		const key = await deriveKey(password, fromBase64(pkg.salt));
 		plaintext = await crypto.subtle.decrypt(
 			{ name: "AES-GCM", iv: fromBase64(pkg.nonce) as BufferSource },
 			key,

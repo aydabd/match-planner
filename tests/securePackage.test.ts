@@ -51,6 +51,14 @@ describe("encryptJson / decryptJson - round trip", () => {
 		);
 	});
 
+	it("refuses a salt that is not valid base64, as a SecurePackageError", async () => {
+		const pkg = await encryptJson("pw", { secret: true });
+		const corrupted = { ...pkg, salt: "not valid base64!!" };
+		await expect(decryptJson("pw", corrupted)).rejects.toThrow(
+			SecurePackageError,
+		);
+	});
+
 	it("round-trips a package through JSON text", async () => {
 		const pkg = await encryptJson("pw", { a: 1 });
 		const roundTripped = parseSecurePackage(
