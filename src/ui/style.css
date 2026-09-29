@@ -109,17 +109,16 @@ body {
 	flex-direction: column;
 	gap: 16px;
 }
-.view.hidden {
-	display: none;
-}
 /* Pages toggle an empty state against real content via the `hidden`
- * property (src/ui/pages/report.ts and .../match.ts), not this class - a
- * plain `[hidden]` would otherwise lose to `.view`'s own `display: flex`. */
+ * property (src/ui/pages/report.ts and .../match.ts) - a plain `[hidden]`
+ * would otherwise lose to `.view`'s own `display: flex`. */
 .view[hidden] {
 	display: none;
 }
 @media (min-width: 900px) {
-	.app:has(.view-match:not(.hidden)) {
+	/* #matchView, not just .view-match: the empty state on /match/ (see
+	 * src/ui/pages/match.ts) has no match to show and stays narrow. */
+	.app:has(#matchView:not([hidden])) {
 		max-width: 1080px;
 	}
 }
@@ -701,12 +700,6 @@ button:disabled {
 		gap: 16px;
 	}
 }
-@media (max-width: 479px) {
-	.view-match .brand-name {
-		display: none;
-	}
-}
-
 /* ---------- clock: the one loud element ---------- */
 .clock {
 	gap: 8px;
