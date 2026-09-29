@@ -309,6 +309,16 @@
         <div class="hint" role="status"><ul class="history-messages" id="historyMessages"></ul></div>
         <p class="hint" id="historyCount"></p>
       </section>
+      <section class="card" aria-labelledby="historyBackupTitle" id="historyBackupCard" hidden>
+        <h2 id="historyBackupTitle">Säkerhetskopiera till Google Drive</h2>
+        <p class="hint">Kopplas till ditt eget Google-konto. Appen sparar bara sina egna filer i Drive - aldrig resten av din Drive.</p>
+        <div class="row-buttons">
+          <button type="button" id="driveConnectBtn" class="btn btn-secondary">Koppla Google Drive</button>
+          <button type="button" id="driveBackupBtn" class="btn btn-secondary" hidden>Säkerhetskopiera</button>
+          <button type="button" id="driveRestoreBtn" class="btn btn-secondary" hidden>Återställ</button>
+        </div>
+        <p class="hint" id="driveStatus" role="status"></p>
+      </section>
       <div id="historyResults" class="policy-rules"></div>
     </section>
 

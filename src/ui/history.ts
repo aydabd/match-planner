@@ -4,6 +4,9 @@ import {
 	MatchFileError,
 	parseMatchFile,
 } from "../core/matchFile.js";
+import { createDriveAuth } from "./driveAuth.js";
+import { createDriveBackup } from "./driveBackup.js";
+import { DRIVE_CLIENT_ID, DRIVE_SCOPE } from "./driveConfig.js";
 import { keepMatchFiles, loadMatchFiles } from "./matchFileStorage.js";
 import { lineName } from "./reportText.js";
 import { TEXT } from "./text.js";
@@ -51,6 +54,62 @@ function table(
 		});
 	}
 	return el;
+}
+
+/** Wires the "backup to Google Drive" card; hidden when no client id is set. */
+function setUpDriveBackup(refresh: () => void): void {
+	const card = byId("historyBackupCard");
+	if (DRIVE_CLIENT_ID === "") return;
+	card.hidden = false;
+
+	const connectBtn = byId("driveConnectBtn") as HTMLButtonElement;
+	const backupBtn = byId("driveBackupBtn") as HTMLButtonElement;
+	const restoreBtn = byId("driveRestoreBtn") as HTMLButtonElement;
+	const status = byId("driveStatus");
+	const t = TEXT.history.drive;
+
+	const auth = createDriveAuth(DRIVE_CLIENT_ID, DRIVE_SCOPE);
+	const backup = createDriveBackup(auth);
+
+	connectBtn.addEventListener("click", async () => {
+		status.textContent = t.connecting;
+		try {
+			await auth.accessToken();
+			connectBtn.hidden = true;
+			backupBtn.hidden = false;
+			restoreBtn.hidden = false;
+			status.textContent = t.signedIn;
+		} catch {
+			status.textContent = t.signInFailed;
+		}
+	});
+
+	backupBtn.addEventListener("click", async () => {
+		status.textContent = t.backingUp;
+		backupBtn.disabled = true;
+		try {
+			const { uploaded } = await backup.backup();
+			status.textContent = t.backedUp(uploaded);
+		} catch {
+			status.textContent = t.failed;
+		} finally {
+			backupBtn.disabled = false;
+		}
+	});
+
+	restoreBtn.addEventListener("click", async () => {
+		status.textContent = t.restoring;
+		restoreBtn.disabled = true;
+		try {
+			const { downloaded } = await backup.restore();
+			status.textContent = t.restored(downloaded);
+			refresh();
+		} catch {
+			status.textContent = t.failed;
+		} finally {
+			restoreBtn.disabled = false;
+		}
+	});
 }
 
 /**
@@ -176,6 +235,8 @@ export function createHistoryView(): { refresh: () => void } {
 		}
 		refresh();
 	});
+
+	setUpDriveBackup(refresh);
 
 	return { refresh };
 }

@@ -6,12 +6,26 @@ export class HistoryPage {
 	readonly count: Locator;
 	readonly messages: Locator;
 	readonly backButton: Locator;
+	readonly driveConnectButton: Locator;
+	readonly driveBackupButton: Locator;
+	readonly driveRestoreButton: Locator;
+	readonly driveStatus: Locator;
 
 	constructor(private readonly page: Page) {
 		this.root = page.locator("#historyView");
 		this.count = this.root.locator("#historyCount");
 		this.messages = this.root.locator("#historyMessages li");
 		this.backButton = this.root.getByRole("button", { name: "Tillbaka" });
+		this.driveConnectButton = this.root.getByRole("button", {
+			name: "Koppla Google Drive",
+		});
+		this.driveBackupButton = this.root.getByRole("button", {
+			name: "Säkerhetskopiera",
+		});
+		this.driveRestoreButton = this.root.getByRole("button", {
+			name: "Återställ",
+		});
+		this.driveStatus = this.root.locator("#driveStatus");
 	}
 
 	/** Open it from the setup screen. */
