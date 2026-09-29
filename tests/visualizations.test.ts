@@ -62,12 +62,14 @@ describe("season visualization models", () => {
 	});
 
 	it("returns zero when a player has no recent matches", () => {
+		const firstPlayer = history.players[0];
+		if (!firstPlayer) throw new Error("fixture missing first player");
 		const noRecentMatches: SeasonHistory = {
 			...history,
 			players: [
 				...history.players,
 				{
-					...history.players[0]!,
+					...firstPlayer,
 					key: "cedric",
 					name: "Cedric",
 					recent: { started: 0, of: 0 },
