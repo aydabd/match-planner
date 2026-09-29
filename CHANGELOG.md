@@ -3,6 +3,16 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.8.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.7.0...matchplanner-v0.8.0) (2026-09-29)
+
+
+### Features
+
+* **history:** a player-notes model for availability and development ([#65](https://github.com/aydabd/match-planner/issues/65)) ([b55c300](https://github.com/aydabd/match-planner/commit/b55c300c843724f0f7ad30862e20d46ad51b29c6))
+* **history:** back up and restore match files via Google Drive ([#66](https://github.com/aydabd/match-planner/issues/66)) ([6df3fb2](https://github.com/aydabd/match-planner/commit/6df3fb248fc35b37ead3063a1c422c375d782e5e))
+* **history:** plan Google Drive backup and restore of match files ([#61](https://github.com/aydabd/match-planner/issues/61)) ([f3c7c95](https://github.com/aydabd/match-planner/commit/f3c7c9520b9236edcdbd3a2a8e3793d303595906))
+* **policy:** region-aware policy and a squad file's region ([#60](https://github.com/aydabd/match-planner/issues/60)) ([4f8f34e](https://github.com/aydabd/match-planner/commit/4f8f34e4b8c790b6cf8331ed219fcd8313f6ff46)), closes [#55](https://github.com/aydabd/match-planner/issues/55)
+
 ## [0.7.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.6.0...matchplanner-v0.7.0) (2026-09-28)
 
 
