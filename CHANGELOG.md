@@ -3,6 +3,19 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.10.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.9.0...matchplanner-v0.10.0) (2026-09-29)
+
+
+### Features
+
+* **setup:** allow half-minute rotation intervals ([#77](https://github.com/aydabd/match-planner/issues/77)) ([e4716d5](https://github.com/aydabd/match-planner/commit/e4716d52291bae2e2ffce61dd5f60811dad137c7))
+* **setup:** let a coach pick their region, and flag policy overrides ([#78](https://github.com/aydabd/match-planner/issues/78)) ([cc0d8c0](https://github.com/aydabd/match-planner/commit/cc0d8c0f78506273065d6d029b768e539a616209)), closes [#69](https://github.com/aydabd/match-planner/issues/69)
+
+
+### Bug Fixes
+
+* **report:** don't count a keeper's guaranteed time against outfield fairness ([#79](https://github.com/aydabd/match-planner/issues/79)) ([9865124](https://github.com/aydabd/match-planner/commit/9865124244db433a2b54620117eef44aa4fbf2c4))
+
 ## [0.9.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.8.0...matchplanner-v0.9.0) (2026-09-29)
 
 
