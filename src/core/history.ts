@@ -128,7 +128,7 @@ export function matchesForPlayer(
 	files: readonly MatchFile[],
 	map: PlayerIdMap,
 	key: string,
-): { matchId: string; opponent: string; date: string }[] {
+): { matchId: string; opponent: string; date: string; formatId: string }[] {
 	return mergeMatchFiles([], files)
 		.files.filter((f) =>
 			f.squad.players.some((p) => playerId(map, p.name) === key),
@@ -137,6 +137,7 @@ export function matchesForPlayer(
 			matchId: f.audit.matchId,
 			opponent: f.match.opponent,
 			date: whenOf(f),
+			formatId: f.setup.formatId,
 		}));
 }
 

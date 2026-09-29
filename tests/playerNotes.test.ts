@@ -7,6 +7,7 @@ import {
 	playerNotesFileToJson,
 	seasonFeedback,
 	withAvailability,
+	withCheckpoint,
 	withDevelopment,
 } from "../src/core/playerNotes.js";
 import { makeMatchFile, NAMES, playerIdMapFor } from "./support/matchFiles.js";
@@ -35,6 +36,33 @@ describe("PlayerNotesFile - parsing and round trip", () => {
 		expect(
 			parsePlayerNotesFile(JSON.parse(playerNotesFileToJson(withBoth))),
 		).toEqual(withBoth);
+	});
+
+	it("round-trips a file with a checkpoint entry", () => {
+		const withCp = withCheckpoint(
+			EMPTY_PLAYER_NOTES_FILE,
+			"alva",
+			"technical",
+			1,
+			"2026-09-05",
+		);
+		expect(
+			parsePlayerNotesFile(JSON.parse(playerNotesFileToJson(withCp))),
+		).toEqual(withCp);
+	});
+
+	it("defaults checkpoints to an empty list for a file saved before #109", () => {
+		expect(
+			parsePlayerNotesFile({
+				schemaVersion: 1,
+				players: [{ key: "a", availability: [], development: [] }],
+			}),
+		).toEqual({
+			schemaVersion: 1,
+			players: [
+				{ key: "a", availability: [], development: [], checkpoints: [] },
+			],
+		});
 	});
 
 	it.each([
@@ -147,6 +175,29 @@ describe("PlayerNotesFile - parsing and round trip", () => {
 				],
 			},
 		],
+		[
+			"a checkpoint with an area that is not recognised",
+			{
+				schemaVersion: 1,
+				players: [
+					{
+						key: "a",
+						availability: [],
+						development: [],
+						checkpoints: [{ area: "spiritual", level: 1, date: "2026-09-05" }],
+					},
+				],
+			},
+		],
+		[
+			"checkpoints that is not a list",
+			{
+				schemaVersion: 1,
+				players: [
+					{ key: "a", availability: [], development: [], checkpoints: {} },
+				],
+			},
+		],
 	])("rejects %s", (_, raw) => {
 		expect(() => parsePlayerNotesFile(raw)).toThrow(PlayerNotesError);
 	});
@@ -163,6 +214,7 @@ describe("withAvailability - recording one match's availability", () => {
 				key: "alva",
 				availability: [{ matchId: "m1", status: "available" }],
 				development: [],
+				checkpoints: [],
 			},
 		]);
 	});
@@ -232,6 +284,47 @@ describe("withDevelopment - recording a development note", () => {
 		expect(notes).toHaveLength(200);
 		expect(notes[0]?.note).toBe("note-1");
 		expect(notes[199]?.note).toBe("note-200");
+	});
+});
+
+describe("withCheckpoint - marking a development level reached", () => {
+	it("adds a level for a player who has no notes yet", () => {
+		const file = withCheckpoint(
+			EMPTY_PLAYER_NOTES_FILE,
+			"alva",
+			"technical",
+			1,
+			"2026-09-05",
+		);
+		expect(file.players[0]?.checkpoints).toEqual([
+			{ area: "technical", level: 1, date: "2026-09-05" },
+		]);
+	});
+
+	it("keeps other areas and levels untouched", () => {
+		const first = withCheckpoint(
+			EMPTY_PLAYER_NOTES_FILE,
+			"alva",
+			"technical",
+			1,
+			"2026-01-01",
+		);
+		const second = withCheckpoint(first, "alva", "mental", 1, "2026-02-01");
+		expect(second.players[0]?.checkpoints).toEqual([
+			{ area: "technical", level: 1, date: "2026-01-01" },
+			{ area: "mental", level: 1, date: "2026-02-01" },
+		]);
+	});
+
+	it("does not mutate the file it was given", () => {
+		withCheckpoint(
+			EMPTY_PLAYER_NOTES_FILE,
+			"alva",
+			"technical",
+			1,
+			"2026-09-05",
+		);
+		expect(EMPTY_PLAYER_NOTES_FILE.players).toEqual([]);
 	});
 });
 

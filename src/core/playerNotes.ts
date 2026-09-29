@@ -1,3 +1,10 @@
+import {
+	type CheckpointEvent,
+	DEVELOPMENT_AREAS,
+	type DevelopmentArea,
+	isValidCheckpointEvent,
+	withCheckpointReached,
+} from "./developmentCheckpoints.js";
 import type { SeasonHistory } from "./history.js";
 import { LIMITS } from "./limits.js";
 
@@ -17,7 +24,10 @@ import { LIMITS } from "./limits.js";
 
 export type AvailabilityStatus = "available" | "absent";
 export type AbsenceReason = "injury" | "illness" | "other";
-export type DevelopmentArea = "physical" | "mental" | "technical" | "tactical";
+export type {
+	CheckpointEvent,
+	DevelopmentArea,
+} from "./developmentCheckpoints.js";
 
 /** One match's (or session's) availability for one player. */
 export interface AvailabilityEntry {
@@ -42,6 +52,8 @@ export interface PlayerNotes {
 	availability: AvailabilityEntry[];
 	/** Newest last; capped at LIMITS.developmentNotesPerPlayer. */
 	development: DevelopmentEntry[];
+	/** Highest level reached per area (developmentCheckpoints.ts, #109). */
+	checkpoints: CheckpointEvent[];
 }
 
 export interface PlayerNotesFile {
@@ -59,7 +71,8 @@ export type PlayerNotesProblem =
 	| { code: "schemaVersion" }
 	| { code: "players" }
 	| { code: "availability" }
-	| { code: "development" };
+	| { code: "development" }
+	| { code: "checkpoints" };
 
 export class PlayerNotesError extends Error {
 	constructor(
@@ -83,12 +96,6 @@ const ABSENCE_REASONS: readonly AbsenceReason[] = [
 	"injury",
 	"illness",
 	"other",
-];
-const DEVELOPMENT_AREAS: readonly DevelopmentArea[] = [
-	"physical",
-	"mental",
-	"technical",
-	"tactical",
 ];
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -154,6 +161,15 @@ function parseDevelopment(raw: unknown): DevelopmentEntry {
 	};
 }
 
+function parseCheckpoint(raw: unknown): CheckpointEvent {
+	if (!isValidCheckpointEvent(raw)) {
+		throw new PlayerNotesError("Invalid checkpoint entry", {
+			code: "checkpoints",
+		});
+	}
+	return raw;
+}
+
 function parsePlayerNotes(raw: unknown): PlayerNotes {
 	const fail = () =>
 		new PlayerNotesError("Invalid player notes entry", { code: "players" });
@@ -162,10 +178,15 @@ function parsePlayerNotes(raw: unknown): PlayerNotes {
 	if (!Array.isArray(raw.availability) || !Array.isArray(raw.development)) {
 		throw fail();
 	}
+	// Additive (#109): older files have no checkpoints at all, which simply
+	// means none were recorded yet - not something to guess at or refuse.
+	const rawCheckpoints = raw.checkpoints === undefined ? [] : raw.checkpoints;
+	if (!Array.isArray(rawCheckpoints)) throw fail();
 	return {
 		key: raw.key,
 		availability: raw.availability.map(parseAvailability),
 		development: raw.development.map(parseDevelopment),
+		checkpoints: rawCheckpoints.map(parseCheckpoint),
 	};
 }
 
@@ -199,6 +220,7 @@ function notesOf(file: PlayerNotesFile, key: string): PlayerNotes {
 			key,
 			availability: [],
 			development: [],
+			checkpoints: [],
 		}
 	);
 }
@@ -256,6 +278,28 @@ export function withDevelopment(
 		-LIMITS.developmentNotesPerPlayer,
 	);
 	return withPlayerNotes(file, key, { ...current, development });
+}
+
+/**
+ * Mark `level` in `area` reached for a player on `date`, given by their
+ * playerIdentity.ts id. Re-marking the same level replaces its date. The
+ * file given is left unchanged.
+ */
+export function withCheckpoint(
+	file: PlayerNotesFile,
+	key: string,
+	area: DevelopmentArea,
+	level: number,
+	date: string,
+): PlayerNotesFile {
+	const current = notesOf(file, key);
+	const checkpoints = withCheckpointReached(
+		current.checkpoints,
+		area,
+		level,
+		date,
+	);
+	return withPlayerNotes(file, key, { ...current, checkpoints });
 }
 
 /** A finding for the coach; src/ui/text.ts turns it into a sentence. */

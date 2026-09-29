@@ -1,15 +1,24 @@
+import {
+	DEVELOPMENT_AREAS as AREAS,
+	currentLevel,
+	type DevelopmentArea,
+} from "./developmentCheckpoints.js";
 import type { SeasonHistory } from "./history.js";
-import type {
-	AbsenceReason,
-	DevelopmentArea,
-	PlayerNotesFile,
-} from "./playerNotes.js";
+import type { AbsenceReason, PlayerNotesFile } from "./playerNotes.js";
 
-export const SEASON_REPORT_SCHEMA_VERSION = 1;
+export const SEASON_REPORT_SCHEMA_VERSION = 2;
 
 export interface DevelopmentSummary {
 	area: DevelopmentArea;
 	summary: string;
+}
+
+/** A player's checkpoint level (developmentCheckpoints.ts, #109) at report time. */
+export interface DevelopmentLevel {
+	area: DevelopmentArea;
+	level: number;
+	/** That area's ladder length for the squad's current team size. */
+	of: number;
 }
 
 export interface PlayerSeasonReport {
@@ -24,27 +33,28 @@ export interface PlayerSeasonReport {
 	};
 	/** Coach-reviewed before export; initially derived from development notes. */
 	developmentSummary: DevelopmentSummary[];
+	developmentLevels: DevelopmentLevel[];
 }
 
 export interface SeasonReport {
-	schemaVersion: 1;
+	schemaVersion: 2;
 	generatedAt: string;
 	players: PlayerSeasonReport[];
 }
 
-const AREAS: readonly DevelopmentArea[] = [
-	"physical",
-	"mental",
-	"technical",
-	"tactical",
-];
-
 const REASONS: readonly AbsenceReason[] = ["injury", "illness", "other"];
 
+/**
+ * `levelCounts` is each area's ladder length for the squad's current team
+ * size (developmentCheckpoints.ts's ladders are UI text - src/ui/text.ts's
+ * TEXT.history.checkpoints.ladders - so the caller, not this core module,
+ * looks the counts up and hands them in).
+ */
 export function buildSeasonReport(
 	history: SeasonHistory,
 	notes: PlayerNotesFile,
 	generatedAt: string,
+	levelCounts: Record<DevelopmentArea, number>,
 ): SeasonReport {
 	return {
 		schemaVersion: SEASON_REPORT_SCHEMA_VERSION,
@@ -85,6 +95,11 @@ export function buildSeasonReport(
 							.filter((entry) => entry.area === area)
 							.map((entry) => entry.note)
 							.join(" · ") ?? "",
+				})),
+				developmentLevels: AREAS.map((area) => ({
+					area,
+					level: currentLevel(own?.checkpoints ?? [], area),
+					of: levelCounts[area],
 				})),
 			};
 		}),
@@ -142,11 +157,23 @@ export function isSeasonReport(value: unknown): value is SeasonReport {
 		)
 			return false;
 		if (!Array.isArray(raw.developmentSummary)) return false;
-		return raw.developmentSummary.every(
+		if (
+			!raw.developmentSummary.every(
+				(entry) =>
+					isRecord(entry) &&
+					AREAS.includes(entry.area as DevelopmentArea) &&
+					typeof entry.summary === "string",
+			)
+		) {
+			return false;
+		}
+		if (!Array.isArray(raw.developmentLevels)) return false;
+		return raw.developmentLevels.every(
 			(entry) =>
 				isRecord(entry) &&
 				AREAS.includes(entry.area as DevelopmentArea) &&
-				typeof entry.summary === "string",
+				isNumber(entry.level) &&
+				isNumber(entry.of),
 		);
 	});
 }

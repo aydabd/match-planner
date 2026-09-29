@@ -1,3 +1,4 @@
+import { DEVELOPMENT_AREAS as AREAS } from "../core/developmentCheckpoints.js";
 import {
 	EXPORT_BUNDLE_VERSION,
 	type ExportBundle,
@@ -486,12 +487,6 @@ function setUpSecureExport(refresh: () => void): void {
 
 /** Which of the reason keys TEXT.history.playerNotes.reason declares. */
 const REASONS: readonly AbsenceReason[] = ["injury", "illness", "other"];
-const AREAS: readonly DevelopmentArea[] = [
-	"physical",
-	"mental",
-	"technical",
-	"tactical",
-];
 
 function downloadJson(fileName: string, json: string): void {
 	const blob = new Blob([json], { type: "application/json" });
@@ -502,6 +497,15 @@ function downloadJson(fileName: string, json: string): void {
 	link.click();
 	URL.revokeObjectURL(url);
 }
+
+// TODO(#109): replace with each ladder's real length once the checkpoint
+// catalog lands in text.ts - every ladder happens to be 4 levels today.
+const LEVEL_COUNTS: Record<DevelopmentArea, number> = {
+	physical: 4,
+	mental: 4,
+	technical: 4,
+	tactical: 4,
+};
 
 function buildSeasonReportCard(history: SeasonHistory): HTMLElement {
 	const t = TEXT.history.seasonReport;
@@ -516,6 +520,7 @@ function buildSeasonReportCard(history: SeasonHistory): HTMLElement {
 		history,
 		loadPlayerNotes(),
 		new Date().toISOString(),
+		LEVEL_COUNTS,
 	);
 	const summaryInputs = new Map<
 		string,
