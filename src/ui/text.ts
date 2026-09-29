@@ -297,6 +297,53 @@ export const TEXT = {
 			failed: "Det gick inte att nå Google Drive just nu. Försök igen senare.",
 			signInFailed: "Inloggningen misslyckades eller avbröts.",
 		},
+		playerNotes: {
+			title: "Anteckningar per spelare",
+			choosePlayer: "Välj spelare",
+			availabilityTitle: "Närvaro per match",
+			chooseMatch: "Välj match",
+			noMatchesYet: "Inga matcher med den här spelaren i truppen än.",
+			matchLabel: (opponent: string, date: string) =>
+				`${opponent || "Match"} (${date})`,
+			statusAvailable: "Var med",
+			statusAbsent: "Frånvarande",
+			reason: {
+				injury: "Skada",
+				illness: "Sjukdom",
+				other: "Annat",
+			},
+			notePlaceholder: "Anteckning (valfritt)",
+			saveAvailability: "Spara närvaro",
+			currentAvailability(
+				status: "available" | "absent",
+				reason: "injury" | "illness" | "other" | undefined,
+			): string {
+				if (status === "available") return "Sparat: var med.";
+				const reasons = {
+					injury: "skada",
+					illness: "sjukdom",
+					other: "annat",
+				} as const;
+				return `Sparat: frånvarande${reason ? ` (${reasons[reason]})` : ", ingen anledning angiven"}.`;
+			},
+			developmentTitle: "Utvecklingsanteckningar",
+			area: {
+				physical: "Fysiskt",
+				mental: "Mentalt",
+				technical: "Tekniskt",
+				tactical: "Taktiskt",
+			},
+			developmentNotePlaceholder: "Vad har du sett?",
+			addDevelopmentNote: "Lägg till anteckning",
+			noNotesYet: "Inga anteckningar än.",
+			developmentNote: (date: string, area: string, note: string) =>
+				`${date} · ${area}: ${note}`,
+			feedbackTitle: "Värt att titta på",
+			unexplainedAbsences: (name: string, count: number) =>
+				`${name}: ${count} ${count === 1 ? "frånvaro" : "frånvaron"} utan angiven anledning.`,
+			noDevelopmentNotes: (name: string, matches: number) =>
+				`${name}: ingen utvecklingsanteckning trots ${matches} matcher i truppen.`,
+		},
 		problem(problem: MatchFileProblem): string {
 			switch (problem.code) {
 				case "notObject":

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildHistory, mergeMatchFiles } from "../src/core/history.js";
+import {
+	buildHistory,
+	matchesForPlayer,
+	mergeMatchFiles,
+} from "../src/core/history.js";
 import type { MatchFile } from "../src/core/matchFile.js";
 import { secondsPlayed } from "../src/core/timeline.js";
 import { makeMatchFile, NAMES, seeded } from "./support/matchFiles.js";
@@ -251,5 +255,39 @@ describe("season history: it can be trusted", () => {
 	it("covers six months or more", () => {
 		const history = buildHistory(files);
 		expect(history.months.length).toBeGreaterThanOrEqual(6);
+	});
+});
+
+describe("matchesForPlayer - which matches a player was in the squad for", () => {
+	it("lists only the matches that player's squad included, oldest first", () => {
+		const a = makeMatchFile({
+			matchId: "a",
+			date: "2026-03-01",
+			opponent: "Först",
+			names: ["Alva", "Bo", "Cleo", "Dino", "Ebba", "Filip", "Greta", "Hugo"],
+		});
+		const b = makeMatchFile({
+			matchId: "b",
+			date: "2026-04-01",
+			opponent: "Sen",
+			names: ["Bo", "Cleo", "Dino", "Ebba", "Filip", "Greta", "Hugo", "Ines"],
+		});
+		expect(matchesForPlayer([b, a], "alva")).toEqual([
+			{ matchId: "a", opponent: "Först", date: "2026-03-01" },
+		]);
+		expect(matchesForPlayer([b, a], "bo")).toEqual([
+			{ matchId: "a", opponent: "Först", date: "2026-03-01" },
+			{ matchId: "b", opponent: "Sen", date: "2026-04-01" },
+		]);
+	});
+
+	it("returns nothing for a player never in any squad", () => {
+		const a = makeMatchFile({ matchId: "a", names: ["Alva", "Bo"] });
+		expect(matchesForPlayer([a], "nobody")).toEqual([]);
+	});
+
+	it("counts a match once however often its file is given", () => {
+		const a = makeMatchFile({ matchId: "a", names: ["Alva", "Bo"] });
+		expect(matchesForPlayer([a, a], "alva")).toHaveLength(1);
 	});
 });

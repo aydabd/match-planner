@@ -17,6 +17,8 @@ export const STORAGE_KEYS = {
 	reports: "matchplanner:reports:v1",
 	/** Match files of the matches played and imported, for the history. */
 	matches: "matchplanner:matches:v1",
+	/** Availability and development notes per player, for the history (#58). */
+	playerNotes: "matchplanner:playerNotes:v1",
 } as const;
 
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];

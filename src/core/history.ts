@@ -119,6 +119,25 @@ export function mergeMatchFiles(
 	};
 }
 
+/**
+ * The matches (id, opponent, date) a player was in the squad for, oldest
+ * first, a match counted once however often its file is given - so a
+ * player-notes screen can offer "which match" without its own dedup or
+ * ordering rules (playerNotes.ts's key is history.ts's nameKey).
+ */
+export function matchesForPlayer(
+	files: readonly MatchFile[],
+	key: string,
+): { matchId: string; opponent: string; date: string }[] {
+	return mergeMatchFiles([], files)
+		.files.filter((f) => f.squad.players.some((p) => nameKey(p.name) === key))
+		.map((f) => ({
+			matchId: f.audit.matchId,
+			opponent: f.match.opponent,
+			date: whenOf(f),
+		}));
+}
+
 interface Appearance {
 	name: string;
 	started: boolean;
