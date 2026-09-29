@@ -212,6 +212,37 @@ describe("feedback", () => {
 		);
 	});
 
+	it("does not count a keeper's guaranteed time against outfield fairness", () => {
+		// a and b split the two periods evenly outfield (600s each); k keeps
+		// goal the whole match (1200s) - a and b are perfectly even with each
+		// other and should not be flagged just because k, doing the job a
+		// keeper is meant to do, played more.
+		const r = buildReport({
+			timeline: [
+				{ type: "periodStart", at: 0, period: 1 },
+				{ type: "lineup", at: 0, zones: { back: ["a"] }, keeperId: "k" },
+				{ type: "periodEnd", at: 600, period: 1 },
+				{ type: "periodStart", at: 600, period: 2 },
+				{ type: "lineup", at: 600, zones: { back: ["b"] }, keeperId: "k" },
+				{ type: "periodEnd", at: 1200, period: 2 },
+			],
+			players: [
+				{ id: "a", name: "A" },
+				{ id: "b", name: "B" },
+				{ id: "k", name: "K" },
+			],
+			endedAt: 1200,
+			rotationSeconds: 300,
+		});
+		expect(r.feedback).toContainEqual({
+			code: "evenPlaytime",
+			spreadSeconds: 0,
+		});
+		expect(r.feedback).not.toContainEqual(
+			expect.objectContaining({ code: "playerBelowAverage" }),
+		);
+	});
+
 	it("reports no swaps when there were none", () => {
 		const r = buildReport({
 			timeline: [

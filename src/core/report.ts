@@ -1,6 +1,7 @@
 import { POLICY } from "./policy.js";
 import type { MatchDetails } from "./storage.js";
 import {
+	GOAL,
 	restsOf,
 	secondsPlayed,
 	secondsPlayedByPeriod,
@@ -88,7 +89,11 @@ export interface MatchReport {
 	swaps: SwapReport[];
 	swapSummary: SwapSummary;
 	playtime: {
-		/** Average over players who could play the whole match. */
+		/**
+		 * Average over players who could play the whole match, excluding
+		 * anyone who kept goal at all - a keeper's time is guaranteed and
+		 * uninterrupted by design, not part of what the rotation equalizes.
+		 */
 		averageSeconds: number;
 		/** Most minus least played among them. */
 		spreadSeconds: number;
@@ -196,9 +201,17 @@ export function buildReport(input: ReportInput): MatchReport {
 		}),
 	};
 
-	// Fairness is judged among players who could play the whole match: someone
-	// who arrived late or was hurt naturally plays less.
-	const compared = players.filter((p) => p.status === "played");
+	// Fairness is judged among players who could play the whole match (someone
+	// who arrived late or was hurt naturally plays less) and who were never
+	// asked to keep goal: a keeper's stretch is guaranteed and uninterrupted
+	// by design (scheduler.ts excludes the keeper from outfield rotation
+	// entirely), not something the rotation is trying to equalize, so
+	// counting it here would flag an evenly-rotated outfield as "unfair"
+	// merely because the keeper played more, or flag the keeper as
+	// underplayed for doing the job as intended.
+	const compared = players.filter(
+		(p) => p.status === "played" && (p.zoneSeconds[GOAL] ?? 0) === 0,
+	);
 	const averageSeconds = mean(compared.map((p) => p.totalSeconds));
 	const seconds = compared.map((p) => p.totalSeconds);
 	const spreadSeconds =
