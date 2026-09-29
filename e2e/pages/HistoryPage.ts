@@ -10,6 +10,8 @@ export class HistoryPage {
 	readonly driveBackupButton: Locator;
 	readonly driveRestoreButton: Locator;
 	readonly driveStatus: Locator;
+	readonly playerNotesCard: Locator;
+	readonly playerNotesFeedback: Locator;
 
 	constructor(private readonly page: Page) {
 		this.root = page.locator("#historyView");
@@ -26,6 +28,12 @@ export class HistoryPage {
 			name: "Återställ",
 		});
 		this.driveStatus = this.root.locator("#driveStatus");
+		this.playerNotesCard = this.root.locator("section.card").filter({
+			has: page.getByRole("heading", { name: "Anteckningar per spelare" }),
+		});
+		this.playerNotesFeedback = this.playerNotesCard.locator(
+			".report-feedback li",
+		);
 	}
 
 	/** Open it from the setup screen. */
@@ -56,5 +64,67 @@ export class HistoryPage {
 			.filter({
 				has: this.page.getByRole("rowheader", { name: player, exact: true }),
 			});
+	}
+
+	async choosePlayerForNotes(name: string): Promise<void> {
+		await this.playerNotesCard
+			.getByLabel("Välj spelare")
+			.selectOption({ label: name });
+	}
+
+	async logAvailability(fields: {
+		match: string;
+		status: "Var med" | "Frånvarande";
+		reason?: "Skada" | "Sjukdom" | "Annat";
+		note?: string;
+	}): Promise<void> {
+		const card = this.playerNotesCard;
+		await card.getByLabel("Välj match").selectOption({ label: fields.match });
+		await card.getByLabel("Status", { exact: true }).selectOption({
+			label: fields.status,
+		});
+		if (fields.reason) {
+			await card
+				.getByLabel("Anledning", { exact: true })
+				.selectOption({ label: fields.reason });
+		}
+		if (fields.note) {
+			await card.getByLabel("Anteckning (valfritt)").fill(fields.note);
+		}
+		const saveBtn = card.getByRole("button", { name: "Spara närvaro" });
+		await saveBtn.scrollIntoViewIfNeeded();
+		await this.clickBelowADateField(saveBtn);
+	}
+
+	async addDevelopmentNote(fields: {
+		area: "Fysiskt" | "Mentalt" | "Tekniskt" | "Taktiskt";
+		note: string;
+	}): Promise<void> {
+		const card = this.playerNotesCard;
+		await card
+			.getByLabel("Område", { exact: true })
+			.selectOption({ label: fields.area });
+		await card.getByLabel("Vad har du sett?").fill(fields.note);
+		const addBtn = card.getByRole("button", { name: "Lägg till anteckning" });
+		await addBtn.scrollIntoViewIfNeeded();
+		await this.clickBelowADateField(addBtn);
+	}
+
+	/**
+	 * On the "phone" project only, Playwright's own actionability re-check
+	 * inside .click() reports this button as covered by the <input
+	 * type="date"> earlier in the same form, on every retry, for the full
+	 * 30s timeout - even though scrollIntoViewIfNeeded() plus a direct
+	 * elementFromPoint() check (both verified by hand while debugging this)
+	 * agree the button is correctly on top with nothing overlapping it. That
+	 * makes this a Playwright/mobile-Chromium false positive, not a real UI
+	 * defect worth chasing further - force the click past it.
+	 */
+	private async clickBelowADateField(button: Locator): Promise<void> {
+		await button.click({ force: true });
+	}
+
+	developmentNotes(): Locator {
+		return this.playerNotesCard.locator(".history-messages li");
 	}
 }

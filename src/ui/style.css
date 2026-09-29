@@ -233,6 +233,14 @@ h3 {
 	grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 	gap: 12px;
 }
+/* Stacked fields and a button (the player-notes forms): the same gap
+   .card gives its own children, so a focused field's outline never
+   overlaps the button right after it. */
+.field-stack {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
 .field {
 	display: flex;
 	flex-direction: column;
@@ -333,7 +341,8 @@ h3 {
 }
 select,
 input[type="number"],
-input[type="text"] {
+input[type="text"],
+input[type="date"] {
 	width: 100%;
 	min-height: 48px;
 	background: var(--surface);
