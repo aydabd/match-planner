@@ -1,7 +1,6 @@
 import {
 	EXPORT_BUNDLE_VERSION,
 	type ExportBundle,
-	ExportBundleError,
 	parseExportBundle,
 } from "../core/exportBundle.js";
 import {
@@ -467,11 +466,14 @@ function setUpSecureExport(refresh: () => void): void {
 					status.textContent = t.imported;
 					refresh();
 				} catch (err) {
+					// ExportBundleError only happens after decryptJson already
+					// succeeded - the password was right and the file was not
+					// tampered with, it just isn't a valid export bundle (the
+					// coach picked a different encrypted file by mistake).
+					// "wrong password" would send them chasing a problem that
+					// isn't there.
 					status.textContent =
-						err instanceof SecurePackageError ||
-						err instanceof ExportBundleError
-							? t.wrongPassword
-							: t.unreadable;
+						err instanceof SecurePackageError ? t.wrongPassword : t.unreadable;
 				} finally {
 					pendingFile = null;
 					fileInput.value = "";

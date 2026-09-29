@@ -111,4 +111,40 @@ test.describe("Secure export and import (#81)", () => {
 		expect(contents.ciphertext).toEqual(expect.any(String));
 		expect(JSON.stringify(contents)).not.toContain("Alva");
 	});
+
+	test("a file that decrypts fine but isn't an export bundle is refused as unreadable, not a wrong password", async ({
+		history,
+		setup,
+		page,
+	}) => {
+		const password = "samma-lösenord";
+		await setup.open();
+		await history.open();
+		await history.importFiles([{ name: "match.json", contents: MATCH }]);
+
+		// Export the season report (a different SecurePackage payload shape)
+		// with the same password the import will use.
+		const reportCard = history.root.locator("section.card").filter({
+			has: page.getByRole("heading", { name: "Säsongsrapport" }),
+		});
+		await reportCard.getByLabel("Lösenord för filen").fill(password);
+		const download = page.waitForEvent("download");
+		await reportCard
+			.getByRole("button", { name: "Spara säsongsrapport (krypterad)" })
+			.click();
+		const file = await download;
+		const contents = await readFile(await file.path(), "utf8");
+
+		await history.secureImportFileInput.setInputFiles({
+			name: "sasongsrapport.json",
+			mimeType: "application/json",
+			buffer: Buffer.from(contents),
+		});
+		await history.secureExportPasswordInput.fill(password);
+		await history.secureImportButton.click();
+		await history.secureImportButton.click();
+		await expect(history.secureExportStatus).toHaveText(
+			"Filen kunde inte läsas som en exporterad fil.",
+		);
+	});
 });
