@@ -1290,8 +1290,15 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 
 	/**
 	 * Change who is in goal and record it. During play the lineup adjusts
-	 * (changeKeeper); right before a new lineup (period break) only the keeper
-	 * is chosen (assignKeeper). Returns false if the change was refused.
+	 * (changeKeeper) and is recorded right away; right before a new lineup
+	 * (period break) only the keeper is chosen (assignKeeper) - the outfield
+	 * zones still hold the finished period's assignment, so recording a
+	 * lineup snapshot here would list the new keeper in an outfield zone
+	 * too, whenever they were on the pitch rather than the bench
+	 * (recordLineup can't tell that seat is about to be vacated).
+	 * putNextLineupOn(), called right after this in beginNextPeriod, builds
+	 * and records the real next lineup instead. Returns false if the change
+	 * was refused.
 	 */
 	function switchKeeper(
 		toId: string,
@@ -1311,7 +1318,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			toId,
 		});
 		live.pendingSwap = null;
-		noteLineup();
+		if (!options.beforeNextLineup) noteLineup();
 		return true;
 	}
 
