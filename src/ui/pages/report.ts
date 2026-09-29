@@ -8,9 +8,10 @@ initPage("report");
 
 /**
  * The report to show: the one named by ?matchId= (set when Start's "kept
- * reports" list links here), or the most recent one, so the page is a
- * useful destination on its own. Null when nothing is saved at all, or the
- * requested match isn't among what's kept on this device.
+ * reports" list links here), falling back to the most recent one - also
+ * when ?matchId doesn't match anything kept on this device - so the page
+ * is a useful destination on its own. Null only when nothing is saved at
+ * all.
  */
 function pickReport(): StoredReport | null {
 	const reports = loadReports();

@@ -10,6 +10,10 @@ test.describe("Report page", () => {
 		await expect(
 			page.getByRole("heading", { name: "Ingen matchrapport att visa" }),
 		).toBeVisible();
+		// The report content itself must not also render behind the empty
+		// state - toggled via the `hidden` property, not just aria/text.
+		await expect(page.locator("#reportView")).toBeHidden();
+
 		await page.getByRole("link", { name: "Till start" }).click();
 		await expect(page.getByRole("heading", { name: "Ny match" })).toBeVisible();
 	});
@@ -27,6 +31,8 @@ test.describe("Report page", () => {
 		await page.goto("report/?matchId=does-not-exist");
 		await expect(report.root).toBeVisible();
 		await expect(report.playtimeRows).toHaveCount(8);
+		// The empty state must not also render behind the shown report.
+		await expect(page.locator("#reportEmptyState")).toBeHidden();
 	});
 
 	test("shows the shared nav with Matchrapport marked current", async ({
