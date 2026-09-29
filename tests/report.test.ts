@@ -243,6 +243,38 @@ describe("feedback", () => {
 		);
 	});
 
+	it("falls back to everyone who played when the whole squad rotates through goal", () => {
+		// a, b and c all take a turn in goal at some point, so none of them is
+		// "outfield only" - the fairness comparison must still reflect their
+		// real, uneven playtime (900/1200/900) instead of an empty pool
+		// reading as a meaningless "Snitt 0:00, perfectly even".
+		const r = buildReport({
+			timeline: [
+				{ type: "periodStart", at: 0, period: 1 },
+				{ type: "lineup", at: 0, zones: { back: ["b"] }, keeperId: "a" },
+				{ type: "periodEnd", at: 600, period: 1 },
+				{ type: "periodStart", at: 600, period: 2 },
+				{ type: "lineup", at: 600, zones: { back: ["c"] }, keeperId: "b" },
+				{ type: "periodEnd", at: 1200, period: 2 },
+				{ type: "periodStart", at: 1200, period: 3 },
+				{ type: "lineup", at: 1200, zones: { back: ["a"] }, keeperId: "c" },
+				{ type: "periodEnd", at: 1500, period: 3 },
+			],
+			players: [
+				{ id: "a", name: "A" },
+				{ id: "b", name: "B" },
+				{ id: "c", name: "C" },
+			],
+			endedAt: 1500,
+			rotationSeconds: 300,
+		});
+		expect(r.playtime).toEqual({ averageSeconds: 1000, spreadSeconds: 300 });
+		expect(r.feedback).toContainEqual({
+			code: "evenPlaytime",
+			spreadSeconds: 300,
+		});
+	});
+
 	it("reports no swaps when there were none", () => {
 		const r = buildReport({
 			timeline: [

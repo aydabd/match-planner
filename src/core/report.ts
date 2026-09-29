@@ -209,9 +209,13 @@ export function buildReport(input: ReportInput): MatchReport {
 	// counting it here would flag an evenly-rotated outfield as "unfair"
 	// merely because the keeper played more, or flag the keeper as
 	// underplayed for doing the job as intended.
-	const compared = players.filter(
-		(p) => p.status === "played" && (p.zoneSeconds[GOAL] ?? 0) === 0,
-	);
+	const played = players.filter((p) => p.status === "played");
+	const outfieldOnly = played.filter((p) => (p.zoneSeconds[GOAL] ?? 0) === 0);
+	// Falls back to everyone who played if every one of them kept goal at
+	// some point (e.g. the whole squad rotates through goal) - an empty pool
+	// would otherwise report a meaningless "0:00 average, perfectly even"
+	// instead of the match's real, possibly uneven playtime.
+	const compared = outfieldOnly.length > 0 ? outfieldOnly : played;
 	const averageSeconds = mean(compared.map((p) => p.totalSeconds));
 	const seconds = compared.map((p) => p.totalSeconds);
 	const spreadSeconds =
