@@ -53,6 +53,26 @@ Run all of them before you push.
    push it yourself so CI runs: `git rebase --onto origin/main <old-lower-tip>`, then
    `git push --force-with-lease`.
 
+## Issues instead of specs and plans
+
+Work here is tracked in GitHub issues, not in spec or plan files (see "Do not commit agent plans,
+specs or scratch files" below). Create one from `.github/ISSUE_TEMPLATE/`: `bug.yml`, `security.yml`,
+or `task.yml` for everything else, from a one-line fix to a multi-PR slice of work.
+
+- **Before creating one**, search for a duplicate: `gh issue list --search "<keywords>"`.
+- **The issue is the spec.** Its Summary and Scope/acceptance-criteria fields are the design: the
+  problem, what's in and out of scope, and a numbered acceptance list a test can check.
+- **The issue is the plan.** Fill in "Implementation plan" as an ordered `- [ ] step` checklist
+  before implementation starts; leave it blank only for work too small to need one. Check items off,
+  in the issue, as they land, instead of keeping a separate plan file.
+- **To start work**, read the issue: `gh issue view <N>`. Then follow the normal worktree and
+  stacked-PR flow above, using the issue's own validation command to know when you're done.
+- **As you go**, keep the issue current: comment with real progress, tick off finished plan items,
+  and update Scope if it changed. Don't invent labels or issue states — the checklist and comments
+  are the source of truth for status, not a label taxonomy.
+- **When you open the PR**, link back with `Closes #N` and leave no unchecked plan item open in the
+  issue before it merges.
+
 ## Commits and pull requests
 
 - Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`), with `git commit -s` (a
