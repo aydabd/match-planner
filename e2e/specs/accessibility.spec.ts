@@ -77,7 +77,7 @@ for (const colorScheme of ["light", "dark"] as const) {
 		}) => {
 			await setup.open();
 			await page
-				.getByRole("button", { name: "Varför fungerar det så här?" })
+				.getByRole("link", { name: "Varför fungerar det så här?" })
 				.click();
 			expect(await accessibilityViolations(page)).toEqual([]);
 		});

@@ -11,7 +11,6 @@ test.describe("Page shells", () => {
 	for (const [path, current] of [
 		["match/", "Match"],
 		["statistics/", "Statistik"],
-		["about/", "Om"],
 	] as const) {
 		test(`${path} loads directly and shows the not-ready placeholder`, async ({
 			page,

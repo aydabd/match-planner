@@ -2,7 +2,6 @@ import "./ui/style.css";
 import { createHistoryView } from "./ui/history.js";
 import { createMatchView } from "./ui/match.js";
 import { byId, initPage } from "./ui/page.js";
-import { createPolicyView } from "./ui/policy.js";
 import { createReportView } from "./ui/report.js";
 import { createRosterView } from "./ui/roster.js";
 import { clearSession } from "./ui/sessionStorage.js";
@@ -11,7 +10,6 @@ initPage("start");
 
 const setupView = byId("setupView");
 const matchView = byId("matchView");
-const policyView = byId("policyView");
 const reportView = byId("reportView");
 const historyPage = byId("historyView");
 
@@ -28,7 +26,7 @@ function showMatch(): void {
 }
 
 // Pages that open over whichever screen is showing and return to it: the
-// policy page and the match report. A running match keeps its clock.
+// match report. A running match keeps its clock.
 /** What had focus when a page opened over a screen, to give focus back on close. */
 const openers = new WeakMap<HTMLElement, HTMLElement>();
 
@@ -73,14 +71,6 @@ function closePage(page: HTMLElement): void {
 	restoreFocus(page, back);
 }
 
-createPolicyView();
-for (const [button, page] of [
-	["policyFromSetupBtn", policyView],
-	["policyFromMatchBtn", policyView],
-] as const) {
-	byId(button).addEventListener("click", () => openOver(page));
-}
-byId("policyBackBtn").addEventListener("click", () => closePage(policyView));
 byId("reportBackBtn").addEventListener("click", () => closePage(reportView));
 
 const history = createHistoryView();

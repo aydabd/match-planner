@@ -21,7 +21,22 @@
       <nav class="page-nav" id="pageNav" aria-label="Sidor"></nav>
     </header>
 
-    <section class="view" id="notReady"></section>
+    <!-- ============ ABOUT VIEW ============ -->
+    <section id="policyView" class="view view-policy" aria-labelledby="policyTitle">
+      <div class="row-buttons">
+        <a id="policyBackBtn" href="../" class="btn btn-ghost">Tillbaka</a>
+      </div>
+      <div class="intro">
+        <h1 id="policyTitle" tabindex="-1">Varför fungerar det så här?</h1>
+        <p class="lede">Reglerna i appen kommer från idrottens riktlinjer. Här ser du vilka som är hämtade från dokument och vilka som är MatchPlanners egna val, med länkar så att du kan kontrollera själv.</p>
+      </div>
+      <div id="policyRules" class="policy-rules"></div>
+      <section class="card" aria-labelledby="policySourcesTitle">
+        <h2 id="policySourcesTitle">Dokument och länkar</h2>
+        <div id="policySources"></div>
+        <p class="hint">Sidan fungerar utan nät. Länkarna öppnas när du är uppkopplad.</p>
+      </section>
+    </section>
 
     <footer class="footer app-footer" id="appFooter">
       <span>MatchPlanner v<span data-app-version></span></span>

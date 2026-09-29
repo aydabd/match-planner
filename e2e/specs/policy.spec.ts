@@ -13,12 +13,11 @@ test.describe("Why does it work like this?", () => {
 	}) => {
 		await setup.open();
 		await page
-			.getByRole("button", { name: "Varför fungerar det så här?" })
+			.getByRole("link", { name: "Varför fungerar det så här?" })
 			.click();
 
 		const policy = page.locator("#policyView");
 		await expect(policy).toBeVisible();
-		await expect(setup.root).toBeHidden();
 		await expect(
 			policy.getByRole("heading", { name: "Högst 2 led per spelare" }),
 		).toBeVisible();
@@ -46,26 +45,34 @@ test.describe("Why does it work like this?", () => {
 			expect(hrefs.some((href) => new URL(href).host === host)).toBe(true);
 		}
 
-		await policy.getByRole("button", { name: "Tillbaka" }).click();
+		await policy.getByRole("link", { name: "Tillbaka" }).click();
 		await expect(setup.root).toBeVisible();
-		// Focus goes back to the button that opened the page, not to a hidden one.
-		await expect(
-			page.getByRole("button", { name: "Varför fungerar det så här?" }),
-		).toBeFocused();
-		await expect(policy).toBeHidden();
 	});
 
-	test("is reachable from the match menu and returns to the match", async ({
+	test("shows the shared nav with Om marked current", async ({
+		page,
+		setup,
+	}) => {
+		await setup.open();
+		await page
+			.getByRole("link", { name: "Varför fungerar det så här?" })
+			.click();
+		const nav = page.locator("#pageNav");
+		await expect(
+			nav.getByRole("link", { name: "Om", exact: true }),
+		).toHaveAttribute("aria-current", "page");
+	});
+
+	test("is reachable from the match menu, and returning resumes the match", async ({
 		startedMatch: match,
 		page,
 	}) => {
 		await match.openPolicyPage();
 		await expect(page.locator("#policyView")).toBeVisible();
-		await expect(match.root).toBeHidden();
 
-		await page.getByRole("button", { name: "Tillbaka" }).click();
+		await page.getByRole("link", { name: "Tillbaka" }).click();
+		// The match is still running in storage; landing back on start resumes
+		// it straight away instead of dropping the coach at setup (see #93).
 		await expect(match.root).toBeVisible();
-		// The menu item is inside a closed menu, so the menu button gets focus.
-		await expect(match.root.getByText("Meny", { exact: true })).toBeFocused();
 	});
 });
