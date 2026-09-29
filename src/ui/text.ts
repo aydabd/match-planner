@@ -270,6 +270,22 @@ export const TEXT = {
 			noDevelopmentNotes: "Inga utvecklingsanteckningar att visa än.",
 			chartDescription: "Samma uppgifter finns i tabellerna nedan.",
 		},
+		seasonReport: {
+			title: "Säsongsrapport",
+			description:
+				"Granska sammanfattningarna innan du sparar rapporten. Den här rapporten är avsedd att delas med spelaren, familjen eller klubben.",
+			stats: (
+				squad: number,
+				played: number,
+				started: number,
+				minutes: number,
+				present: number,
+				absent: number,
+			) =>
+				`${squad} truppmatcher · ${played} spelade · ${started} starter · ${minutes} minuter · närvaro ${present}/${present + absent}`,
+			exportButton: "Spara säsongsrapport",
+			printButton: "Skriv ut / spara som PDF",
+		},
 		startedHint: (name: string, started: number, of: number) =>
 			`${name} har startat ${started} av de senaste ${of} matcherna.`,
 		month(month: string): string {

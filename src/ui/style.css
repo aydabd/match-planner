@@ -1310,6 +1310,35 @@ button:disabled {
 	flex-direction: column;
 	gap: 8px;
 }
+.season-report-player {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding-top: 8px;
+	border-top: 1px solid var(--line);
+}
+.season-report-player textarea {
+	width: 100%;
+	resize: vertical;
+}
+@media print {
+	body.printing-season-report * {
+		visibility: hidden;
+	}
+	body.printing-season-report .season-report-card,
+	body.printing-season-report .season-report-card * {
+		visibility: visible;
+	}
+	body.printing-season-report .season-report-card {
+		position: absolute;
+		inset: 0;
+		box-shadow: none;
+		border: 0;
+	}
+	body.printing-season-report .season-report-card > .row-buttons {
+		display: none;
+	}
+}
 
 /* ---------- rest time ---------- */
 .bench-rest {

@@ -21,6 +21,11 @@ import {
 	withDevelopment,
 } from "../core/playerNotes.js";
 import {
+	buildSeasonReport,
+	type SeasonReport,
+	seasonReportToJson,
+} from "../core/seasonReport.js";
+import {
 	developmentTimeline,
 	monthlyMinutes,
 	recentStartFrequency,
@@ -309,6 +314,114 @@ const AREAS: readonly DevelopmentArea[] = [
 	"technical",
 	"tactical",
 ];
+
+function downloadJson(fileName: string, json: string): void {
+	const blob = new Blob([json], { type: "application/json" });
+	const url = URL.createObjectURL(blob);
+	const link = document.createElement("a");
+	link.href = url;
+	link.download = fileName;
+	link.click();
+	URL.revokeObjectURL(url);
+}
+
+function buildSeasonReportCard(history: SeasonHistory): HTMLElement {
+	const t = TEXT.history.seasonReport;
+	const section = card(t.title);
+	section.classList.add("season-report-card");
+	const description = document.createElement("p");
+	description.className = "hint";
+	description.textContent = t.description;
+	section.append(description);
+
+	const report = buildSeasonReport(
+		history,
+		loadPlayerNotes(),
+		new Date().toISOString(),
+	);
+	const summaryInputs = new Map<
+		string,
+		Map<DevelopmentArea, HTMLTextAreaElement>
+	>();
+	for (const player of report.players) {
+		const playerSection = document.createElement("section");
+		playerSection.className = "season-report-player";
+		const heading = document.createElement("h3");
+		heading.textContent = player.name;
+		playerSection.append(heading);
+		const stats = document.createElement("p");
+		stats.className = "hint";
+		stats.textContent = t.stats(
+			player.matches.squad,
+			player.matches.played,
+			player.matches.started,
+			Math.round(player.playtimeSeconds.total / 60),
+			player.availability.present,
+			player.availability.absent,
+		);
+		playerSection.append(stats);
+
+		const inputs = new Map<DevelopmentArea, HTMLTextAreaElement>();
+		for (const summary of player.developmentSummary) {
+			const textarea = document.createElement("textarea");
+			textarea.rows = 2;
+			textarea.value = summary.summary;
+			textarea.maxLength = LIMITS.playerNoteLength;
+			playerSection.append(
+				field(
+					TEXT.history.playerNotes.area[summary.area],
+					textarea,
+					`season-${player.key}-${summary.area}`,
+				),
+			);
+			inputs.set(summary.area, textarea);
+		}
+		summaryInputs.set(player.key, inputs);
+		section.append(playerSection);
+	}
+
+	const actions = document.createElement("div");
+	actions.className = "row-buttons";
+	const exportButton = document.createElement("button");
+	exportButton.type = "button";
+	exportButton.className = "btn btn-secondary";
+	exportButton.textContent = t.exportButton;
+	exportButton.addEventListener("click", () => {
+		const reviewed: SeasonReport = {
+			...report,
+			players: report.players.map((player) => ({
+				...player,
+				developmentSummary: player.developmentSummary.map((summary) => ({
+					...summary,
+					summary:
+						summaryInputs.get(player.key)?.get(summary.area)?.value.trim() ??
+						summary.summary,
+				})),
+			})),
+		};
+		downloadJson(
+			`sasongsrapport-${report.generatedAt.slice(0, 10)}.json`,
+			seasonReportToJson(reviewed),
+		);
+	});
+	actions.append(exportButton);
+
+	const printButton = document.createElement("button");
+	printButton.type = "button";
+	printButton.className = "btn btn-secondary";
+	printButton.textContent = t.printButton;
+	printButton.addEventListener("click", () => {
+		document.body.classList.add("printing-season-report");
+		window.print();
+		window.setTimeout(
+			() => document.body.classList.remove("printing-season-report"),
+			0,
+		);
+	});
+	actions.append(printButton);
+	section.append(actions);
+	return section;
+}
 
 /**
  * Availability, per match, for one player: pick a match, save whether they
@@ -641,6 +754,7 @@ export function createHistoryView(): { refresh: () => void } {
 			),
 		);
 		results.append(months);
+		results.append(buildSeasonReportCard(history));
 
 		results.append(buildVisualizationCard(history));
 
