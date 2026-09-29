@@ -10,6 +10,9 @@ test.describe("Match page", () => {
 		await expect(
 			page.getByRole("heading", { name: "Ingen match pågår" }),
 		).toBeVisible();
+		// The (empty) match screen must not also render behind the empty
+		// state - toggled via the `hidden` property, not just aria/text.
+		await expect(page.locator("#matchView")).toBeHidden();
 
 		await page.getByRole("link", { name: "Till start" }).click();
 		await expect(page.getByRole("heading", { name: "Ny match" })).toBeVisible();
@@ -20,6 +23,8 @@ test.describe("Match page", () => {
 		page,
 	}) => {
 		await expect(match.root).toBeVisible();
+		// The no-active-match empty state must not also render behind it.
+		await expect(page.locator("#matchEmptyState")).toBeHidden();
 		const nav = page.locator("#pageNav");
 		await expect(
 			nav.getByRole("link", { name: "Match", exact: true }),
