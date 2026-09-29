@@ -162,4 +162,41 @@ test.describe("A busy match", () => {
 		await expect(history.count).toHaveText("1 match över 1 månad.");
 		await expect(history.row("Startat och speltid", "Ines")).toBeVisible();
 	});
+
+	test("a period-break keeper change to a player still on the pitch still makes a valid match file", async ({
+		setup,
+		match,
+		report,
+		history,
+		page,
+	}) => {
+		await setup.open();
+		await setup.chooseTeamSize("7v7");
+		await setup.setMatchLength(2, 5);
+		await setup.addPlayers([...SQUAD]);
+		await setup.markGoalkeeper("Alva");
+		await setup.startingKeeper.selectOption({ label: "Alva" });
+		await setup.startMatch();
+		await match.startClock();
+		await match.play(5);
+
+		// Bo is on the pitch (not the bench) when chosen as the next keeper.
+		await match.root
+			.locator("#breakKeeperSelect")
+			.selectOption({ label: "Bo" });
+		await match.nextPeriodButton.click();
+		await match.play(5);
+		await expect(report.root).toBeVisible();
+
+		const saveBtn = report.root.getByRole("button", { name: "Spara matchfil" });
+		await expect(saveBtn).toBeEnabled();
+		const download = page.waitForEvent("download");
+		await saveBtn.click();
+		await download;
+
+		await report.backButton.click();
+		await match.editSquad();
+		await history.open();
+		await expect(history.count).toHaveText("1 match över 1 månad.");
+	});
 });
