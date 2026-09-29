@@ -3,6 +3,23 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.15.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.14.0...matchplanner-v0.15.0) (2026-09-29)
+
+
+### Features
+
+* **pages:** move player history and statistics onto /statistics/ ([#100](https://github.com/aydabd/match-planner/issues/100)) ([214ab0c](https://github.com/aydabd/match-planner/commit/214ab0c43a9db7dba50c47742c7007446fcb80fa))
+* **pages:** move the live match onto its own /match/ page ([#101](https://github.com/aydabd/match-planner/issues/101)) ([4882ec9](https://github.com/aydabd/match-planner/commit/4882ec9bd8b195e227d1575770d73ff0e97bba64))
+* **pages:** move the match report onto its own /report/ page ([#98](https://github.com/aydabd/match-planner/issues/98)) ([dc7cf45](https://github.com/aydabd/match-planner/commit/dc7cf4505784eb0ebe80182821d4e304d26ea8ba))
+* **pages:** move the policy explanation onto its own /about/ page ([#99](https://github.com/aydabd/match-planner/issues/99)) ([fbd8e73](https://github.com/aydabd/match-planner/commit/fbd8e7384d92f4dd01c085dfb01518dd0ed99929))
+* **pages:** scaffold multi-entry build for the five real page URLs ([#95](https://github.com/aydabd/match-planner/issues/95)) ([a746a92](https://github.com/aydabd/match-planner/commit/a746a924438c27a283ade6bab4e8b3a0c148e0b2))
+* **pages:** wire the start page onto the shared page bootstrap ([#96](https://github.com/aydabd/match-planner/issues/96)) ([f7b53f8](https://github.com/aydabd/match-planner/commit/f7b53f87ec49e2bc3051711b1941a5725fa9bb27))
+
+
+### Bug Fixes
+
+* **pages:** remove dead placeholder code and fix the e2e path filter ([#102](https://github.com/aydabd/match-planner/issues/102)) ([325372a](https://github.com/aydabd/match-planner/commit/325372aa26d58fb20774abe04df627b9abf602c9))
+
 ## [0.14.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.13.0...matchplanner-v0.14.0) (2026-09-29)
 
 
