@@ -61,6 +61,29 @@ describe("season visualization models", () => {
 		]);
 	});
 
+	it("returns zero when a player has no recent matches", () => {
+		const noRecentMatches: SeasonHistory = {
+			...history,
+			players: [
+				...history.players,
+				{
+					...history.players[0]!,
+					key: "cedric",
+					name: "Cedric",
+					recent: { started: 0, of: 0 },
+				},
+			],
+		};
+
+		expect(recentStartFrequency(noRecentMatches)[2]).toEqual({
+			key: "cedric",
+			name: "Cedric",
+			started: 0,
+			of: 0,
+			percentage: 0,
+		});
+	});
+
 	it("orders development notes by date and keeps their player and area", () => {
 		const notes: PlayerNotesFile = {
 			schemaVersion: 1,
@@ -69,6 +92,13 @@ describe("season visualization models", () => {
 					key: "bo",
 					availability: [],
 					development: [{ date: "2026-02-03", area: "mental", note: "Fokus" }],
+				},
+				{
+					key: "unknown",
+					availability: [],
+					development: [
+						{ date: "2026-01-01", area: "physical", note: "Ignored" },
+					],
 				},
 				{
 					key: "alva",
