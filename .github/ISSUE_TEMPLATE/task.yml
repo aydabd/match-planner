@@ -1,0 +1,41 @@
+name: Task
+description: A piece of work to design, plan, and implement, tracked directly in this issue.
+title: "[TASK] "
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: State the problem or change and why it is needed now.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and acceptance criteria
+      description: >-
+        List what is included, what is explicitly out of scope, and a numbered
+        list of acceptance criteria. Each criterion should be checkable against
+        a test or an observable result.
+    validations:
+      required: true
+  - type: textarea
+    id: plan
+    attributes:
+      label: Implementation plan
+      description: >-
+        Ordered task checklist (- [ ] one step per line). Fill this in before
+        implementation starts, and check items off as they land. Leave blank
+        for work too small to need a plan.
+  - type: input
+    id: validation
+    attributes:
+      label: Validation command
+      description: The exact command(s) that prove this issue is done.
+    validations:
+      required: true
+  - type: input
+    id: related
+    attributes:
+      label: Related issue or PR
+      description: "Use #123 to link a parent, blocker, or follow-up."
