@@ -3,6 +3,13 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.15.1](https://github.com/aydabd/match-planner/compare/matchplanner-v0.15.0...matchplanner-v0.15.1) (2026-09-29)
+
+
+### Bug Fixes
+
+* **ui:** stop the header nav wrapping into a squeezed sidebar ([#105](https://github.com/aydabd/match-planner/issues/105)) ([149df34](https://github.com/aydabd/match-planner/commit/149df34ca6a3800705948a5fd29b1148dc1dd69f))
+
 ## [0.15.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.14.0...matchplanner-v0.15.0) (2026-09-29)
 
 
