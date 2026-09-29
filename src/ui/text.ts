@@ -1,4 +1,5 @@
-import type { FormationProblem } from "../core/formations.js";
+import type { DevelopmentArea } from "../core/developmentCheckpoints.js";
+import type { FormationProblem, TeamSizeId } from "../core/formations.js";
 import { LIMITS } from "../core/limits.js";
 import type { MatchFileProblem } from "../core/matchFile.js";
 import { POLICY, type RuleId } from "../core/policy.js";
@@ -273,9 +274,11 @@ export const TEXT = {
 		visualizations: {
 			title: "Översikt",
 			monthlyMinutes: "Speltid månad för månad",
-			startFrequency: "Startfrekvens i de senaste matcherna",
-			developmentTimeline: "Utvecklingsanteckningar över tid",
-			noDevelopmentNotes: "Inga utvecklingsanteckningar att visa än.",
+			startFrequency: (matches: number) =>
+				`Startfrekvens i de senaste ${matches} ${matches === 1 ? "matchen" : "matcherna"}`,
+			axisMinutes: "Minuter",
+			axisPercent: "Andel starter (%)",
+			developmentTitle: "Utveckling per spelare",
 			chartDescription: "Samma uppgifter finns i tabellerna nedan.",
 		},
 		seasonReport: {
@@ -291,6 +294,8 @@ export const TEXT = {
 				absent: number,
 			) =>
 				`${squad} truppmatcher · ${played} spelade · ${started} starter · ${minutes} minuter · närvaro ${present}/${present + absent}`,
+			developmentLevelPrefix: (level: number, of: number) =>
+				level === 0 ? "" : `Nivå ${level} av ${of} uppnådd. `,
 			passwordLabel: "Lösenord för filen",
 			needPassword: "Ange ett lösenord för filen först.",
 			exportButton: "Spara säsongsrapport (krypterad)",
@@ -398,6 +403,131 @@ export const TEXT = {
 				`${name}: ${count} ${count === 1 ? "frånvaro" : "frånvaron"} utan angiven anledning.`,
 			noDevelopmentNotes: (name: string, matches: number) =>
 				`${name}: ingen utvecklingsanteckning trots ${matches} matcher i truppen.`,
+			checkpointTitle: "Nivåer",
+			nextLevel: "Nästa nivå uppnådd",
+			levelReached: (date: string) => `Uppnått ${date}`,
+			maxLevelReached: "Högsta nivån uppnådd",
+			/**
+			 * The 16 age-banded checkpoint ladders (#109): one per team size and
+			 * development area, each describing increasing context complexity
+			 * (unopposed, then light pressure, then small-group/match-like, then
+			 * full match) rather than an absolute skill bar, so a player of any
+			 * age climbs it at their own pace, never compared to any other
+			 * player. A MatchPlanner "decision" in policy.ts's sense: RF/SvFF's
+			 * general guidance on play-first development at younger ages and
+			 * match-application at older ages is background reading, never
+			 * quoted as their rule - see issue #109 for the full reasoning and
+			 * sources.
+			 */
+			checkpointLadders: {
+				"5v5": {
+					technical: [
+						"Vågar prova grundtekniken i lekfulla övningar",
+						"Klarar grundtekniken (passa, ta emot, dribbla) obehindrat",
+						"Provar tekniken i lekfulla smågruppsspel",
+						"Använder tekniken med glädje i matchlika lekar",
+					],
+					tactical: [
+						"Förstår var boll och mål är på planen",
+						"Provar att vara nära bollen och delta i spelet",
+						"Börjar förstå enkla roller (anfalla och försvara)",
+						"Provar enkla samarbeten med en kompis i smågrupp",
+					],
+					physical: [
+						"Rör sig lekfullt med balans och koordination",
+						"Orkar vara aktiv genom hela passet med lek och variation",
+						"Klarar att springa, hoppa och vända i olika lekar",
+						"Håller igång genom en hel match med pauser",
+					],
+					mental: [
+						"Vågar vara med och prova utan rädsla för att göra fel",
+						"Visar glädje i träning och match",
+						"Provar igen efter ett misstag utan att tappa sugen",
+						"Stöttar och hejar på sina lagkompisar",
+					],
+				},
+				"7v7": {
+					technical: [
+						"Behärskar grundteknik (passning, mottagning, dribbling) obehindrat",
+						"Använder tekniken med lätt motstånd eller tidspress",
+						"Väljer rätt teknik i enkla spelsituationer",
+						"Använder tekniken säkert i matchlika övningar",
+					],
+					tactical: [
+						"Förstår sin egen roll i laget (försvar och anfall)",
+						"Läser enkla spelsituationer och anpassar sig till medspelare",
+						"Tar egna initiativ i smågruppsspel",
+						"Bidrar till enkla lagmönster (bredd och djup)",
+					],
+					physical: [
+						"Orkar delta aktivt genom hela träningspasset",
+						"Håller jämn intensitet större delen av matchen",
+						"Klarar snabba riktningsförändringar och spurter upprepade gånger",
+						"Återhämtar sig mellan insatser under en match",
+					],
+					mental: [
+						"Håller fokus genom en övning eller ett delmoment",
+						"Hanterar ett misslyckande och fortsätter spela sitt spel",
+						"Visar vilja att kämpa i tuffa situationer",
+						"Peppar lagkompisar även när det går tungt",
+					],
+				},
+				"9v9": {
+					technical: [
+						"Använder tekniken säkert med motstånd och tidspress",
+						"Väljer och genomför rätt teknik i matchlika situationer",
+						"Behärskar tekniken i högt tempo och pressade lägen",
+						"Använder tekniken pålitligt i match, båda fötterna och olika situationer",
+					],
+					tactical: [
+						"Läser av och anpassar sig till medspelare i grupp",
+						"Fattar egna beslut i matchsituationer under tidspress",
+						"Förstår och använder lagets grundprinciper (press, omställning)",
+						"Hjälper till att organisera sin del av laget proaktivt",
+					],
+					physical: [
+						"Håller samma intensitet genom hela matchen",
+						"Klarar upprepade högintensiva insatser med kort återhämtning",
+						"Visar god löpteknik och styrka i dueller",
+						"Återhämtar sig snabbt mellan matcher och träningar",
+					],
+					mental: [
+						"Hanterar motgång (mål emot, misslyckad aktion) och fortsätter spela sitt spel",
+						"Tar ansvar i pressade matchsituationer",
+						"Visar självständighet och eget ansvarstagande i träning",
+						"Stöttar och peppar lagkamrater i pressade stunder",
+					],
+				},
+				"11v11": {
+					technical: [
+						"Använder tekniken säkert i match, även i pressade lägen",
+						"Anpassar tekniken efter matchsituation och motståndare",
+						"Behärskar tekniken i sin position på hög nivå för åldern",
+						"Är en pålitlig teknisk resurs för laget i alla lägen",
+					],
+					tactical: [
+						"Tar egna initiativ och fattar snabba beslut i match",
+						"Hjälper till att organisera laget och positionera sig proaktivt",
+						"Anpassar sig till olika taktiska upplägg",
+						"Tar ledarskap i taktiska beslut på planen",
+					],
+					physical: [
+						"Håller hög intensitet konsekvent genom hela matchen",
+						"Återhämtar sig snabbt mellan insatser och matcher",
+						"Klarar en hel säsongs belastning utan att tappa i kvalitet",
+						"Visar fysisk mognad anpassad efter egen förutsättning",
+					],
+					mental: [
+						"Visar lugn och fattar bra beslut under press",
+						"Tar ansvar och ledarskap i pressade stunder",
+						"Stöttar och utvecklar yngre eller mindre erfarna lagkompisar",
+						"Är en mental förebild för laget i med- och motgång",
+					],
+				},
+			} satisfies Record<
+				TeamSizeId,
+				Record<DevelopmentArea, readonly string[]>
+			>,
 		},
 		problem(problem: MatchFileProblem): string {
 			switch (problem.code) {

@@ -1,14 +1,20 @@
-import { DEVELOPMENT_AREAS as AREAS } from "../core/developmentCheckpoints.js";
+import {
+	DEVELOPMENT_AREAS as AREAS,
+	currentLevel,
+	currentTeamSize,
+} from "../core/developmentCheckpoints.js";
 import {
 	EXPORT_BUNDLE_VERSION,
 	type ExportBundle,
 	parseExportBundle,
 } from "../core/exportBundle.js";
+import type { TeamSizeId } from "../core/formations.js";
 import {
 	buildHistory,
 	matchesForPlayer,
 	type PlayerHistory,
 	type SeasonHistory,
+	whenOf,
 } from "../core/history.js";
 import { LIMITS } from "../core/limits.js";
 import {
@@ -25,6 +31,7 @@ import {
 	type PlayerNotesFile,
 	seasonFeedback,
 	withAvailability,
+	withCheckpoint,
 	withDevelopment,
 } from "../core/playerNotes.js";
 import { buildSeasonReport, type SeasonReport } from "../core/seasonReport.js";
@@ -36,8 +43,8 @@ import {
 	securePackageToJson,
 } from "../core/securePackage.js";
 import {
-	developmentTimeline,
 	monthlyMinutes,
+	playerDevelopment,
 	recentStartFrequency,
 } from "../core/visualizations.js";
 import { readItem, STORAGE_KEYS, writeItem } from "./appStorage.js";
@@ -166,6 +173,7 @@ function monthlyMinutesChart(history: SeasonHistory): SVGSVGElement {
 	svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
 	svg.setAttribute("role", "img");
 	svg.setAttribute("aria-label", TEXT.history.visualizations.monthlyMinutes);
+	svg.append(svgText(TEXT.history.visualizations.axisMinutes, left, 12));
 
 	model.series.forEach((series, playerIndex) => {
 		const y = top + playerIndex * rowHeight;
@@ -196,14 +204,18 @@ function startFrequencyChart(history: SeasonHistory): SVGSVGElement {
 	const model = recentStartFrequency(history);
 	const width = 360;
 	const left = 92;
-	const top = 8;
+	const top = 20;
 	const rowHeight = 28;
 	const barWidth = width - left - 34;
 	const height = top + model.length * rowHeight;
 	const svg = svgNode("svg") as SVGSVGElement;
 	svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
 	svg.setAttribute("role", "img");
-	svg.setAttribute("aria-label", TEXT.history.visualizations.startFrequency);
+	svg.setAttribute(
+		"aria-label",
+		TEXT.history.visualizations.startFrequency(LIMITS.recentMatches),
+	);
+	svg.append(svgText(TEXT.history.visualizations.axisPercent, left, 12));
 
 	model.forEach((player, index) => {
 		const y = top + index * rowHeight;
@@ -222,7 +234,32 @@ function startFrequencyChart(history: SeasonHistory): SVGSVGElement {
 	return svg;
 }
 
-function buildVisualizationCard(history: SeasonHistory): HTMLElement {
+/** A ladder as steps, the reached ones marked done. Shared by the editable
+ * checkpoint field (player notes) and the read-only per-player view
+ * (Översikt) - same rendering, so a level means the same thing in both. */
+function checkpointLadderList(
+	labels: readonly string[],
+	level: number,
+): HTMLOListElement {
+	const list = document.createElement("ol");
+	list.className = "checkpoint-ladder";
+	labels.forEach((label, index) => {
+		const li = document.createElement("li");
+		li.textContent = label;
+		if (index < level) li.classList.add("done");
+		list.append(li);
+	});
+	return list;
+}
+
+function buildVisualizationCard(
+	history: SeasonHistory,
+	notes: PlayerNotesFile,
+	teamSize: TeamSizeId,
+	levelCounts: Record<DevelopmentArea, number>,
+	selectedKey: string | null,
+	onSelect: (key: string) => void,
+): HTMLElement {
 	const t = TEXT.history.visualizations;
 	const section = card(t.title);
 	const description = document.createElement("p");
@@ -240,32 +277,68 @@ function buildVisualizationCard(history: SeasonHistory): HTMLElement {
 	const starts = document.createElement("div");
 	starts.className = "history-chart";
 	const startsHeading = document.createElement("h3");
-	startsHeading.textContent = t.startFrequency;
+	startsHeading.textContent = t.startFrequency(LIMITS.recentMatches);
 	starts.append(startsHeading, startFrequencyChart(history));
 	section.append(starts);
 
-	const timeline = document.createElement("div");
-	timeline.className = "history-chart";
-	const timelineHeading = document.createElement("h3");
-	timelineHeading.textContent = t.developmentTimeline;
-	timeline.append(timelineHeading);
-	const entries = developmentTimeline(history, loadPlayerNotes());
-	if (entries.length === 0) {
-		const empty = document.createElement("p");
-		empty.className = "hint";
-		empty.textContent = t.noDevelopmentNotes;
-		timeline.append(empty);
-	} else {
-		const list = document.createElement("ol");
-		list.className = "development-timeline";
-		for (const entry of entries) {
-			const item = document.createElement("li");
-			item.textContent = `${entry.date} · ${entry.name} · ${TEXT.history.playerNotes.area[entry.area]}: ${entry.note}`;
-			list.append(item);
+	// One player's own checkpoints and notes (#109) - never mixed with any
+	// other player's, unlike the two charts above which compare the whole
+	// squad on purpose (they check fair playtime, not skill).
+	const dev = document.createElement("div");
+	dev.className = "history-chart";
+	const devHeading = document.createElement("h3");
+	devHeading.textContent = t.developmentTitle;
+	dev.append(devHeading);
+
+	const key =
+		selectedKey && history.players.some((p) => p.key === selectedKey)
+			? selectedKey
+			: (history.players[0]?.key ?? null);
+	const { wrap: playerWrap, select: playerSelect } = selectField(
+		TEXT.history.playerNotes.choosePlayer,
+		"developmentPlayerSelect",
+		history.players.map((p) => [p.key, p.name] as const),
+	);
+	if (key) playerSelect.value = key;
+	playerSelect.addEventListener("change", () => onSelect(playerSelect.value));
+	dev.append(playerWrap);
+
+	if (key) {
+		const view = playerDevelopment(notes, key, levelCounts);
+		for (const checkpoint of view.checkpoints) {
+			const areaWrap = document.createElement("div");
+			areaWrap.className = "checkpoint-area";
+			const areaHeading = document.createElement("h4");
+			areaHeading.textContent = TEXT.history.playerNotes.area[checkpoint.area];
+			areaWrap.append(
+				areaHeading,
+				checkpointLadderList(
+					TEXT.history.playerNotes.checkpointLadders[teamSize][checkpoint.area],
+					checkpoint.level,
+				),
+			);
+			dev.append(areaWrap);
 		}
-		timeline.append(list);
+		const notesList = document.createElement("ul");
+		notesList.className = "history-messages";
+		if (view.notes.length === 0) {
+			const empty = document.createElement("li");
+			empty.textContent = TEXT.history.playerNotes.noNotesYet;
+			notesList.append(empty);
+		} else {
+			for (const entry of view.notes) {
+				const item = document.createElement("li");
+				item.textContent = TEXT.history.playerNotes.developmentNote(
+					entry.date,
+					TEXT.history.playerNotes.area[entry.area],
+					entry.note,
+				);
+				notesList.append(item);
+			}
+		}
+		dev.append(notesList);
 	}
-	section.append(timeline);
+	section.append(dev);
 	return section;
 }
 
@@ -498,16 +571,10 @@ function downloadJson(fileName: string, json: string): void {
 	URL.revokeObjectURL(url);
 }
 
-// TODO(#109): replace with each ladder's real length once the checkpoint
-// catalog lands in text.ts - every ladder happens to be 4 levels today.
-const LEVEL_COUNTS: Record<DevelopmentArea, number> = {
-	physical: 4,
-	mental: 4,
-	technical: 4,
-	tactical: 4,
-};
-
-function buildSeasonReportCard(history: SeasonHistory): HTMLElement {
+function buildSeasonReportCard(
+	history: SeasonHistory,
+	levelCounts: Record<DevelopmentArea, number>,
+): HTMLElement {
 	const t = TEXT.history.seasonReport;
 	const section = card(t.title);
 	section.classList.add("season-report-card");
@@ -520,7 +587,7 @@ function buildSeasonReportCard(history: SeasonHistory): HTMLElement {
 		history,
 		loadPlayerNotes(),
 		new Date().toISOString(),
-		LEVEL_COUNTS,
+		levelCounts,
 	);
 	const summaryInputs = new Map<
 		string,
@@ -544,11 +611,17 @@ function buildSeasonReportCard(history: SeasonHistory): HTMLElement {
 		);
 		playerSection.append(stats);
 
+		const levelByArea = new Map(
+			player.developmentLevels.map((entry) => [entry.area, entry]),
+		);
 		const inputs = new Map<DevelopmentArea, HTMLTextAreaElement>();
 		for (const summary of player.developmentSummary) {
 			const textarea = document.createElement("textarea");
 			textarea.rows = 2;
-			textarea.value = summary.summary;
+			const level = levelByArea.get(summary.area);
+			textarea.value =
+				(level ? t.developmentLevelPrefix(level.level, level.of) : "") +
+				summary.summary;
 			textarea.maxLength = LIMITS.playerNoteLength;
 			playerSection.append(
 				field(
@@ -800,6 +873,58 @@ function buildDevelopmentField(
 }
 
 /**
+ * The checkpoint ladders (#109): per area, the labels as steps and a single
+ * "next level" button - no numbers to type, and nothing here ever shows or
+ * reads another player's progress.
+ */
+function buildCheckpointField(
+	notes: PlayerNotesFile,
+	player: PlayerHistory,
+	teamSize: TeamSizeId,
+	onSaved: () => void,
+): HTMLElement {
+	const t = TEXT.history.playerNotes;
+	const section = document.createElement("div");
+	section.className = "field-stack";
+	const heading = document.createElement("h3");
+	heading.textContent = t.checkpointTitle;
+	section.append(heading);
+
+	const own = notes.players.find((p) => p.key === player.key);
+	for (const area of AREAS) {
+		const labels = t.checkpointLadders[teamSize][area];
+		const level = currentLevel(own?.checkpoints ?? [], area);
+		const areaWrap = document.createElement("div");
+		areaWrap.className = "checkpoint-area";
+		const areaHeading = document.createElement("h4");
+		areaHeading.textContent = t.area[area];
+		areaWrap.append(areaHeading, checkpointLadderList(labels, level));
+
+		const button = document.createElement("button");
+		button.type = "button";
+		button.className = "btn btn-secondary";
+		const maxed = level >= labels.length;
+		button.textContent = maxed ? t.maxLevelReached : t.nextLevel;
+		button.disabled = maxed;
+		button.addEventListener("click", () => {
+			savePlayerNotes(
+				withCheckpoint(
+					loadPlayerNotes(),
+					player.key,
+					area,
+					level + 1,
+					new Date().toISOString().slice(0, 10),
+				),
+			);
+			onSaved();
+		});
+		areaWrap.append(button);
+		section.append(areaWrap);
+	}
+	return section;
+}
+
+/**
  * Availability and development notes, per player (#58): who a coach knows
  * but the match timeline can't see. Every number above is derived from
  * match files; this card's data comes from core/playerNotes.ts instead,
@@ -810,6 +935,7 @@ function buildDevelopmentField(
 function buildPlayerNotesCard(
 	history: SeasonHistory,
 	map: PlayerIdMap,
+	teamSize: TeamSizeId,
 	selectedKey: string | null,
 	onSelect: (key: string) => void,
 	onSaved: () => void,
@@ -857,6 +983,7 @@ function buildPlayerNotesCard(
 		section.append(
 			buildAvailabilityField(notes, player, map, onSaved),
 			buildDevelopmentField(notes, player, onSaved),
+			buildCheckpointField(notes, player, teamSize, onSaved),
 		);
 	}
 	return section;
@@ -959,19 +1086,47 @@ export function createHistoryView(): { refresh: () => void } {
 			),
 		);
 		results.append(months);
-		results.append(buildSeasonReportCard(history));
 
-		results.append(buildVisualizationCard(history));
+		// The squad's team size right now, from its latest match - stands in
+		// for an age class (#109), no new setup field needed since SvFF's own
+		// match formats already carry the ages (see policy.ts's
+		// POLICY.formats). One value for the whole squad, not per player: a
+		// squad doesn't change team size mid-season in practice.
+		const teamSize = currentTeamSize(
+			files.map((f) => ({ formatId: f.setup.formatId, date: whenOf(f) })),
+		);
+		const levelCounts = Object.fromEntries(
+			AREAS.map((area) => [
+				area,
+				TEXT.history.playerNotes.checkpointLadders[teamSize][area].length,
+			]),
+		) as Record<DevelopmentArea, number>;
+		const onSelectPlayer = (key: string) => {
+			selectedPlayerKey = key;
+			refresh();
+		};
+		const notes = loadPlayerNotes();
+
+		results.append(buildSeasonReportCard(history, levelCounts));
+
+		results.append(
+			buildVisualizationCard(
+				history,
+				notes,
+				teamSize,
+				levelCounts,
+				selectedPlayerKey,
+				onSelectPlayer,
+			),
+		);
 
 		results.append(
 			buildPlayerNotesCard(
 				history,
 				map,
+				teamSize,
 				selectedPlayerKey,
-				(key) => {
-					selectedPlayerKey = key;
-					refresh();
-				},
+				onSelectPlayer,
 				refresh,
 			),
 		);

@@ -1339,12 +1339,29 @@ button:disabled {
 		12px system-ui,
 		sans-serif;
 }
-.development-timeline {
-	margin: 0;
-	padding-left: 24px;
+.checkpoint-area {
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
+	gap: 4px;
+}
+.checkpoint-area h4 {
+	font-size: 0.9rem;
+	margin: 0;
+}
+.checkpoint-ladder {
+	margin: 0;
+	padding-left: 20px;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	color: var(--ink-2);
+}
+.checkpoint-ladder li.done {
+	color: var(--ink);
+	font-weight: 600;
+}
+.checkpoint-ladder li.done::marker {
+	content: "✓ ";
 }
 .season-report-player {
 	display: flex;

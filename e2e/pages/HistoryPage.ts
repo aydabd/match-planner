@@ -14,6 +14,8 @@ export class HistoryPage {
 	readonly driveStatus: Locator;
 	readonly playerNotesCard: Locator;
 	readonly playerNotesFeedback: Locator;
+	readonly seasonReportCard: Locator;
+	readonly visualizationCard: Locator;
 	readonly secureExportPasswordInput: Locator;
 	readonly secureExportButton: Locator;
 	readonly secureImportFileInput: Locator;
@@ -47,6 +49,12 @@ export class HistoryPage {
 		this.playerNotesFeedback = this.playerNotesCard.locator(
 			".report-feedback li",
 		);
+		this.seasonReportCard = this.root.locator("section.card").filter({
+			has: page.getByRole("heading", { name: "Säsongsrapport" }),
+		});
+		this.visualizationCard = this.root.locator("section.card").filter({
+			has: page.getByRole("heading", { name: "Översikt" }),
+		});
 		this.secureExportPasswordInput = this.root.locator(
 			"#secureExportPasswordInput",
 		);
@@ -148,5 +156,51 @@ export class HistoryPage {
 
 	developmentNotes(): Locator {
 		return this.playerNotesCard.locator(".history-messages li");
+	}
+
+	/** The checkpoint field for one area, in "Anteckningar per spelare". */
+	checkpointArea(
+		area: "Fysiskt" | "Mentalt" | "Tekniskt" | "Taktiskt",
+	): Locator {
+		return this.playerNotesCard.locator(".checkpoint-area").filter({
+			has: this.page.getByRole("heading", { name: area, exact: true }),
+		});
+	}
+
+	async markNextLevel(
+		area: "Fysiskt" | "Mentalt" | "Tekniskt" | "Taktiskt",
+	): Promise<void> {
+		const button = this.checkpointArea(area).getByRole("button", {
+			name: "Nästa nivå uppnådd",
+		});
+		await button.scrollIntoViewIfNeeded();
+		await this.clickBelowADateField(button);
+	}
+
+	/** The pre-filled, editable development summary for one player and area
+	 * in the Säsongsrapport card. */
+	seasonReportSummary(
+		name: string,
+		area: "Fysiskt" | "Mentalt" | "Tekniskt" | "Taktiskt",
+	): Locator {
+		return this.seasonReportCard
+			.locator("section.season-report-player")
+			.filter({ has: this.page.getByRole("heading", { name, exact: true }) })
+			.getByLabel(area, { exact: true });
+	}
+
+	/** One area's checkpoint ladder in the Översikt card's per-player view. */
+	visualizationCheckpointArea(
+		area: "Fysiskt" | "Mentalt" | "Tekniskt" | "Taktiskt",
+	): Locator {
+		return this.visualizationCard.locator(".checkpoint-area").filter({
+			has: this.page.getByRole("heading", { name: area, exact: true }),
+		});
+	}
+
+	async choosePlayerForVisualization(name: string): Promise<void> {
+		await this.visualizationCard
+			.getByLabel("Välj spelare")
+			.selectOption({ label: name });
 	}
 }

@@ -73,6 +73,32 @@ test.describe("Player notes: availability and development", () => {
 		).toHaveCount(0);
 	});
 
+	test("marking a checkpoint shows up in Översikt and pre-fills Säsongsrapport", async ({
+		history,
+	}) => {
+		await history.choosePlayerForNotes("Dino");
+		await expect(
+			history.checkpointArea("Tekniskt").getByRole("listitem").first(),
+		).not.toHaveClass(/done/);
+
+		await history.markNextLevel("Tekniskt");
+
+		await expect(
+			history.checkpointArea("Tekniskt").getByRole("listitem").first(),
+		).toHaveClass(/done/);
+		await expect(history.seasonReportSummary("Dino", "Tekniskt")).toHaveValue(
+			/^Nivå 1 av 4 uppnådd\. /,
+		);
+
+		await history.choosePlayerForVisualization("Dino");
+		await expect(
+			history
+				.visualizationCheckpointArea("Tekniskt")
+				.getByRole("listitem")
+				.first(),
+		).toHaveClass(/done/);
+	});
+
 	test("keeps notes after a reload", async ({ history, page }) => {
 		await history.choosePlayerForNotes("Cleo");
 		await history.addDevelopmentNote({ area: "Mentalt", note: "Peppar laget" });

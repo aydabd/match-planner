@@ -1,5 +1,10 @@
+import {
+	currentLevel,
+	DEVELOPMENT_AREAS,
+	type DevelopmentArea,
+} from "./developmentCheckpoints.js";
 import type { SeasonHistory } from "./history.js";
-import type { DevelopmentArea, PlayerNotesFile } from "./playerNotes.js";
+import type { PlayerNotesFile } from "./playerNotes.js";
 
 export interface MonthlyMinutesSeries {
 	key: string;
@@ -20,12 +25,22 @@ export interface StartFrequency {
 	percentage: number;
 }
 
-export interface DevelopmentTimelineEntry {
+export interface CheckpointProgress {
+	area: DevelopmentArea;
+	level: number;
+	of: number;
+}
+
+export interface PlayerNoteEntry {
 	date: string;
-	key: string;
-	name: string;
 	area: DevelopmentArea;
 	note: string;
+}
+
+/** One player's own development, never mixed with any other player's. */
+export interface PlayerDevelopmentView {
+	checkpoints: CheckpointProgress[];
+	notes: PlayerNoteEntry[];
 }
 
 /** Build the monthly minute series used by the season chart. */
@@ -59,31 +74,33 @@ export function recentStartFrequency(history: SeasonHistory): StartFrequency[] {
 	}));
 }
 
-/** Flatten local development notes into a stable, oldest-first timeline. */
-export function developmentTimeline(
-	history: SeasonHistory,
+/**
+ * One player's own checkpoint progress and development notes (#109) - never
+ * any other player's. `levelCounts` is each area's ladder length for the
+ * squad's current team size (the ladders themselves are UI text; see
+ * seasonReport.ts's buildSeasonReport for why this module takes counts
+ * rather than looking them up).
+ */
+export function playerDevelopment(
 	notes: PlayerNotesFile,
-): DevelopmentTimelineEntry[] {
-	const players = new Map(
-		history.players.map((player) => [player.key, player]),
-	);
-	return notes.players
-		.flatMap((playerNotes) => {
-			const player = players.get(playerNotes.key);
-			return player
-				? playerNotes.development.map((entry) => ({
-						date: entry.date,
-						key: player.key,
-						name: player.name,
-						area: entry.area,
-						note: entry.note,
-					}))
-				: [];
-		})
-		.sort(
-			(a, b) =>
-				a.date.localeCompare(b.date) ||
-				a.name.localeCompare(b.name, "sv") ||
-				a.area.localeCompare(b.area),
-		);
+	key: string,
+	levelCounts: Record<DevelopmentArea, number>,
+): PlayerDevelopmentView {
+	const own = notes.players.find((player) => player.key === key);
+	return {
+		checkpoints: DEVELOPMENT_AREAS.map((area) => ({
+			area,
+			level: currentLevel(own?.checkpoints ?? [], area),
+			of: levelCounts[area],
+		})),
+		notes: (own?.development ?? [])
+			.map((entry) => ({
+				date: entry.date,
+				area: entry.area,
+				note: entry.note,
+			}))
+			.sort(
+				(a, b) => a.date.localeCompare(b.date) || a.area.localeCompare(b.area),
+			),
+	};
 }
