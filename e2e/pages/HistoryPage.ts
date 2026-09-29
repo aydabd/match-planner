@@ -24,7 +24,7 @@ export class HistoryPage {
 		this.root = page.locator("#historyView");
 		this.count = this.root.locator("#historyCount");
 		this.messages = this.root.locator("#historyMessages li");
-		this.backButton = this.root.getByRole("button", { name: "Tillbaka" });
+		this.backButton = this.root.getByRole("link", { name: "Tillbaka" });
 		this.driveConnectButton = this.root.getByRole("button", {
 			name: "Koppla Google Drive",
 		});
@@ -60,11 +60,9 @@ export class HistoryPage {
 		this.secureExportStatus = this.root.locator("#secureExportStatus");
 	}
 
-	/** Open it from the setup screen. */
+	/** Open it from the setup screen: a real navigation to /statistics/. */
 	async open(): Promise<void> {
-		await this.page
-			.getByRole("button", { name: "Visa spelarhistorik" })
-			.click();
+		await this.page.getByRole("link", { name: "Visa spelarhistorik" }).click();
 	}
 
 	async importFiles(

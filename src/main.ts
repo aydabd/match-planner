@@ -1,5 +1,4 @@
 import "./ui/style.css";
-import { createHistoryView } from "./ui/history.js";
 import { createMatchView } from "./ui/match.js";
 import { byId, initPage } from "./ui/page.js";
 import { createReportView } from "./ui/report.js";
@@ -11,7 +10,6 @@ initPage("start");
 const setupView = byId("setupView");
 const matchView = byId("matchView");
 const reportView = byId("reportView");
-const historyPage = byId("historyView");
 
 function showSetup(): void {
 	clearSession();
@@ -72,13 +70,6 @@ function closePage(page: HTMLElement): void {
 }
 
 byId("reportBackBtn").addEventListener("click", () => closePage(reportView));
-
-const history = createHistoryView();
-byId("historyOpenBtn").addEventListener("click", () => {
-	history.refresh();
-	openOver(historyPage);
-});
-byId("historyBackBtn").addEventListener("click", () => closePage(historyPage));
 
 // The list of kept reports lives on Start; opening one is a real navigation
 // to its own page (see src/ui/pages/report.ts), not an in-page overlay.

@@ -96,8 +96,9 @@ test.describe("Season history", () => {
 		await history.importFiles(FILES);
 		// Reading files is asynchronous: reload only once they are kept.
 		await expect(history.count).toHaveText("6 matcher över 6 månader.");
+		// /statistics/ is a real page (#93): a reload stays there, no need to
+		// reopen it from setup.
 		await page.reload();
-		await history.open();
 		await expect(history.count).toHaveText("6 matcher över 6 månader.");
 	});
 });
