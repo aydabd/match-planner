@@ -7,6 +7,8 @@ export class SetupPage {
 	readonly formations: Locator;
 	readonly customFormation: Locator;
 	readonly customFormationMessage: Locator;
+	readonly region: Locator;
+	readonly regionOverrideNote: Locator;
 	readonly minutesBetweenSwaps: Locator;
 	readonly periods: Locator;
 	readonly periodMinutes: Locator;
@@ -35,6 +37,8 @@ export class SetupPage {
 			"Egen formation, från back till anfall",
 		);
 		this.customFormationMessage = this.root.locator("#customFormationMessage");
+		this.region = this.root.getByLabel("Distrikt");
+		this.regionOverrideNote = this.root.locator("#regionOverrideNote");
 		this.minutesBetweenSwaps = this.root.getByLabel("Minuter mellan byten");
 		this.periods = this.root.getByLabel("Perioder");
 		this.periodMinutes = this.root.getByLabel("Minuter per period");

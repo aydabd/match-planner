@@ -1,8 +1,10 @@
 import { getFormat, outfieldCount, teamSizeOf } from "../core/formations.js";
 import { LIMITS, numberWithin, rotationSecondsFrom } from "../core/limits.js";
+import { REGIONS, type RegionId } from "../core/policy.js";
 import {
 	newRoster,
 	parseRosterFile,
+	policyOverrides,
 	type RosterFile,
 	StorageError,
 	squadFile,
@@ -54,6 +56,8 @@ export function createRosterView(callbacks: RosterViewCallbacks): void {
 
 	const byId = <T extends HTMLElement>(id: string) =>
 		document.getElementById(id) as T;
+	const regionSelect = byId<HTMLSelectElement>("regionSelect");
+	const regionOverrideNote = byId<HTMLElement>("regionOverrideNote");
 	const periodsInput = byId<HTMLInputElement>("periodsInput");
 	const periodMinutesInput = byId<HTMLInputElement>("periodMinutesInput");
 	const opponentInput = byId<HTMLInputElement>("opponentInput");
@@ -62,6 +66,16 @@ export function createRosterView(callbacks: RosterViewCallbacks): void {
 	const coachNameInput = byId<HTMLInputElement>("coachNameInput");
 	const startingKeeperField = byId<HTMLElement>("startingKeeperField");
 	const startingKeeperSelect = byId<HTMLSelectElement>("startingKeeperSelect");
+
+	// The region list comes from core/policy.ts, never written in the HTML.
+	regionSelect.replaceChildren(
+		...Object.entries(REGIONS).map(([id, region]) => {
+			const option = document.createElement("option");
+			option.value = id;
+			option.textContent = region.label;
+			return option;
+		}),
+	);
 
 	// Limits come from core/limits.ts, never from numbers written in the HTML.
 	rotationInput.min = String(LIMITS.rotationMinutes.min);
@@ -115,6 +129,12 @@ export function createRosterView(callbacks: RosterViewCallbacks): void {
 
 	function render(): void {
 		formationPicker.render(draft.formatId);
+		regionSelect.value = draft.region;
+		const overridden = policyOverrides(draft).length > 0;
+		regionOverrideNote.hidden = !overridden;
+		regionOverrideNote.textContent = overridden
+			? TEXT.setup.policyOverride
+			: "";
 		rotationInput.value = String(draft.rotationSeconds / 60);
 		periodsInput.value = String(draft.periods);
 		periodMinutesInput.value = String(Math.round(draft.periodSeconds / 60));
@@ -270,6 +290,12 @@ export function createRosterView(callbacks: RosterViewCallbacks): void {
 		draft = { ...draft, players: [...draft.players, player] };
 		persist();
 	}
+
+	regionSelect.addEventListener("change", () => {
+		if (!(regionSelect.value in REGIONS)) return;
+		draft = { ...draft, region: regionSelect.value as RegionId };
+		persist();
+	});
 
 	periodsInput.addEventListener("change", () => {
 		draft = {

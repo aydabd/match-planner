@@ -131,6 +131,36 @@ test.describe("Setting up a match", () => {
 		await expect(setup.players).toHaveInputValues(SQUAD);
 	});
 
+	test("defaults to the national region, and remembers a chosen one", async ({
+		setup,
+		page,
+	}) => {
+		await expect(setup.region).toHaveValue("national");
+
+		await setup.region.selectOption({ label: "Skåne (Skånebollen)" });
+		await page.reload();
+
+		await expect(setup.region).toHaveValue("skane");
+	});
+
+	test("points out a match length that differs from the region's policy", async ({
+		setup,
+	}) => {
+		await expect(setup.regionOverrideNote).toBeHidden();
+
+		await setup.periodMinutes.fill("18");
+		await setup.periodMinutes.blur();
+
+		await expect(setup.regionOverrideNote).toBeVisible();
+		await expect(setup.regionOverrideNote).toHaveText(
+			"Avviker från distriktets rekommenderade policy (perioder eller minuter per period).",
+		);
+
+		await setup.periodMinutes.fill("20");
+		await setup.periodMinutes.blur();
+		await expect(setup.regionOverrideNote).toBeHidden();
+	});
+
 	test("starting the match shows the format and swap interval", async ({
 		setup,
 		match,

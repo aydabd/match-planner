@@ -52,6 +52,8 @@ export const TEXT = {
 		keeperToggleLabel: (name: string) => `Målvakt: ${name}`,
 		confirmStartOver: "Tryck igen för att tömma truppen",
 		confirmClearAll: "Tryck igen för att rensa allt",
+		policyOverride:
+			"Avviker från distriktets rekommenderade policy (perioder eller minuter per period).",
 	},
 
 	formation: {
