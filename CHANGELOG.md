@@ -3,6 +3,13 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.16.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.15.1...matchplanner-v0.16.0) (2026-09-29)
+
+
+### Features
+
+* **github:** add issue templates and issue-based workflow ([#107](https://github.com/aydabd/match-planner/issues/107)) ([8a3403c](https://github.com/aydabd/match-planner/commit/8a3403c5a737aaf35f48e02b5587e05bbf38124e))
+
 ## [0.15.1](https://github.com/aydabd/match-planner/compare/matchplanner-v0.15.0...matchplanner-v0.15.1) (2026-09-29)
 
 
