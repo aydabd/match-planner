@@ -39,16 +39,24 @@ const notes: PlayerNotesFile = {
 			development: [
 				{ date: "2026-01-10", area: "technical", note: "Passningar" },
 			],
+			checkpoints: [],
 		},
 	],
 };
 
+const LEVEL_COUNTS = { physical: 4, mental: 4, technical: 4, tactical: 4 };
+
 describe("season reports", () => {
 	it("builds objective stats and editable summaries from season data", () => {
 		expect(
-			buildSeasonReport(history, notes, "2026-02-01T12:00:00.000Z"),
+			buildSeasonReport(
+				history,
+				notes,
+				"2026-02-01T12:00:00.000Z",
+				LEVEL_COUNTS,
+			),
 		).toEqual({
-			schemaVersion: 1,
+			schemaVersion: 2,
 			generatedAt: "2026-02-01T12:00:00.000Z",
 			players: [
 				{
@@ -67,6 +75,12 @@ describe("season reports", () => {
 						{ area: "technical", summary: "Passningar" },
 						{ area: "tactical", summary: "" },
 					],
+					developmentLevels: [
+						{ area: "physical", level: 0, of: 4 },
+						{ area: "mental", level: 0, of: 4 },
+						{ area: "technical", level: 0, of: 4 },
+						{ area: "tactical", level: 0, of: 4 },
+					],
 				},
 			],
 		});
@@ -77,9 +91,39 @@ describe("season reports", () => {
 			history,
 			notes,
 			"2026-02-01T12:00:00.000Z",
+			LEVEL_COUNTS,
 		);
 		expect(isSeasonReport(JSON.parse(seasonReportToJson(report)))).toBe(true);
-		expect(isSeasonReport({ ...report, schemaVersion: 2 })).toBe(false);
+		expect(isSeasonReport({ ...report, schemaVersion: 1 })).toBe(false);
 		expect(isSeasonReport({ ...report, players: [] })).toBe(false);
+	});
+
+	it("rejects a report whose developmentLevels is missing or malformed", () => {
+		const report = buildSeasonReport(
+			history,
+			notes,
+			"2026-02-01T12:00:00.000Z",
+			LEVEL_COUNTS,
+		);
+		const withoutLevels = {
+			...report,
+			players: [
+				{
+					...report.players[0],
+					developmentLevels: undefined,
+				},
+			],
+		};
+		expect(isSeasonReport(withoutLevels)).toBe(false);
+		const badArea = {
+			...report,
+			players: [
+				{
+					...report.players[0],
+					developmentLevels: [{ area: "spiritual", level: 1, of: 4 }],
+				},
+			],
+		};
+		expect(isSeasonReport(badArea)).toBe(false);
 	});
 });

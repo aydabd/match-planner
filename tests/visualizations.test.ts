@@ -94,6 +94,7 @@ describe("season visualization models", () => {
 					key: "bo",
 					availability: [],
 					development: [{ date: "2026-02-03", area: "mental", note: "Fokus" }],
+					checkpoints: [],
 				},
 				{
 					key: "unknown",
@@ -101,6 +102,7 @@ describe("season visualization models", () => {
 					development: [
 						{ date: "2026-01-01", area: "physical", note: "Ignored" },
 					],
+					checkpoints: [],
 				},
 				{
 					key: "alva",
@@ -108,6 +110,7 @@ describe("season visualization models", () => {
 					development: [
 						{ date: "2026-01-20", area: "technical", note: "Pass" },
 					],
+					checkpoints: [],
 				},
 			],
 		};

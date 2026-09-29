@@ -289,11 +289,26 @@ describe("matchesForPlayer - which matches a player was in the squad for", () =>
 		});
 		const map = await playerIdMapFor([a, b]);
 		expect(matchesForPlayer([b, a], map, playerId(map, "Alva"))).toEqual([
-			{ matchId: "a", opponent: "Först", date: "2026-03-01" },
+			{
+				matchId: "a",
+				opponent: "Först",
+				date: "2026-03-01",
+				formatId: "7v7:2-3-1",
+			},
 		]);
 		expect(matchesForPlayer([b, a], map, playerId(map, "Bo"))).toEqual([
-			{ matchId: "a", opponent: "Först", date: "2026-03-01" },
-			{ matchId: "b", opponent: "Sen", date: "2026-04-01" },
+			{
+				matchId: "a",
+				opponent: "Först",
+				date: "2026-03-01",
+				formatId: "7v7:2-3-1",
+			},
+			{
+				matchId: "b",
+				opponent: "Sen",
+				date: "2026-04-01",
+				formatId: "7v7:2-3-1",
+			},
 		]);
 	});
 
