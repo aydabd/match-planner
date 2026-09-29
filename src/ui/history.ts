@@ -157,10 +157,6 @@ function monthlyMinutesChart(history: SeasonHistory): SVGSVGElement {
 				`translate(0 ${18 - (minutes / max) * 18})`,
 			);
 			bar.setAttribute("fill", chartColor(playerIndex));
-			bar.setAttribute(
-				"aria-label",
-				TEXT.history.visualizations.minutes(series.name, minutes),
-			);
 			svg.append(bar);
 		});
 	});
@@ -194,15 +190,6 @@ function startFrequencyChart(history: SeasonHistory): SVGSVGElement {
 		bar.setAttribute("width", String((player.percentage / 100) * barWidth));
 		bar.setAttribute("height", "18");
 		bar.setAttribute("fill", chartColor(index));
-		bar.setAttribute(
-			"aria-label",
-			TEXT.history.visualizations.starts(
-				player.name,
-				player.started,
-				player.of,
-				player.percentage,
-			),
-		);
 		svg.append(
 			bar,
 			svgText(`${player.percentage}%`, left + barWidth + 4, y + 17),

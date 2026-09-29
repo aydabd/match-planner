@@ -269,9 +269,6 @@ export const TEXT = {
 			developmentTimeline: "Utvecklingsanteckningar över tid",
 			noDevelopmentNotes: "Inga utvecklingsanteckningar att visa än.",
 			chartDescription: "Samma uppgifter finns i tabellerna nedan.",
-			minutes: (name: string, minutes: number) => `${name}: ${minutes} minuter`,
-			starts: (name: string, started: number, of: number, percentage: number) =>
-				`${name}: ${started} av ${of} starter (${percentage} procent)`,
 		},
 		startedHint: (name: string, started: number, of: number) =>
 			`${name} har startat ${started} av de senaste ${of} matcherna.`,
