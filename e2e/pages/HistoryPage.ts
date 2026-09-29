@@ -14,6 +14,11 @@ export class HistoryPage {
 	readonly driveStatus: Locator;
 	readonly playerNotesCard: Locator;
 	readonly playerNotesFeedback: Locator;
+	readonly secureExportPasswordInput: Locator;
+	readonly secureExportButton: Locator;
+	readonly secureImportFileInput: Locator;
+	readonly secureImportButton: Locator;
+	readonly secureExportStatus: Locator;
 
 	constructor(private readonly page: Page) {
 		this.root = page.locator("#historyView");
@@ -42,6 +47,17 @@ export class HistoryPage {
 		this.playerNotesFeedback = this.playerNotesCard.locator(
 			".report-feedback li",
 		);
+		this.secureExportPasswordInput = this.root.locator(
+			"#secureExportPasswordInput",
+		);
+		this.secureExportButton = this.root.getByRole("button", {
+			name: "Exportera allt (krypterat)",
+		});
+		this.secureImportFileInput = this.root.locator("#secureImportFileInput");
+		this.secureImportButton = this.root.getByRole("button", {
+			name: /^(Importera|Ersätt trupp och anteckningar\?)$/,
+		});
+		this.secureExportStatus = this.root.locator("#secureExportStatus");
 	}
 
 	/** Open it from the setup screen. */

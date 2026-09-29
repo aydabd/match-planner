@@ -273,7 +273,7 @@ export const TEXT = {
 		seasonReport: {
 			title: "Säsongsrapport",
 			description:
-				"Granska sammanfattningarna innan du sparar rapporten. Den här rapporten är avsedd att delas med spelaren, familjen eller klubben.",
+				"Granska sammanfattningarna innan du sparar rapporten. Den här rapporten är avsedd att delas med spelaren, familjen eller klubben - filen krypteras med ett lösenord du väljer.",
 			stats: (
 				squad: number,
 				played: number,
@@ -283,7 +283,9 @@ export const TEXT = {
 				absent: number,
 			) =>
 				`${squad} truppmatcher · ${played} spelade · ${started} starter · ${minutes} minuter · närvaro ${present}/${present + absent}`,
-			exportButton: "Spara säsongsrapport",
+			passwordLabel: "Lösenord för filen",
+			needPassword: "Ange ett lösenord för filen först.",
+			exportButton: "Spara säsongsrapport (krypterad)",
 			printButton: "Skriv ut / spara som PDF",
 		},
 		startedHint: (name: string, started: number, of: number) =>
@@ -331,6 +333,16 @@ export const TEXT = {
 			failed: "Det gick inte att nå Google Drive just nu. Försök igen senare.",
 			signInFailed: "Inloggningen misslyckades eller avbröts.",
 			folderPickerFailed: "Det gick inte att öppna mappväljaren.",
+		},
+		secureExport: {
+			needPassword: "Ange ett lösenord först.",
+			exported: "Allt exporterades till en krypterad fil.",
+			importing: "Läser in …",
+			imported: "Allt importerades.",
+			wrongPassword:
+				"Fel lösenord, eller filen har ändrats. Kontrollera lösenordet och försök igen.",
+			unreadable: "Filen kunde inte läsas som en exporterad fil.",
+			confirmImport: "Ersätt trupp och anteckningar?",
 		},
 		playerNotes: {
 			title: "Anteckningar per spelare",

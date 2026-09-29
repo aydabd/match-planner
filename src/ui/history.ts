@@ -1,4 +1,10 @@
 import {
+	EXPORT_BUNDLE_VERSION,
+	type ExportBundle,
+	ExportBundleError,
+	parseExportBundle,
+} from "../core/exportBundle.js";
+import {
 	buildHistory,
 	matchesForPlayer,
 	type PlayerHistory,
@@ -21,18 +27,22 @@ import {
 	withAvailability,
 	withDevelopment,
 } from "../core/playerNotes.js";
+import { buildSeasonReport, type SeasonReport } from "../core/seasonReport.js";
 import {
-	buildSeasonReport,
-	type SeasonReport,
-	seasonReportToJson,
-} from "../core/seasonReport.js";
-import { SecurePackageError } from "../core/securePackage.js";
+	decryptJson,
+	encryptJson,
+	parseSecurePackage,
+	SecurePackageError,
+	securePackageToJson,
+} from "../core/securePackage.js";
 import {
 	developmentTimeline,
 	monthlyMinutes,
 	recentStartFrequency,
 } from "../core/visualizations.js";
 import { readItem, STORAGE_KEYS, writeItem } from "./appStorage.js";
+import { confirmWithSecondTap } from "./confirmButton.js";
+import { loadDraft, saveDraft } from "./draftStorage.js";
 import { createDriveAuth } from "./driveAuth.js";
 import { createDriveBackup } from "./driveBackup.js";
 import {
@@ -394,6 +404,84 @@ function setUpDriveBackup(refresh: () => void): void {
 	});
 }
 
+/**
+ * The "Säker export och import" card (#81): a coach's whole local season -
+ * roster draft, every match file, player notes - as one file protected by
+ * one password (core/exportBundle.ts, core/securePackage.ts), for moving
+ * everything to another device without Google Drive. Purely local: no
+ * network, no sign-in.
+ */
+function setUpSecureExport(refresh: () => void): void {
+	const passwordInput = byId("secureExportPasswordInput") as HTMLInputElement;
+	const exportBtn = byId("secureExportBtn") as HTMLButtonElement;
+	const fileInput = byId("secureImportFileInput") as HTMLInputElement;
+	const importBtn = byId("secureImportBtn") as HTMLButtonElement;
+	const status = byId("secureExportStatus");
+	const t = TEXT.history.secureExport;
+
+	let pendingFile: File | null = null;
+
+	exportBtn.addEventListener("click", async () => {
+		if (passwordInput.value === "") {
+			status.textContent = t.needPassword;
+			return;
+		}
+		const bundle: ExportBundle = {
+			schemaVersion: EXPORT_BUNDLE_VERSION,
+			roster: loadDraft(),
+			matches: loadMatchFiles(),
+			playerNotes: loadPlayerNotes(),
+		};
+		const pkg = await encryptJson(passwordInput.value, bundle);
+		downloadJson(
+			`matchplanner-export-${new Date().toISOString().slice(0, 10)}.json`,
+			securePackageToJson(pkg),
+		);
+		status.textContent = t.exported;
+	});
+
+	fileInput.addEventListener("change", () => {
+		pendingFile = fileInput.files?.[0] ?? null;
+		importBtn.disabled = pendingFile === null;
+	});
+
+	confirmWithSecondTap(importBtn, {
+		confirmLabel: t.confirmImport,
+		onConfirm: () => {
+			void (async () => {
+				const file = pendingFile;
+				if (file === null) return;
+				if (passwordInput.value === "") {
+					status.textContent = t.needPassword;
+					return;
+				}
+				status.textContent = t.importing;
+				try {
+					const pkg = parseSecurePackage(JSON.parse(await file.text()));
+					const bundle = parseExportBundle(
+						await decryptJson(passwordInput.value, pkg),
+					);
+					if (bundle.roster) saveDraft(bundle.roster);
+					savePlayerNotes(bundle.playerNotes);
+					keepMatchFiles(bundle.matches);
+					status.textContent = t.imported;
+					refresh();
+				} catch (err) {
+					status.textContent =
+						err instanceof SecurePackageError ||
+						err instanceof ExportBundleError
+							? t.wrongPassword
+							: t.unreadable;
+				} finally {
+					pendingFile = null;
+					fileInput.value = "";
+					importBtn.disabled = true;
+				}
+			})();
+		},
+	});
+}
+
 /** Which of the reason keys TEXT.history.playerNotes.reason declares. */
 const REASONS: readonly AbsenceReason[] = ["injury", "illness", "other"];
 const AREAS: readonly DevelopmentArea[] = [
@@ -468,13 +556,27 @@ function buildSeasonReportCard(history: SeasonHistory): HTMLElement {
 		section.append(playerSection);
 	}
 
+	const passwordInput = document.createElement("input");
+	passwordInput.type = "password";
+	passwordInput.autocomplete = "off";
+	section.append(field(t.passwordLabel, passwordInput, "seasonReportPassword"));
+
+	const status = document.createElement("p");
+	status.className = "hint";
+	status.setAttribute("role", "status");
+	section.append(status);
+
 	const actions = document.createElement("div");
 	actions.className = "row-buttons";
 	const exportButton = document.createElement("button");
 	exportButton.type = "button";
 	exportButton.className = "btn btn-secondary";
 	exportButton.textContent = t.exportButton;
-	exportButton.addEventListener("click", () => {
+	exportButton.addEventListener("click", async () => {
+		if (passwordInput.value === "") {
+			status.textContent = t.needPassword;
+			return;
+		}
 		const reviewed: SeasonReport = {
 			...report,
 			players: report.players.map((player) => ({
@@ -487,10 +589,12 @@ function buildSeasonReportCard(history: SeasonHistory): HTMLElement {
 				})),
 			})),
 		};
+		const pkg = await encryptJson(passwordInput.value, reviewed);
 		downloadJson(
 			`sasongsrapport-${report.generatedAt.slice(0, 10)}.json`,
-			seasonReportToJson(reviewed),
+			securePackageToJson(pkg),
 		);
+		status.textContent = "";
 	});
 	actions.append(exportButton);
 
@@ -897,6 +1001,7 @@ export function createHistoryView(): { refresh: () => void } {
 	});
 
 	setUpDriveBackup(refresh);
+	setUpSecureExport(refresh);
 
 	return { refresh };
 }
