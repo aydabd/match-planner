@@ -13,7 +13,11 @@ export class ReportPage {
 		this.summary = this.root.locator("#reportFeedback li");
 		this.playtimeRows = this.root.locator("#reportPlaytime tbody tr");
 		this.swapRows = this.root.locator("#reportSwaps tbody tr");
-		this.backButton = this.root.getByRole("button", { name: "Tillbaka" });
+		// A button on the in-match overlay (still opened from the match menu);
+		// a link on the standalone /report/ page (a real navigation, see #93).
+		this.backButton = this.root
+			.getByRole("button", { name: "Tillbaka" })
+			.or(this.root.getByRole("link", { name: "Tillbaka" }));
 	}
 
 	/** A kept report in the "Tidigare matchrapporter" list on setup. */

@@ -112,6 +112,12 @@ body {
 .view.hidden {
 	display: none;
 }
+/* Pages toggle an empty state against real content via the `hidden`
+ * property (src/ui/pages/report.ts and .../match.ts), not this class - a
+ * plain `[hidden]` would otherwise lose to `.view`'s own `display: flex`. */
+.view[hidden] {
+	display: none;
+}
 @media (min-width: 900px) {
 	.app:has(.view-match:not(.hidden)) {
 		max-width: 1080px;

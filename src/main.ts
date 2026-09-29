@@ -90,10 +90,11 @@ byId("historyOpenBtn").addEventListener("click", () => {
 });
 byId("historyBackBtn").addEventListener("click", () => closePage(historyPage));
 
+// The list of kept reports lives on Start; opening one is a real navigation
+// to its own page (see src/ui/pages/report.ts), not an in-page overlay.
 const report = createReportView({
 	onOpen: (stored) => {
-		report.show(stored);
-		openOver(reportView);
+		location.href = `${import.meta.env.BASE_URL}report/?matchId=${encodeURIComponent(stored.matchId)}`;
 	},
 });
 

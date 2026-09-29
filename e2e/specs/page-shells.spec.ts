@@ -1,15 +1,15 @@
 import { expect, test } from "../fixtures.js";
 
 /**
- * The four new page shells (issue #93): direct navigation works, each shows
- * its "not ready yet" placeholder, and the shared nav lists all five pages
- * with the current one marked. The pages get their real content in later
- * PRs, which replace this spec's placeholder assertions with real ones.
+ * The page shells still not split out of the single-page app (issue #93):
+ * direct navigation works, each shows its "not ready yet" placeholder, and
+ * the shared nav lists all five pages with the current one marked. Each
+ * page's own spec replaces its entry here once its real content lands -
+ * see e2e/specs/report-page.spec.ts for the first one.
  */
 test.describe("Page shells", () => {
 	for (const [path, current] of [
 		["match/", "Match"],
-		["report/", "Matchrapport"],
 		["statistics/", "Statistik"],
 		["about/", "Om"],
 	] as const) {

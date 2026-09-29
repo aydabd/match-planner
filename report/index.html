@@ -21,7 +21,49 @@
       <nav class="page-nav" id="pageNav" aria-label="Sidor"></nav>
     </header>
 
-    <section class="view" id="notReady"></section>
+    <!-- Shown when there is no report to display: none saved yet, or a bad ?matchId. -->
+    <section class="view" id="reportEmptyState" hidden>
+      <div class="intro">
+        <h1 tabindex="-1">Ingen matchrapport att visa</h1>
+        <p class="lede">Det finns ingen sparad matchrapport i den här webbläsaren än. Spela klart en match så visas rapporten här.</p>
+      </div>
+      <a href="../" class="btn btn-primary">Till start</a>
+    </section>
+
+    <!-- ============ REPORT VIEW ============ -->
+    <section id="reportView" class="view view-report" aria-labelledby="reportTitle" hidden>
+      <div class="row-buttons">
+        <a id="reportBackBtn" href="../" class="btn btn-ghost">Tillbaka</a>
+      </div>
+      <div class="intro">
+        <h1 id="reportTitle" tabindex="-1">Matchrapport</h1>
+        <p class="lede" id="reportSubtitle"></p>
+      </div>
+      <section class="card" aria-labelledby="reportFeedbackTitle">
+        <h2 id="reportFeedbackTitle">Sammanfattning</h2>
+        <ul id="reportFeedback" class="report-feedback"></ul>
+      </section>
+      <section class="card" aria-labelledby="reportPlaytimeTitle">
+        <h2 id="reportPlaytimeTitle">Speltid</h2>
+        <p class="hint" id="reportPlaytimeSummary"></p>
+        <table id="reportPlaytime" class="report-table"></table>
+      </section>
+      <section class="card" aria-labelledby="reportSwapsTitle">
+        <h2 id="reportSwapsTitle">Byten: planerat mot gjort</h2>
+        <p class="hint" id="reportSwapSummary"></p>
+        <table id="reportSwaps" class="report-table"></table>
+      </section>
+      <section class="card" aria-labelledby="reportShareTitle">
+        <h2 id="reportShareTitle">Spara eller dela</h2>
+        <p class="hint">Matchfilen innehåller hela matchen och används i spelarhistoriken.</p>
+        <div class="row-buttons">
+          <button type="button" id="reportCopyBtn" class="btn btn-secondary">Kopiera som text</button>
+          <button type="button" id="reportSaveBtn" class="btn btn-secondary">Spara rapport som fil</button>
+          <button type="button" id="matchFileSaveBtn" class="btn btn-secondary">Spara matchfil</button>
+        </div>
+        <p class="hint" id="reportShareStatus" role="status"></p>
+      </section>
+    </section>
 
     <footer class="footer app-footer" id="appFooter">
       <span>MatchPlanner v<span data-app-version></span></span>
