@@ -1,7 +1,7 @@
 import { getFormat } from "./formations.js";
 import { LIMITS } from "./limits.js";
 import {
-	isWholeMinutesWithin,
+	isMinutesStepWithin,
 	type MatchDetails,
 	parseAudit,
 	parseMatchDetails,
@@ -174,8 +174,8 @@ function parseSetup(raw: unknown): MatchSetup {
 		!Number.isInteger(raw.periods) ||
 		raw.periods < LIMITS.periods.min ||
 		raw.periods > LIMITS.periods.max ||
-		!isWholeMinutesWithin(raw.periodSeconds, LIMITS.periodMinutes) ||
-		!isWholeMinutesWithin(raw.rotationSeconds, LIMITS.rotationMinutes)
+		!isMinutesStepWithin(raw.periodSeconds, LIMITS.periodMinutes) ||
+		!isMinutesStepWithin(raw.rotationSeconds, LIMITS.rotationMinutes, 0.5)
 	) {
 		return fail(problem, "periods and times must be in range");
 	}

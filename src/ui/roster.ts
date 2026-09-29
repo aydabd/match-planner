@@ -1,5 +1,5 @@
 import { getFormat, outfieldCount, teamSizeOf } from "../core/formations.js";
-import { LIMITS, numberWithin, rotationMinutesFrom } from "../core/limits.js";
+import { LIMITS, numberWithin, rotationSecondsFrom } from "../core/limits.js";
 import {
 	newRoster,
 	parseRosterFile,
@@ -66,6 +66,7 @@ export function createRosterView(callbacks: RosterViewCallbacks): void {
 	// Limits come from core/limits.ts, never from numbers written in the HTML.
 	rotationInput.min = String(LIMITS.rotationMinutes.min);
 	rotationInput.max = String(LIMITS.rotationMinutes.max);
+	rotationInput.step = "0.5";
 	periodsInput.min = String(LIMITS.periods.min);
 	periodsInput.max = String(LIMITS.periods.max);
 	periodMinutesInput.min = String(LIMITS.periodMinutes.min);
@@ -114,7 +115,7 @@ export function createRosterView(callbacks: RosterViewCallbacks): void {
 
 	function render(): void {
 		formationPicker.render(draft.formatId);
-		rotationInput.value = String(Math.round(draft.rotationSeconds / 60));
+		rotationInput.value = String(draft.rotationSeconds / 60);
 		periodsInput.value = String(draft.periods);
 		periodMinutesInput.value = String(Math.round(draft.periodSeconds / 60));
 		opponentInput.value = draft.match.opponent;
@@ -313,11 +314,11 @@ export function createRosterView(callbacks: RosterViewCallbacks): void {
 	});
 
 	rotationInput.addEventListener("change", () => {
-		const minutes = rotationMinutesFrom(
+		const rotationSeconds = rotationSecondsFrom(
 			rotationInput.value,
-			Math.round(draft.rotationSeconds / 60),
+			draft.rotationSeconds,
 		);
-		draft = { ...draft, rotationSeconds: minutes * 60 };
+		draft = { ...draft, rotationSeconds };
 		persist();
 	});
 

@@ -54,7 +54,18 @@ export function numberWithin(
 	return Math.min(range.max, Math.max(range.min, Math.round(value)));
 }
 
-/** Minutes between swaps from what the coach typed, within LIMITS. */
-export function rotationMinutesFrom(input: string, current: number): number {
-	return numberWithin(input, LIMITS.rotationMinutes, current);
+/**
+ * Seconds between swaps from what the coach typed, in half-minute steps and
+ * within LIMITS.rotationMinutes. Works in seconds throughout (not minutes,
+ * then multiplied) so a value already on a half minute - like 450s (7.5
+ * min) - round-trips exactly instead of being rounded away when re-read.
+ */
+export function rotationSecondsFrom(input: string, current: number): number {
+	const value = Number.parseFloat(input);
+	if (!Number.isFinite(value)) return current;
+	const halfMinutes = Math.round(value * 2);
+	const seconds = (halfMinutes / 2) * 60;
+	const min = LIMITS.rotationMinutes.min * 60;
+	const max = LIMITS.rotationMinutes.max * 60;
+	return Math.min(max, Math.max(min, seconds));
 }
