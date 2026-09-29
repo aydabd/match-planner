@@ -45,12 +45,6 @@ export const TEXT = {
 		statistics: "Statistik",
 		about: "Om",
 	},
-	/** Placeholder shown on a page not yet split out of the single-page app. */
-	pageNotReady: {
-		heading: "Sidan är inte klar än",
-		body: "Den här sidan håller på att flyttas hit. Gå till start så länge.",
-		backToStart: "Till start",
-	},
 	setup: {
 		emptySquad: "Inga spelare än. Lägg till dem som är med idag.",
 		playerNameLabel: (position: number) => `Namn, spelare ${position}`,

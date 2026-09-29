@@ -18,13 +18,6 @@ const PAGES: readonly PageDef[] = [
 	{ id: "about", path: "about/", label: TEXT.nav.about },
 ];
 
-function byId(id: string): HTMLElement {
-	const el = document.getElementById(id);
-	if (!el)
-		throw new Error(`Required element #${id} is missing from the document`);
-	return el;
-}
-
 function stampVersion(): void {
 	for (const el of document.querySelectorAll("[data-app-version]")) {
 		el.textContent = __APP_VERSION__;
@@ -65,30 +58,6 @@ function registerServiceWorker(): void {
 }
 
 /**
- * Fills #notReady on a page not yet split out of the single-page app (see
- * AGENTS issue #93). Removed again, along with its call site, once that
- * page's real content moves in.
- */
-function renderNotReady(): void {
-	const el = document.getElementById("notReady");
-	if (!el) return;
-	const { heading, body, backToStart } = TEXT.pageNotReady;
-	el.innerHTML = "";
-	const h1 = document.createElement("h1");
-	h1.textContent = heading;
-	h1.tabIndex = -1;
-	const p = document.createElement("p");
-	p.className = "lede";
-	p.textContent = body;
-	const a = document.createElement("a");
-	a.href = import.meta.env.BASE_URL;
-	a.className = "btn btn-primary";
-	a.textContent = backToStart;
-	el.append(h1, p, a);
-	h1.focus();
-}
-
-/**
  * Wires what every page needs regardless of which view it owns: the version
  * and copyright footer, the shared nav, and the service worker. Call once
  * per page entry. No module-level mutable state: everything here runs
@@ -99,7 +68,4 @@ export function initPage(current: PageId): void {
 	stampCopyright();
 	renderNav(current);
 	registerServiceWorker();
-	renderNotReady();
 }
-
-export { byId };

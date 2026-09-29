@@ -10,8 +10,8 @@ npx playwright test --repeat-each=10   # check for flakiness before pushing
 ```
 
 The suite runs on pull requests that change app code, the e2e suite,
-build or runtime config, or dependencies (`src/`, `public/`, `e2e/`,
-`index.html`, `package*.json`, `mise.*`, `vite`/`playwright` config,
+build or runtime config, or dependencies (`src/`, `public/`, `e2e/`, any
+page's `index.html`, `package*.json`, `mise.*`, `vite`/`playwright` config,
 `tsconfig.json`). Other PRs (docs, rulesets, unit tests, workflows) skip it,
 and the skipped **E2E** check still counts as passed. Release PRs (version
 and changelog only) skip it too.
