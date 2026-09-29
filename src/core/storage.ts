@@ -113,7 +113,7 @@ export function newRoster(fields: {
  * minute - periods and period length stay whole-minutes-only; the rotation
  * interval allows half minutes, see LIMITS.rotationMinutes's callers).
  */
-export function isWholeMinutesWithin(
+export function isMinutesStepWithin(
 	seconds: unknown,
 	range: { min: number; max: number },
 	stepMinutes = 1,
@@ -296,7 +296,7 @@ export function parseRosterFile(
 	}
 	const size = TEAM_SIZES[teamSizeOf(formatId)];
 
-	if (!isWholeMinutesWithin(obj.rotationSeconds, LIMITS.rotationMinutes, 0.5)) {
+	if (!isMinutesStepWithin(obj.rotationSeconds, LIMITS.rotationMinutes, 0.5)) {
 		throw new StorageError(
 			"rotationSeconds must be a half-minute step in range",
 			{ code: "rotation" },
@@ -311,7 +311,7 @@ export function parseRosterFile(
 		!Number.isInteger(periods) ||
 		periods < LIMITS.periods.min ||
 		periods > LIMITS.periods.max ||
-		!isWholeMinutesWithin(periodSeconds, LIMITS.periodMinutes)
+		!isMinutesStepWithin(periodSeconds, LIMITS.periodMinutes)
 	) {
 		throw new StorageError("periods and periodSeconds must be in range", {
 			code: "periods",
