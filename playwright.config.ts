@@ -18,6 +18,15 @@ export default defineConfig({
 	testDir: "./e2e/specs",
 	fullyParallel: true,
 	forbidOnly: isCI,
+	// The default (30s of real wall-clock time) is tight for specs that fast-
+	// forward many simulated minutes via page.clock.runFor(): each simulated
+	// second still runs a real per-second render synchronously, so a 20+
+	// minute fast-forward is real CPU work. Under CI's shared, parallel
+	// runners that can brush the default ceiling even though nothing hung -
+	// see the flake on goalkeepers.spec.ts's period-break test, gone on an
+	// immediate retry. More headroom, not a longer real wait, in the common
+	// case.
+	timeout: 45_000,
 	// A retry only exists to detect flakiness: a test that passes on retry
 	// still fails the run, so flaky tests get fixed instead of ignored.
 	retries: isCI ? 1 : 0,
