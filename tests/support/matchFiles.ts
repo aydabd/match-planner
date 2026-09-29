@@ -1,5 +1,9 @@
 import { getFormat } from "../../src/core/formations.js";
 import { type MatchFile, startersOf } from "../../src/core/matchFile.js";
+import {
+	buildPlayerIdMap,
+	type PlayerIdMap,
+} from "../../src/core/playerIdentity.js";
 import type { TimelineEvent } from "../../src/core/timeline.js";
 
 /** A small deterministic random number generator, so failures can be replayed. */
@@ -117,4 +121,13 @@ export function makeMatchFile(options: Options = {}): MatchFile {
 		timeline,
 		endedAt: periods * periodSeconds,
 	};
+}
+
+/** A PlayerIdMap covering every player named across `files`, for tests. */
+export function playerIdMapFor(
+	files: readonly MatchFile[],
+): Promise<PlayerIdMap> {
+	return buildPlayerIdMap(
+		files.flatMap((f) => f.squad.players.map((p) => p.name)),
+	);
 }

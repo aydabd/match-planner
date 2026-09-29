@@ -9,7 +9,7 @@ import {
 	withAvailability,
 	withDevelopment,
 } from "../src/core/playerNotes.js";
-import { makeMatchFile, NAMES } from "./support/matchFiles.js";
+import { makeMatchFile, NAMES, playerIdMapFor } from "./support/matchFiles.js";
 
 describe("PlayerNotesFile - parsing and round trip", () => {
 	it("round-trips an empty file through JSON", () => {
@@ -251,23 +251,29 @@ describe("seasonFeedback - blind-spot flags from history and notes", () => {
 		);
 	}
 
-	it("flags a player with an absence that was never explained", () => {
-		const history = buildHistory(season(1));
-		const file = withAvailability(EMPTY_PLAYER_NOTES_FILE, "alva", {
+	it("flags a player with an absence that was never explained", async () => {
+		const files = season(1);
+		const history = buildHistory(files, await playerIdMapFor(files));
+		const alvaKey = history.players.find((p) => p.name === "Alva")
+			?.key as string;
+		const file = withAvailability(EMPTY_PLAYER_NOTES_FILE, alvaKey, {
 			matchId: "m0",
 			status: "absent",
 		});
 		const feedback = seasonFeedback(history, file);
 		expect(feedback).toContainEqual({
 			code: "unexplainedAbsences",
-			playerId: "alva",
+			playerId: alvaKey,
 			count: 1,
 		});
 	});
 
-	it("does not flag an absence with a reason given", () => {
-		const history = buildHistory(season(1));
-		const file = withAvailability(EMPTY_PLAYER_NOTES_FILE, "alva", {
+	it("does not flag an absence with a reason given", async () => {
+		const files = season(1);
+		const history = buildHistory(files, await playerIdMapFor(files));
+		const alvaKey = history.players.find((p) => p.name === "Alva")
+			?.key as string;
+		const file = withAvailability(EMPTY_PLAYER_NOTES_FILE, alvaKey, {
 			matchId: "m0",
 			status: "absent",
 			reason: "injury",
@@ -277,15 +283,17 @@ describe("seasonFeedback - blind-spot flags from history and notes", () => {
 		);
 	});
 
-	it("flags a player who has been in every squad but has no development notes", () => {
-		const history = buildHistory(season(10));
+	it("flags a player who has been in every squad but has no development notes", async () => {
+		const files = season(10);
+		const history = buildHistory(files, await playerIdMapFor(files));
 		const feedback = seasonFeedback(history, EMPTY_PLAYER_NOTES_FILE);
 		const withNoNotes = feedback.filter((f) => f.code === "noDevelopmentNotes");
 		expect(withNoNotes.length).toBe(history.players.length);
 	});
 
-	it("does not flag a player who has at least one development note", () => {
-		const history = buildHistory(season(10));
+	it("does not flag a player who has at least one development note", async () => {
+		const files = season(10);
+		const history = buildHistory(files, await playerIdMapFor(files));
 		const someKey = history.players[0]?.key as string;
 		const file = withDevelopment(EMPTY_PLAYER_NOTES_FILE, someKey, {
 			date: "2026-09-05",

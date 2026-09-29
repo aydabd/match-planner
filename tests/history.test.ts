@@ -5,8 +5,14 @@ import {
 	mergeMatchFiles,
 } from "../src/core/history.js";
 import type { MatchFile } from "../src/core/matchFile.js";
+import { playerId } from "../src/core/playerIdentity.js";
 import { secondsPlayed } from "../src/core/timeline.js";
-import { makeMatchFile, NAMES, seeded } from "./support/matchFiles.js";
+import {
+	makeMatchFile,
+	NAMES,
+	playerIdMapFor,
+	seeded,
+} from "./support/matchFiles.js";
 
 /** A season of matches: different squads, dates and months. */
 function season(count: number, seed = 100): MatchFile[] {
@@ -48,8 +54,8 @@ describe("season history: what is counted", () => {
 		}),
 	];
 
-	it("counts matches, starts and minutes per player, recognised by name", () => {
-		const history = buildHistory(files);
+	it("counts matches, starts and minutes per player, recognised by name", async () => {
+		const history = buildHistory(files, await playerIdMapFor(files));
 		expect(history.matches).toBe(2);
 		expect(history.months).toEqual(["2026-03", "2026-04"]);
 		const alva = history.players.find((p) => p.name === "Alva");
@@ -67,22 +73,24 @@ describe("season history: what is counted", () => {
 		});
 	});
 
-	it("gives minutes per month", () => {
-		const keeper = buildHistory(files).players.find((p) => p.name === "Ines");
+	it("gives minutes per month", async () => {
+		const history = buildHistory(files, await playerIdMapFor(files));
+		const keeper = history.players.find((p) => p.name === "Ines");
 		expect(keeper?.months).toEqual([
 			{ month: "2026-03", seconds: 1200, matches: 1 },
 			{ month: "2026-04", seconds: 1200, matches: 1 },
 		]);
 	});
 
-	it("says how many of the latest matches a player started", () => {
-		const keeper = buildHistory(files).players.find((p) => p.name === "Ines");
+	it("says how many of the latest matches a player started", async () => {
+		const history = buildHistory(files, await playerIdMapFor(files));
+		const keeper = history.players.find((p) => p.name === "Ines");
 		expect(keeper?.recent).toEqual({ started: 2, of: 2 });
 	});
 
-	it("counts a player who was only on the bench as a bench start", () => {
+	it("counts a player who was only on the bench as a bench start", async () => {
 		const bench = makeMatchFile({ names: [...NAMES], matchId: "big", seed: 5 });
-		const history = buildHistory([bench]);
+		const history = buildHistory([bench], await playerIdMapFor([bench]));
 		// 10 in the squad, 7 start (6 on the pitch and the keeper): 3 wait.
 		expect(history.players.reduce((n, p) => n + p.startedOnBench, 0)).toBe(3);
 		expect(
@@ -90,7 +98,7 @@ describe("season history: what is counted", () => {
 		).toBe(10);
 	});
 
-	it("does not count a late arrival as starting on the bench", () => {
+	it("does not count a late arrival as starting on the bench", async () => {
 		const file = makeMatchFile({
 			matchId: "late",
 			seed: 9,
@@ -107,13 +115,14 @@ describe("season history: what is counted", () => {
 		file.squad.startingIds = file.squad.startingIds.filter(
 			(id) => id !== late.id,
 		);
-		const player = buildHistory([file]).players.find(
-			(p) => p.name === late.name,
-		);
+		const player = buildHistory(
+			[file],
+			await playerIdMapFor([file]),
+		).players.find((p) => p.name === late.name);
 		expect(player?.startedOnBench).toBe(0);
 	});
 
-	it("shows the most recent spelling of a name", () => {
+	it("shows the most recent spelling of a name", async () => {
 		const older = makeMatchFile({
 			matchId: "x",
 			date: "2026-03-01",
@@ -124,22 +133,25 @@ describe("season history: what is counted", () => {
 			date: "2026-05-01",
 			names: ["Ines", ...NAMES.slice(1, 9)],
 		});
-		const history = buildHistory([newer, older]);
-		expect(history.players.filter((p) => p.key === "ines")).toHaveLength(1);
-		expect(history.players.find((p) => p.key === "ines")?.name).toBe("Ines");
+		const map = await playerIdMapFor([newer, older]);
+		const inesKey = playerId(map, "Ines");
+		const history = buildHistory([newer, older], map);
+		expect(history.players.filter((p) => p.key === inesKey)).toHaveLength(1);
+		expect(history.players.find((p) => p.key === inesKey)?.name).toBe("Ines");
 	});
 });
 
 describe("season history: it can be trusted", () => {
 	const files = season(24);
 
-	it("totals equal the sum of the timeline segments, computed independently", () => {
-		const history = buildHistory(files);
+	it("totals equal the sum of the timeline segments, computed independently", async () => {
+		const map = await playerIdMapFor(files);
+		const history = buildHistory(files, map);
 		for (const player of history.players) {
 			let expected = 0;
 			for (const file of files) {
 				for (const p of file.squad.players) {
-					if (p.name.toLowerCase() !== player.key) continue;
+					if (playerId(map, p.name) !== player.key) continue;
 					// The independent count: walk the lineups and add up each stretch.
 					let lineup: Record<string, string[]> = {};
 					let keeper: string | null = null;
@@ -168,8 +180,8 @@ describe("season history: it can be trusted", () => {
 		}
 	});
 
-	it("gives the same total as secondsPlayed for every file", () => {
-		const history = buildHistory(files);
+	it("gives the same total as secondsPlayed for every file", async () => {
+		const history = buildHistory(files, await playerIdMapFor(files));
 		const fromFiles = files.reduce(
 			(sum, f) =>
 				sum +
@@ -184,8 +196,9 @@ describe("season history: it can be trusted", () => {
 		);
 	});
 
-	it("adds minutes per position up to the total, and months up to the total", () => {
-		for (const player of buildHistory(files).players) {
+	it("adds minutes per position up to the total, and months up to the total", async () => {
+		const history = buildHistory(files, await playerIdMapFor(files));
+		for (const player of history.players) {
 			const byZone = Object.values(player.zoneSeconds).reduce(
 				(s, v) => s + v,
 				0,
@@ -199,17 +212,19 @@ describe("season history: it can be trusted", () => {
 		}
 	});
 
-	it("gives the same result whatever order the files come in", () => {
-		const expected = buildHistory(files);
+	it("gives the same result whatever order the files come in", async () => {
+		const map = await playerIdMapFor(files);
+		const expected = buildHistory(files, map);
 		for (let seed = 1; seed <= 20; seed++) {
-			expect(buildHistory(shuffle(files, seed))).toEqual(expected);
+			expect(buildHistory(shuffle(files, seed), map)).toEqual(expected);
 		}
 	});
 
-	it("does not count a file twice, however often it is imported", () => {
-		const expected = buildHistory(files);
+	it("does not count a file twice, however often it is imported", async () => {
+		const map = await playerIdMapFor(files);
+		const expected = buildHistory(files, map);
 		const repeated = [...files, ...shuffle(files, 3), ...files.slice(0, 5)];
-		expect(buildHistory(repeated)).toEqual(expected);
+		expect(buildHistory(repeated, map)).toEqual(expected);
 	});
 
 	it("keeps one file per match when imported in pieces, in any order", () => {
@@ -252,14 +267,14 @@ describe("season history: it can be trusted", () => {
 		}
 	});
 
-	it("covers six months or more", () => {
-		const history = buildHistory(files);
+	it("covers six months or more", async () => {
+		const history = buildHistory(files, await playerIdMapFor(files));
 		expect(history.months.length).toBeGreaterThanOrEqual(6);
 	});
 });
 
 describe("matchesForPlayer - which matches a player was in the squad for", () => {
-	it("lists only the matches that player's squad included, oldest first", () => {
+	it("lists only the matches that player's squad included, oldest first", async () => {
 		const a = makeMatchFile({
 			matchId: "a",
 			date: "2026-03-01",
@@ -272,22 +287,27 @@ describe("matchesForPlayer - which matches a player was in the squad for", () =>
 			opponent: "Sen",
 			names: ["Bo", "Cleo", "Dino", "Ebba", "Filip", "Greta", "Hugo", "Ines"],
 		});
-		expect(matchesForPlayer([b, a], "alva")).toEqual([
+		const map = await playerIdMapFor([a, b]);
+		expect(matchesForPlayer([b, a], map, playerId(map, "Alva"))).toEqual([
 			{ matchId: "a", opponent: "Först", date: "2026-03-01" },
 		]);
-		expect(matchesForPlayer([b, a], "bo")).toEqual([
+		expect(matchesForPlayer([b, a], map, playerId(map, "Bo"))).toEqual([
 			{ matchId: "a", opponent: "Först", date: "2026-03-01" },
 			{ matchId: "b", opponent: "Sen", date: "2026-04-01" },
 		]);
 	});
 
-	it("returns nothing for a player never in any squad", () => {
+	it("returns nothing for a player never in any squad", async () => {
 		const a = makeMatchFile({ matchId: "a", names: ["Alva", "Bo"] });
-		expect(matchesForPlayer([a], "nobody")).toEqual([]);
+		const map = await playerIdMapFor([a]);
+		expect(matchesForPlayer([a], map, "nobody")).toEqual([]);
 	});
 
-	it("counts a match once however often its file is given", () => {
+	it("counts a match once however often its file is given", async () => {
 		const a = makeMatchFile({ matchId: "a", names: ["Alva", "Bo"] });
-		expect(matchesForPlayer([a, a], "alva")).toHaveLength(1);
+		const map = await playerIdMapFor([a]);
+		expect(matchesForPlayer([a, a], map, playerId(map, "Alva"))).toHaveLength(
+			1,
+		);
 	});
 });
