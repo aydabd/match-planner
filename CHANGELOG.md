@@ -3,6 +3,13 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.14.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.13.0...matchplanner-v0.14.0) (2026-09-29)
+
+
+### Features
+
+* **history:** encrypt the combined export and the season report download ([#92](https://github.com/aydabd/match-planner/issues/92)) ([7b69077](https://github.com/aydabd/match-planner/commit/7b69077d73ed266a83b1058869b4dbc55596c5de))
+
 ## [0.13.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.12.0...matchplanner-v0.13.0) (2026-09-29)
 
 
