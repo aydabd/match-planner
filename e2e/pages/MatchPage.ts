@@ -196,8 +196,12 @@ export class MatchPage {
 		await input.press("Enter");
 	}
 
+	/** A real link to /about/, not a menu button that opens an overlay. */
 	async openPolicyPage(): Promise<void> {
-		await this.chooseFromMenu("Varför fungerar det så här?");
+		await this.menu.getByText("Meny", { exact: true }).click();
+		await this.menu
+			.getByRole("link", { name: "Varför fungerar det så här?" })
+			.click();
 	}
 
 	async editSquad(): Promise<void> {

@@ -22,7 +22,7 @@
       <header class="topbar">
         <span class="brand"><span class="brand-ball" aria-hidden="true">⚽</span>MatchPlanner</span>
         <nav class="page-nav" id="pageNav" aria-label="Sidor"></nav>
-        <button type="button" id="policyFromSetupBtn" class="btn btn-ghost">Varför fungerar det så här?</button>
+        <a id="policyFromSetupBtn" href="about/" class="btn btn-ghost">Varför fungerar det så här?</a>
       </header>
 
       <div class="intro">
@@ -164,7 +164,7 @@
           <div class="menu-panel">
             <button type="button" id="addLateBtn" class="menu-item">Lägg till spelare som kom sent</button>
             <button type="button" id="backToSetupBtn" class="menu-item">Ändra trupp eller format</button>
-            <button type="button" id="policyFromMatchBtn" class="menu-item">Varför fungerar det så här?</button>
+            <a id="policyFromMatchBtn" href="about/" class="btn menu-item">Varför fungerar det så här?</a>
             <button type="button" class="menu-item" id="testBtn">Testa ett byte (hoppa till slutet)</button>
             <button type="button" id="endMatchBtn" class="menu-item">Avsluta matchen</button>
             <button type="button" id="resetMatchBtn" class="menu-item menu-item-danger">Nollställ matchen</button>
@@ -351,24 +351,6 @@
         <p class="hint" id="secureExportStatus" role="status"></p>
       </section>
       <div id="historyResults" class="policy-rules"></div>
-    </section>
-
-    <!-- ============ POLICY VIEW ============ -->
-    <section id="policyView" class="view view-policy hidden" aria-labelledby="policyTitle">
-      <header class="topbar">
-        <span class="brand"><span class="brand-ball" aria-hidden="true">⚽</span>MatchPlanner</span>
-        <button type="button" id="policyBackBtn" class="btn btn-ghost">Tillbaka</button>
-      </header>
-      <div class="intro">
-        <h1 id="policyTitle" tabindex="-1">Varför fungerar det så här?</h1>
-        <p class="lede">Reglerna i appen kommer från idrottens riktlinjer. Här ser du vilka som är hämtade från dokument och vilka som är MatchPlanners egna val, med länkar så att du kan kontrollera själv.</p>
-      </div>
-      <div id="policyRules" class="policy-rules"></div>
-      <section class="card" aria-labelledby="policySourcesTitle">
-        <h2 id="policySourcesTitle">Dokument och länkar</h2>
-        <div id="policySources"></div>
-        <p class="hint">Sidan fungerar utan nät. Länkarna öppnas när du är uppkopplad.</p>
-      </section>
     </section>
 
   <footer class="footer app-footer" id="appFooter">
