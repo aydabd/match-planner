@@ -1,25 +1,13 @@
 import "./ui/style.css";
 import { createHistoryView } from "./ui/history.js";
 import { createMatchView } from "./ui/match.js";
+import { byId, initPage } from "./ui/page.js";
 import { createPolicyView } from "./ui/policy.js";
 import { createReportView } from "./ui/report.js";
 import { createRosterView } from "./ui/roster.js";
 import { clearSession } from "./ui/sessionStorage.js";
 
-for (const el of document.querySelectorAll("[data-app-version]")) {
-	el.textContent = __APP_VERSION__;
-}
-
-for (const el of document.querySelectorAll("[data-copyright]")) {
-	el.textContent = __COPYRIGHT__;
-}
-
-function byId(id: string): HTMLElement {
-	const el = document.getElementById(id);
-	if (!el)
-		throw new Error(`Required element #${id} is missing from the document`);
-	return el;
-}
+initPage("start");
 
 const setupView = byId("setupView");
 const matchView = byId("matchView");
@@ -128,11 +116,3 @@ report.refreshList();
 // If a match was already in progress when the page was reloaded, resume it
 // straight away instead of dropping the coach back at the setup screen.
 if (match.resume()) showMatch();
-
-if ("serviceWorker" in navigator) {
-	window.addEventListener("load", () => {
-		navigator.serviceWorker.register("sw.js").catch(() => {
-			// offline support is a nice-to-have, not required for the app to work
-		});
-	});
-}
