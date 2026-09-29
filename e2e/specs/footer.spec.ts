@@ -33,7 +33,7 @@ test.describe("Footer", () => {
 		page,
 	}) => {
 		await setup.open();
-		await page.getByRole("button", { name: "Visa spelarhistorik" }).click();
+		await page.getByRole("link", { name: "Visa spelarhistorik" }).click();
 		await expect(page.locator("#historyView")).toBeVisible();
 		await expect(page.locator("footer")).toHaveCount(1);
 		await expect(page.locator("#appFooter")).toBeVisible();

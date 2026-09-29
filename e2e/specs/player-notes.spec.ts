@@ -82,8 +82,9 @@ test.describe("Player notes: availability and development", () => {
 			reason: "Sjukdom",
 		});
 
+		// /statistics/ is a real page (#93): a reload stays there, no need to
+		// reopen it from setup.
 		await page.reload();
-		await history.open();
 		await history.choosePlayerForNotes("Cleo");
 
 		await expect(history.developmentNotes()).toHaveText([

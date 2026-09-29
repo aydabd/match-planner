@@ -8,10 +8,7 @@ import { expect, test } from "../fixtures.js";
  * see e2e/specs/report-page.spec.ts for the first one.
  */
 test.describe("Page shells", () => {
-	for (const [path, current] of [
-		["match/", "Match"],
-		["statistics/", "Statistik"],
-	] as const) {
+	for (const [path, current] of [["match/", "Match"]] as const) {
 		test(`${path} loads directly and shows the not-ready placeholder`, async ({
 			page,
 		}) => {
