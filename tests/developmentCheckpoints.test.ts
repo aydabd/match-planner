@@ -5,6 +5,7 @@ import {
 	currentTeamSize,
 	isValidCheckpointEvent,
 	withCheckpointReached,
+	withCheckpointUndone,
 } from "../src/core/developmentCheckpoints.js";
 
 describe("currentLevel - the highest level reached in one area", () => {
@@ -53,6 +54,55 @@ describe("withCheckpointReached - recording a level reached", () => {
 		const events: CheckpointEvent[] = [];
 		withCheckpointReached(events, "physical", 1, "2026-01-01");
 		expect(events).toEqual([]);
+	});
+});
+
+describe("withCheckpointUndone - undoing a level marked by mistake", () => {
+	it("is a no-op when the area has no levels reached", () => {
+		const events: CheckpointEvent[] = [
+			{ area: "mental", level: 1, date: "2026-01-01" },
+		];
+		expect(withCheckpointUndone(events, "technical")).toEqual(events);
+	});
+
+	it("does not mutate the events it was given", () => {
+		const events: CheckpointEvent[] = [
+			{ area: "technical", level: 1, date: "2026-01-01" },
+		];
+		withCheckpointUndone(events, "technical");
+		expect(events).toEqual([
+			{ area: "technical", level: 1, date: "2026-01-01" },
+		]);
+	});
+
+	it("removes only the highest level in that area, dropping currentLevel by one", () => {
+		const events: CheckpointEvent[] = [
+			{ area: "technical", level: 1, date: "2026-01-01" },
+			{ area: "technical", level: 2, date: "2026-02-01" },
+		];
+		const result = withCheckpointUndone(events, "technical");
+		expect(result).toEqual([
+			{ area: "technical", level: 1, date: "2026-01-01" },
+		]);
+		expect(currentLevel(result, "technical")).toBe(1);
+	});
+
+	it("leaves other areas untouched", () => {
+		const events: CheckpointEvent[] = [
+			{ area: "technical", level: 1, date: "2026-01-01" },
+			{ area: "mental", level: 2, date: "2026-02-01" },
+		];
+		const result = withCheckpointUndone(events, "technical");
+		expect(currentLevel(result, "mental")).toBe(2);
+	});
+
+	it("undoing down to zero and again stays a no-op", () => {
+		const once = withCheckpointUndone(
+			[{ area: "physical", level: 1, date: "2026-01-01" }],
+			"physical",
+		);
+		expect(once).toEqual([]);
+		expect(withCheckpointUndone(once, "physical")).toEqual([]);
 	});
 });
 

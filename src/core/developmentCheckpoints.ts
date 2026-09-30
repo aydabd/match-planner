@@ -69,6 +69,24 @@ export function withCheckpointReached(
 	];
 }
 
+/**
+ * `events` with the highest level in `area` removed (#120), so
+ * `currentLevel` drops back to whatever was reached before it - a
+ * coach's way to undo a level marked by mistake. A no-op, returning a
+ * copy of `events`, when `area` has no levels to undo. Does not mutate
+ * `events`.
+ */
+export function withCheckpointUndone(
+	events: readonly CheckpointEvent[],
+	area: DevelopmentArea,
+): CheckpointEvent[] {
+	const level = currentLevel(events, area);
+	if (level === 0) return [...events];
+	return events.filter(
+		(event) => !(event.area === area && event.level === level),
+	);
+}
+
 // Same strict date format as playerNotes.ts's development entries.
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const isValidDate = (value: string): boolean =>
