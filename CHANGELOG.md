@@ -3,6 +3,13 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.17.2](https://github.com/aydabd/match-planner/compare/matchplanner-v0.17.1...matchplanner-v0.17.2) (2026-09-30)
+
+
+### Bug Fixes
+
+* **ui:** let a coach undo a checkpoint level marked by mistake ([#121](https://github.com/aydabd/match-planner/issues/121)) ([2a4ab8f](https://github.com/aydabd/match-planner/commit/2a4ab8f5ada0c38e95ea92f7c3cc4e326fbb8e46))
+
 ## [0.17.1](https://github.com/aydabd/match-planner/compare/matchplanner-v0.17.0...matchplanner-v0.17.1) (2026-09-30)
 
 
