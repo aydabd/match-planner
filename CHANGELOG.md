@@ -3,6 +3,13 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.17.1](https://github.com/aydabd/match-planner/compare/matchplanner-v0.17.0...matchplanner-v0.17.1) (2026-09-30)
+
+
+### Bug Fixes
+
+* **ui:** anchor the Drive folder picker to the viewport ([#116](https://github.com/aydabd/match-planner/issues/116)) ([f9dd95e](https://github.com/aydabd/match-planner/commit/f9dd95ea6ccafb43a1d661da66067924503452ee))
+
 ## [0.17.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.16.0...matchplanner-v0.17.0) (2026-09-29)
 
 
