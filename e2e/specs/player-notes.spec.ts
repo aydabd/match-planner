@@ -99,6 +99,42 @@ test.describe("Player notes: availability and development", () => {
 		).toHaveClass(/done/);
 	});
 
+	test("a checkpoint level marked by mistake can be undone (#120)", async ({
+		history,
+	}) => {
+		await history.choosePlayerForNotes("Ebba");
+		await history.markNextLevel("Mentalt");
+		await history.markNextLevel("Mentalt");
+		await expect(
+			history.checkpointArea("Mentalt").getByRole("listitem").nth(1),
+		).toHaveClass(/done/);
+		await expect(history.seasonReportSummary("Ebba", "Mentalt")).toHaveValue(
+			/^Nivå 2 av 4 uppnådd\. /,
+		);
+
+		await history.undoLevel("Mentalt");
+
+		await expect(
+			history.checkpointArea("Mentalt").getByRole("listitem").nth(1),
+		).not.toHaveClass(/done/);
+		await expect(
+			history.checkpointArea("Mentalt").getByRole("listitem").first(),
+		).toHaveClass(/done/);
+		await expect(history.seasonReportSummary("Ebba", "Mentalt")).toHaveValue(
+			/^Nivå 1 av 4 uppnådd\. /,
+		);
+
+		// Undoing all the way back to nothing is also possible, and the
+		// button disables itself rather than offering to undo forever.
+		await history.undoLevel("Mentalt");
+		await expect(history.seasonReportSummary("Ebba", "Mentalt")).toHaveValue(
+			"",
+		);
+		await expect(
+			history.checkpointArea("Mentalt").locator(".row-buttons button").nth(1),
+		).toBeDisabled();
+	});
+
 	test("keeps notes after a reload", async ({ history, page }) => {
 		await history.choosePlayerForNotes("Cleo");
 		await history.addDevelopmentNote({ area: "Mentalt", note: "Peppar laget" });

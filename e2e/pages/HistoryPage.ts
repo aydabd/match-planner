@@ -177,6 +177,22 @@ export class HistoryPage {
 		await this.clickBelowADateField(button);
 	}
 
+	/**
+	 * Two taps, like every other confirm-with-second-tap action in the app.
+	 * Located by position, not its accessible name - that name changes to
+	 * the confirm label after the first tap.
+	 */
+	async undoLevel(
+		area: "Fysiskt" | "Mentalt" | "Tekniskt" | "Taktiskt",
+	): Promise<void> {
+		const button = this.checkpointArea(area)
+			.locator(".row-buttons button")
+			.nth(1);
+		await button.scrollIntoViewIfNeeded();
+		await this.clickBelowADateField(button);
+		await this.clickBelowADateField(button);
+	}
+
 	/** The pre-filled, editable development summary for one player and area
 	 * in the Säsongsrapport card. */
 	seasonReportSummary(

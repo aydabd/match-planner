@@ -32,6 +32,7 @@ import {
 	seasonFeedback,
 	withAvailability,
 	withCheckpoint,
+	withCheckpointUndone,
 	withDevelopment,
 } from "../core/playerNotes.js";
 import { buildSeasonReport, type SeasonReport } from "../core/seasonReport.js";
@@ -900,6 +901,9 @@ function buildCheckpointField(
 		areaHeading.textContent = t.area[area];
 		areaWrap.append(areaHeading, checkpointLadderList(labels, level));
 
+		const buttonRow = document.createElement("div");
+		buttonRow.className = "row-buttons";
+
 		const button = document.createElement("button");
 		button.type = "button";
 		button.className = "btn btn-secondary";
@@ -918,7 +922,27 @@ function buildCheckpointField(
 			);
 			onSaved();
 		});
-		areaWrap.append(button);
+		buttonRow.append(button);
+
+		// A level marked by mistake needs a way back (#120); a second tap
+		// guards against undoing by mistake too, same as elsewhere in the app.
+		const undoButton = document.createElement("button");
+		undoButton.type = "button";
+		undoButton.className = "btn btn-secondary";
+		undoButton.textContent = t.undoLevel;
+		undoButton.disabled = level === 0;
+		confirmWithSecondTap(undoButton, {
+			confirmLabel: t.confirmUndoLevel,
+			onConfirm: () => {
+				savePlayerNotes(
+					withCheckpointUndone(loadPlayerNotes(), player.key, area),
+				);
+				onSaved();
+			},
+		});
+		buttonRow.append(undoButton);
+
+		areaWrap.append(buttonRow);
 		section.append(areaWrap);
 	}
 	return section;

@@ -8,6 +8,7 @@ import {
 	seasonFeedback,
 	withAvailability,
 	withCheckpoint,
+	withCheckpointUndone,
 	withDevelopment,
 } from "../src/core/playerNotes.js";
 import { makeMatchFile, NAMES, playerIdMapFor } from "./support/matchFiles.js";
@@ -325,6 +326,63 @@ describe("withCheckpoint - marking a development level reached", () => {
 			"2026-09-05",
 		);
 		expect(EMPTY_PLAYER_NOTES_FILE.players).toEqual([]);
+	});
+});
+
+describe("withCheckpointUndone - undoing a level marked by mistake", () => {
+	it("drops the level reached back by one", () => {
+		const marked = withCheckpoint(
+			EMPTY_PLAYER_NOTES_FILE,
+			"alva",
+			"technical",
+			1,
+			"2026-01-01",
+		);
+		const undone = withCheckpointUndone(marked, "alva", "technical");
+		expect(undone.players[0]?.checkpoints).toEqual([]);
+	});
+
+	it("is a no-op for a player with no notes yet", () => {
+		const file = withCheckpointUndone(
+			EMPTY_PLAYER_NOTES_FILE,
+			"alva",
+			"technical",
+		);
+		expect(file.players[0]?.checkpoints).toEqual([]);
+	});
+
+	it("leaves other areas untouched", () => {
+		const marked = withCheckpoint(
+			withCheckpoint(
+				EMPTY_PLAYER_NOTES_FILE,
+				"alva",
+				"technical",
+				1,
+				"2026-01-01",
+			),
+			"alva",
+			"mental",
+			1,
+			"2026-02-01",
+		);
+		const undone = withCheckpointUndone(marked, "alva", "technical");
+		expect(undone.players[0]?.checkpoints).toEqual([
+			{ area: "mental", level: 1, date: "2026-02-01" },
+		]);
+	});
+
+	it("does not mutate the file it was given", () => {
+		const marked = withCheckpoint(
+			EMPTY_PLAYER_NOTES_FILE,
+			"alva",
+			"technical",
+			1,
+			"2026-01-01",
+		);
+		withCheckpointUndone(marked, "alva", "technical");
+		expect(marked.players[0]?.checkpoints).toEqual([
+			{ area: "technical", level: 1, date: "2026-01-01" },
+		]);
 	});
 });
 

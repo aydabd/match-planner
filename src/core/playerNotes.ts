@@ -3,6 +3,7 @@ import {
 	DEVELOPMENT_AREAS,
 	type DevelopmentArea,
 	isValidCheckpointEvent,
+	withCheckpointUndone as undoCheckpointEvent,
 	withCheckpointReached,
 } from "./developmentCheckpoints.js";
 import type { SeasonHistory } from "./history.js";
@@ -299,6 +300,22 @@ export function withCheckpoint(
 		level,
 		date,
 	);
+	return withPlayerNotes(file, key, { ...current, checkpoints });
+}
+
+/**
+ * Undo the highest level reached in `area` for a player, given by their
+ * playerIdentity.ts id (#120): a coach's way to correct a level marked by
+ * mistake. A no-op if the area has no level reached. The file given is
+ * left unchanged.
+ */
+export function withCheckpointUndone(
+	file: PlayerNotesFile,
+	key: string,
+	area: DevelopmentArea,
+): PlayerNotesFile {
+	const current = notesOf(file, key);
+	const checkpoints = undoCheckpointEvent(current.checkpoints, area);
 	return withPlayerNotes(file, key, { ...current, checkpoints });
 }
 

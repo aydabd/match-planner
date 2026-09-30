@@ -407,6 +407,8 @@ export const TEXT = {
 			nextLevel: "Nästa nivå uppnådd",
 			levelReached: (date: string) => `Uppnått ${date}`,
 			maxLevelReached: "Högsta nivån uppnådd",
+			undoLevel: "Ångra nivå",
+			confirmUndoLevel: "Säker? Tryck igen för att ångra",
 			/**
 			 * The 16 age-banded checkpoint ladders (#109): one per team size and
 			 * development area, each describing increasing context complexity
