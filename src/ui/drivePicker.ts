@@ -24,6 +24,43 @@ export interface PickedFolder {
 	name: string;
 }
 
+const PICKER_FIX_STYLE_ID = "matchplanner-picker-fix";
+
+/**
+ * Google's own picker.css positions `.picker-dialog-bg` (the backdrop) and
+ * `.picker-dialog` (the dialog itself) with `position: absolute` and a
+ * `top`/`left` measured against the full document, not the visible
+ * viewport. On a page tall enough that the button which opens the picker
+ * is not near the top - the Drive backup card, well down the season
+ * history screen - that lands the dialog off-screen, so a coach has to
+ * scroll the page to find it (#115). Forcing both to `position: fixed`
+ * (an inline `!important` stylesheet rule beats Google's inline style,
+ * which carries none) anchors them to the viewport instead, however far
+ * down the page the coach has scrolled. Idempotent: safe to call before
+ * every pickFolder() without piling up duplicate <style> tags.
+ */
+function ensurePickerFixedPositioning(): void {
+	if (document.getElementById(PICKER_FIX_STYLE_ID)) return;
+	const style = document.createElement("style");
+	style.id = PICKER_FIX_STYLE_ID;
+	style.textContent = `
+		.picker-dialog-bg {
+			position: fixed !important;
+			top: 0 !important;
+			left: 0 !important;
+			right: 0 !important;
+			bottom: 0 !important;
+		}
+		.picker-dialog {
+			position: fixed !important;
+			top: 50% !important;
+			left: 50% !important;
+			transform: translate(-50%, -50%) !important;
+		}
+	`;
+	document.head.append(style);
+}
+
 function loadGapiPicker(): Promise<void> {
 	return new Promise((resolve, reject) => {
 		function loadPickerLibrary(): void {
@@ -69,6 +106,7 @@ export async function pickFolder(
 	if (!picker) {
 		throw new Error("Kunde inte läsa in Google Drive-väljaren.");
 	}
+	ensurePickerFixedPositioning();
 	return new Promise((resolve, reject) => {
 		const view = new picker.DocsView(picker.ViewId.FOLDERS)
 			.setSelectFolderEnabled(true)

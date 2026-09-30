@@ -248,6 +248,36 @@ test.describe("Google Drive backup and restore", () => {
 		expect(scriptRequests).toBe(2);
 	});
 
+	test("anchors the folder picker to the viewport, not the page (#115)", async ({
+		history,
+		setup,
+		page,
+	}) => {
+		const drive = createFakeDrive();
+		await mockGoogle(page.context(), drive);
+
+		await setup.open();
+		await history.open();
+		await history.driveConnectButton.click();
+		await expect(history.driveStatus).toHaveText("Kopplad till Google Drive.");
+
+		await history.driveChooseFolderButton.click();
+		await expect(history.driveStatus).toHaveText("Mapp: MatchPlanner-mapp");
+
+		// <style> elements carry no visible text, so read their raw content
+		// directly rather than through Playwright's toContainText, which
+		// only ever sees rendered text.
+		const fixStyle = page.locator("style#matchplanner-picker-fix");
+		await expect(fixStyle).toHaveCount(1);
+		expect(await fixStyle.evaluate((el) => el.textContent)).toContain(
+			"position: fixed !important",
+		);
+
+		// Choosing again (e.g. "Byt mapp") must not pile up duplicate tags.
+		await history.driveChooseFolderButton.click();
+		await expect(fixStyle).toHaveCount(1);
+	});
+
 	test("ignores a legacy manifest.json and pages through many files", async ({
 		history,
 		setup,
