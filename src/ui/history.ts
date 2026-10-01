@@ -1,7 +1,6 @@
 import {
 	DEVELOPMENT_AREAS as AREAS,
 	currentLevel,
-	currentTeamSize,
 } from "../core/developmentCheckpoints.js";
 import {
 	EXPORT_BUNDLE_VERSION,
@@ -10,11 +9,9 @@ import {
 } from "../core/exportBundle.js";
 import type { TeamSizeId } from "../core/formations.js";
 import {
-	buildHistory,
 	matchesForPlayer,
 	type PlayerHistory,
 	type SeasonHistory,
-	whenOf,
 } from "../core/history.js";
 import { LIMITS } from "../core/limits.js";
 import {
@@ -22,7 +19,7 @@ import {
 	MatchFileError,
 	parseMatchFile,
 } from "../core/matchFile.js";
-import { buildPlayerIdMap, type PlayerIdMap } from "../core/playerIdentity.js";
+import type { PlayerIdMap } from "../core/playerIdentity.js";
 import {
 	type AbsenceReason,
 	type AvailabilityEntry,
@@ -50,6 +47,14 @@ import {
 } from "../core/visualizations.js";
 import { readItem, STORAGE_KEYS, teamScoped, writeItem } from "./appStorage.js";
 import { confirmWithSecondTap } from "./confirmButton.js";
+import {
+	byId,
+	card,
+	downloadJson,
+	field,
+	selectField,
+	table,
+} from "./domHelpers.js";
 import { loadDraft, saveDraft } from "./draftStorage.js";
 import { createDriveAuth } from "./driveAuth.js";
 import { createDriveBackup } from "./driveBackup.js";
@@ -60,89 +65,15 @@ import {
 	DRIVE_SCOPE,
 } from "./driveConfig.js";
 import { pickFolder } from "./drivePicker.js";
+import { loadSeasonData } from "./historyData.js";
 import { keepMatchFiles, loadMatchFiles } from "./matchFileStorage.js";
 import { loadPlayerNotes, savePlayerNotes } from "./playerNotesStorage.js";
 import { lineName } from "./reportText.js";
 import { activeTeamId } from "./teamStorage.js";
 import { TEXT } from "./text.js";
 
-function byId(id: string): HTMLElement {
-	const node = document.getElementById(id);
-	if (!node) throw new Error(`Missing element #${id}`);
-	return node;
-}
-
 /** The lines in the order a coach reads them: goal, then back to attack. */
 const LINE_ORDER = ["goal", "back", "dmid", "mid", "amid", "fwd"];
-
-function card(title: string): HTMLElement {
-	const section = document.createElement("section");
-	section.className = "card";
-	const heading = document.createElement("h2");
-	heading.textContent = title;
-	section.append(heading);
-	return section;
-}
-
-function table(
-	headers: readonly string[],
-	rows: readonly (readonly string[])[],
-): HTMLTableElement {
-	const el = document.createElement("table");
-	el.className = "report-table";
-	const head = el.appendChild(document.createElement("thead"));
-	const headRow = head.appendChild(document.createElement("tr"));
-	for (const header of headers) {
-		const th = document.createElement("th");
-		th.scope = "col";
-		th.textContent = header;
-		headRow.append(th);
-	}
-	const body = el.appendChild(document.createElement("tbody"));
-	for (const values of rows) {
-		const row = body.appendChild(document.createElement("tr"));
-		values.forEach((text, i) => {
-			const cell = document.createElement(i === 0 ? "th" : "td");
-			if (cell instanceof HTMLTableCellElement && i === 0) cell.scope = "row";
-			cell.textContent = text;
-			row.append(cell);
-		});
-	}
-	return el;
-}
-
-/** A labelled field, the same field/field-label wrapper the setup screen uses. */
-function field(
-	labelText: string,
-	control: HTMLElement,
-	id: string,
-): HTMLElement {
-	control.id = id;
-	const wrap = document.createElement("div");
-	wrap.className = "field";
-	const label = document.createElement("label");
-	label.className = "field-label";
-	label.textContent = labelText;
-	label.htmlFor = id;
-	wrap.append(label, control);
-	return wrap;
-}
-
-/** A labelled <select> field; returns both the wrapper and the select to wire up. */
-function selectField(
-	labelText: string,
-	id: string,
-	options: readonly (readonly [string, string])[],
-): { wrap: HTMLElement; select: HTMLSelectElement } {
-	const select = document.createElement("select");
-	for (const [value, text] of options) {
-		const opt = document.createElement("option");
-		opt.value = value;
-		opt.textContent = text;
-		select.append(opt);
-	}
-	return { wrap: field(labelText, select, id), select };
-}
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const CHART_COLORS = ["#127a3e", "#f07a1a", "#1554d1", "#b81f35", "#7b3f98"];
@@ -568,16 +499,6 @@ function setUpSecureExport(refresh: () => void): void {
 
 /** Which of the reason keys TEXT.history.playerNotes.reason declares. */
 const REASONS: readonly AbsenceReason[] = ["injury", "illness", "other"];
-
-function downloadJson(fileName: string, json: string): void {
-	const blob = new Blob([json], { type: "application/json" });
-	const url = URL.createObjectURL(blob);
-	const link = document.createElement("a");
-	link.href = url;
-	link.download = fileName;
-	link.click();
-	URL.revokeObjectURL(url);
-}
 
 function buildSeasonReportCard(
 	history: SeasonHistory,
@@ -1031,11 +952,7 @@ export function createHistoryView(): { refresh: () => void } {
 	let selectedPlayerKey: string | null = null;
 
 	async function refresh(): Promise<void> {
-		const files = loadMatchFiles();
-		const map = await buildPlayerIdMap(
-			files.flatMap((f) => f.squad.players.map((p) => p.name)),
-		);
-		const history = buildHistory(files, map);
+		const { history, map, teamSize, levelCounts } = await loadSeasonData();
 		byId("historyCount").textContent =
 			history.matches === 0
 				? TEXT.history.empty
@@ -1118,20 +1035,6 @@ export function createHistoryView(): { refresh: () => void } {
 		);
 		results.append(months);
 
-		// The squad's team size right now, from its latest match - stands in
-		// for an age class (#109), no new setup field needed since SvFF's own
-		// match formats already carry the ages (see policy.ts's
-		// POLICY.formats). One value for the whole squad, not per player: a
-		// squad doesn't change team size mid-season in practice.
-		const teamSize = currentTeamSize(
-			files.map((f) => ({ formatId: f.setup.formatId, date: whenOf(f) })),
-		);
-		const levelCounts = Object.fromEntries(
-			AREAS.map((area) => [
-				area,
-				TEXT.history.playerNotes.checkpointLadders[teamSize][area].length,
-			]),
-		) as Record<DevelopmentArea, number>;
 		const onSelectPlayer = (key: string) => {
 			selectedPlayerKey = key;
 			refresh();
