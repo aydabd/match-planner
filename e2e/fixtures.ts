@@ -33,7 +33,11 @@ export const test = base.extend<Fixtures>({
 	page: async ({ page }, use) => {
 		// Paused, so match time moves only through match.play(); real time
 		// passing during assertions can never change what a test sees.
-		await page.clock.install({ time: START });
+		// Installed a minute early and then paused at START: installing at
+		// START itself races, because any real time that passes before the
+		// pause puts the clock already past it ("Cannot fast-forward to the
+		// past").
+		await page.clock.install({ time: new Date(START.getTime() - 60_000) });
 		await page.clock.pauseAt(START);
 		await use(page);
 	},
