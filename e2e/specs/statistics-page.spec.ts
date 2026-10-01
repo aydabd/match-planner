@@ -80,3 +80,42 @@ for (const { path, heading } of [
 		});
 	});
 }
+
+test.describe("Statistics secondary nav (#119)", () => {
+	test("marks the current page and links the three pages together", async ({
+		page,
+	}) => {
+		const subNav = page.locator("#statisticsSubNav");
+		await page.goto("statistics/");
+		await expect(subNav.getByRole("link")).toHaveText([
+			"Spelstatistik",
+			"Säsongsrapport",
+			"Anteckningar",
+		]);
+		await expect(
+			subNav.getByRole("link", { name: "Spelstatistik" }),
+		).toHaveAttribute("aria-current", "page");
+
+		await subNav.getByRole("link", { name: "Säsongsrapport" }).click();
+		await expect(page).toHaveURL(/statistics\/sasongsrapport\/$/);
+		await expect(
+			subNav.getByRole("link", { name: "Säsongsrapport" }),
+		).toHaveAttribute("aria-current", "page");
+		await expect(
+			page
+				.locator("#pageNav")
+				.getByRole("link", { name: "Statistik", exact: true }),
+		).toHaveAttribute("aria-current", "page");
+
+		await subNav.getByRole("link", { name: "Anteckningar" }).click();
+		await expect(page).toHaveURL(/statistics\/anteckningar\/$/);
+		await expect(
+			subNav.getByRole("link", { name: "Anteckningar" }),
+		).toHaveAttribute("aria-current", "page");
+	});
+
+	test("is absent from the other pages", async ({ page }) => {
+		await page.goto("about/");
+		await expect(page.locator("#statisticsSubNav")).toHaveCount(0);
+	});
+});

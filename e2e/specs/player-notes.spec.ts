@@ -76,6 +76,7 @@ test.describe("Player notes: availability and development", () => {
 
 	test("a checkpoint marked on the notes page pre-fills the season report page", async ({
 		history,
+		page,
 	}) => {
 		await history.choosePlayerForNotes("Dino");
 		await expect(
@@ -88,7 +89,10 @@ test.describe("Player notes: availability and development", () => {
 			history.checkpointArea("Tekniskt").getByRole("listitem").first(),
 		).toHaveClass(/done/);
 
-		await history.gotoSeasonReport();
+		await page
+			.locator("#statisticsSubNav")
+			.getByRole("link", { name: "Säsongsrapport" })
+			.click();
 		await expect(history.seasonReportSummary("Dino", "Tekniskt")).toHaveValue(
 			/^Nivå 1 av 4 uppnådd\. /,
 		);

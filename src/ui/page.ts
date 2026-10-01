@@ -10,8 +10,25 @@ import { TEXT } from "./text.js";
 /** One entry per real URL the app serves. Order here is nav order. */
 export type PageId = "start" | "match" | "report" | "statistics" | "about";
 
-interface PageDef {
-	id: PageId;
+/** The three pages that share the "Statistik" entry in the main nav (#119). */
+export type StatisticsPageId = "overview" | "seasonReport" | "notes";
+
+const STATISTICS_PAGES: readonly PageDef<StatisticsPageId>[] = [
+	{ id: "overview", path: "statistics/", label: TEXT.statisticsNav.overview },
+	{
+		id: "seasonReport",
+		path: "statistics/sasongsrapport/",
+		label: TEXT.statisticsNav.seasonReport,
+	},
+	{
+		id: "notes",
+		path: "statistics/anteckningar/",
+		label: TEXT.statisticsNav.notes,
+	},
+];
+
+interface PageDef<Id extends string = PageId> {
+	id: Id;
 	/** Relative to the site root (import.meta.env.BASE_URL); "" is the root page. */
 	path: string;
 	label: string;
@@ -37,16 +54,21 @@ function stampCopyright(): void {
 	}
 }
 
-/** Renders the shared cross-page nav into #pageNav, marking `current`. */
-function renderNav(current: PageId): void {
-	const nav = document.getElementById("pageNav");
+/** Renders `pages` as links into the nav element `id`, marking `current`. */
+function renderLinks<Id extends string>(
+	id: string,
+	linkClass: string,
+	pages: readonly PageDef<Id>[],
+	current: Id,
+): void {
+	const nav = document.getElementById(id);
 	if (!nav) return;
 	nav.replaceChildren(
-		...PAGES.map((page) => {
+		...pages.map((page) => {
 			const a = document.createElement("a");
 			a.href = `${import.meta.env.BASE_URL}${page.path}`;
 			a.textContent = page.label;
-			a.className = "page-nav-link";
+			a.className = linkClass;
 			if (page.id === current) a.setAttribute("aria-current", "page");
 			return a;
 		}),
@@ -156,10 +178,22 @@ function registerServiceWorker(): void {
  * per page entry. No module-level mutable state: everything here runs
  * inside this function, reading the current DOM each time.
  */
-export function initPage(current: PageId): void {
+export function initPage(
+	current: PageId,
+	statisticsPage?: StatisticsPageId,
+): void {
 	stampVersion();
 	stampCopyright();
-	renderNav(current);
+	renderLinks("pageNav", "page-nav-link", PAGES, current);
+	// The secondary strip exists only in the three statistics pages' HTML (#119).
+	if (statisticsPage) {
+		renderLinks(
+			"statisticsSubNav",
+			"page-subnav-link",
+			STATISTICS_PAGES,
+			statisticsPage,
+		);
+	}
 	renderTeamSwitcher();
 	registerServiceWorker();
 }

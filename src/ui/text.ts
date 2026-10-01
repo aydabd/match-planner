@@ -46,6 +46,12 @@ export const TEXT = {
 		statistics: "Statistik",
 		about: "Om",
 	},
+	/** The secondary nav on the three statistics pages (src/ui/page.ts, #119). */
+	statisticsNav: {
+		overview: "Spelstatistik",
+		seasonReport: "Säsongsrapport",
+		notes: "Anteckningar",
+	},
 	/** The team switcher in the shared header (src/ui/page.ts, #118). */
 	teamSwitcher: {
 		label: "Lag",
