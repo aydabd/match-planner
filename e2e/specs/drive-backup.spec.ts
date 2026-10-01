@@ -1,4 +1,5 @@
 import type { BrowserContext } from "@playwright/test";
+import { driveFileName, teamMarkerName } from "../../src/core/driveNames.js";
 import { matchFileToJson } from "../../src/core/matchFile.js";
 import {
 	encryptJson,
@@ -177,6 +178,18 @@ async function mockGoogle(
 			return;
 		}
 
+		if (
+			method === "PATCH" &&
+			url.searchParams.get("uploadType") === "media" &&
+			url.pathname.startsWith("/upload/drive/v3/files/")
+		) {
+			const id = url.pathname.split("/").pop() as string;
+			const file = drive.files.get(id);
+			if (file) file.content = request.postData() ?? "";
+			await json({ id });
+			return;
+		}
+
 		if (url.pathname.startsWith("/upload/drive/v3/files")) {
 			const body = request.postData() ?? "";
 			const parts = body.split(`--${BOUNDARY}`);
@@ -278,35 +291,51 @@ test.describe("Google Drive backup and restore", () => {
 		await expect(fixStyle).toHaveCount(1);
 	});
 
-	test("ignores a legacy manifest.json and pages through many files", async ({
+	test("restores a team's files, skipping anything else in the folder, across several pages", async ({
 		history,
 		setup,
 		page,
 	}) => {
-		// A folder left over from before #70's listing-based sync: a
-		// manifest.json (which also ends in ".json", so must not be mistaken
-		// for a match file) alongside more match files than one Drive
-		// "page" (2, per the fake server above) holds, so restoring them
-		// exercises the nextPageToken loop, not just a single page. This
-		// test's fake picker (see GIS_SCRIPT) always "picks" folder id
-		// "folder-1", so that is the id these files are seeded under.
+		// A folder written by another phone: a team marker and more match
+		// files than one Drive "page" (2, per the fake server above) holds,
+		// so restoring them exercises the nextPageToken loop, next to files
+		// this app never wrote (an old manifest.json, a bare <matchId>.json)
+		// that must be skipped without a word. This test's fake picker (see
+		// GIS_SCRIPT) always "picks" folder id "folder-1".
 		const password = "hemligt-lösenord";
+		const teamId = "6f1c2f6e-3b1a-4c55-9a52-0d1f3f7a9b10";
 		const drive = createFakeDrive();
 		const folderId = "folder-1";
+		const seal = async (payload: unknown) =>
+			securePackageToJson(await encryptJson(password, payload));
 		drive.files.set("legacy-manifest", {
 			name: "manifest.json",
 			parents: [folderId],
 			content: JSON.stringify({ schemaVersion: 1, files: {} }),
 		});
+		drive.files.set("bare", {
+			name: "seed-old.json",
+			parents: [folderId],
+			content: "{}",
+		});
+		drive.files.set("marker", {
+			name: teamMarkerName(teamId),
+			parents: [folderId],
+			content: await seal({ schemaVersion: 1, kind: "team", teamId }),
+		});
 		for (const suffix of ["a", "b", "c"]) {
-			const pkg = await encryptJson(
-				password,
-				makeMatchFile({ matchId: `seed-${suffix}`, names: NAMES.slice(0, 9) }),
-			);
 			drive.files.set(`seed-${suffix}`, {
-				name: `seed-${suffix}.json`,
+				name: await driveFileName("match", teamId, `seed-${suffix}`),
 				parents: [folderId],
-				content: securePackageToJson(pkg),
+				content: await seal({
+					schemaVersion: 1,
+					kind: "match",
+					teamId,
+					match: makeMatchFile({
+						matchId: `seed-${suffix}`,
+						names: NAMES.slice(0, 9),
+					}),
+				}),
 			});
 		}
 		await mockGoogle(page.context(), drive);
@@ -398,7 +427,7 @@ test.describe("Google Drive backup and restore", () => {
 		await otherContext.close();
 	});
 
-	test("backing up a team only uploads that team's own matches (#118)", async ({
+	test("a second team on the same phone cannot back up into the first team's folder (#118, #135)", async ({
 		history,
 		setup,
 		teamSwitcher,
@@ -425,8 +454,8 @@ test.describe("Google Drive backup and restore", () => {
 
 		// A second team, on the same device, pointed at the same shared Drive
 		// folder (this test's fake picker always "picks" the same folder id):
-		// its own backup must never claim team A's already-backed-up match as
-		// new, since it never had that match locally in the first place.
+		// the folder belongs to the first team, so the second is told so and
+		// nothing is written - two teams never share a folder.
 		await setup.open();
 		await teamSwitcher.createTeam("P11 7v7");
 		await history.open();
@@ -439,12 +468,107 @@ test.describe("Google Drive backup and restore", () => {
 		await history.driveChooseFolderButton.click();
 		await expect(history.driveStatus).toHaveText("Mapp: MatchPlanner-mapp");
 		await history.drivePasswordInput.fill(password);
+		const filesBefore = drive.files.size;
 		await history.driveBackupButton.click();
 		await expect(history.driveStatus).toHaveText(
-			"Allt var redan säkerhetskopierat.",
+			"Mappen tillhör ett annat lag på den här enheten. Byt till det laget först.",
 		);
+		expect(drive.files.size).toBe(filesBefore);
 		await expect(history.count).toHaveText(
 			"Inga matcher än. Spela en match eller läs in matchfiler.",
 		);
+	});
+
+	test("player notes reach a second phone, and a coach with their own data is kept out", async ({
+		browser,
+		history,
+		setup,
+		page,
+	}) => {
+		const drive = createFakeDrive();
+		await mockGoogle(page.context(), drive);
+		const password = "hemligt-lösenord";
+		const squad = NAMES.slice(0, 9);
+		const connectAndPickFolder = async (h: HistoryPage) => {
+			await h.driveConnectButton.click();
+			await expect(h.driveStatus).toHaveText("Kopplad till Google Drive.");
+			await h.driveChooseFolderButton.click();
+			await expect(h.driveStatus).toHaveText("Mapp: MatchPlanner-mapp");
+			await h.drivePasswordInput.fill(password);
+		};
+
+		// Phone one: a match, and a development note on the notes page.
+		await setup.open();
+		await history.open();
+		await history.importFiles([
+			{
+				name: "match.json",
+				contents: matchFileToJson(
+					makeMatchFile({ matchId: "notes-1", names: squad }),
+				),
+			},
+		]);
+		await history.gotoNotes();
+		await history.choosePlayerForNotes("Alva");
+		await history.addDevelopmentNote({
+			area: "Fysiskt",
+			note: "Snabbare i vändningar",
+		});
+		await page.goto("statistics/");
+		await connectAndPickFolder(history);
+		await history.driveBackupButton.click();
+		await expect(history.driveStatus).toHaveText(
+			"1 match säkerhetskopierades. Trupp och anteckningar sparades.",
+		);
+
+		// Phone two, empty: restoring brings the match and the note.
+		const otherContext = await browser.newContext({
+			reducedMotion: "reduce",
+			serviceWorkers: "block",
+		});
+		await mockGoogle(otherContext, drive);
+		const otherPage = await otherContext.newPage();
+		const otherHistory = new HistoryPage(otherPage);
+		await new SetupPage(otherPage).open();
+		await otherHistory.open();
+		await connectAndPickFolder(otherHistory);
+		await otherHistory.driveRestoreButton.click();
+		await expect(otherHistory.driveStatus).toHaveText(
+			"1 match lästes in. Anteckningarna uppdaterades.",
+		);
+		await otherHistory.gotoNotes();
+		await otherHistory.choosePlayerForNotes("Alva");
+		await expect(otherHistory.developmentNotes()).toContainText([
+			"Snabbare i vändningar",
+		]);
+		await otherContext.close();
+
+		// Another coach, who already has a match of their own, picks the same
+		// folder: refused, and nothing in the folder changes.
+		const coachContext = await browser.newContext({
+			reducedMotion: "reduce",
+			serviceWorkers: "block",
+		});
+		await mockGoogle(coachContext, drive);
+		const coachPage = await coachContext.newPage();
+		const coachHistory = new HistoryPage(coachPage);
+		await new SetupPage(coachPage).open();
+		await coachHistory.open();
+		await coachHistory.importFiles([
+			{
+				name: "mine.json",
+				contents: matchFileToJson(
+					makeMatchFile({ matchId: "mine-1", seed: 7, names: squad }),
+				),
+			},
+		]);
+		await connectAndPickFolder(coachHistory);
+		const filesBefore = drive.files.size;
+		await coachHistory.driveBackupButton.click();
+		await expect(coachHistory.driveStatus).toHaveText(
+			"Mappen tillhör ett annat lag. Välj en egen mapp för det här laget, eller läs in från den här mappen i ett tomt lag.",
+		);
+		expect(drive.files.size).toBe(filesBefore);
+		await coachContext.close();
 	});
 });
