@@ -26,6 +26,9 @@ export const STORAGE_KEYS = {
 	/** The teams a coach runs, and which one is active (#118). Not itself
 	 * team-scoped - it is the list teamScoped() needs a team id from. */
 	teams: "matchplanner:teams:v1",
+	/** Names this device in the files it writes to Drive (#135). Not
+	 * team-scoped: a device is one device whichever team is active. */
+	deviceId: "matchplanner:deviceId:v1",
 } as const;
 
 // Deliberately absent from STORAGE_KEYS, and never written to localStorage:
@@ -55,6 +58,19 @@ const TEAM_SCOPED_KEYS: readonly StorageKey[] = [
  */
 export function teamScoped(key: StorageKey, teamId: string): string {
 	return `${key}:${teamId}`;
+}
+
+/**
+ * Move everything saved for team `oldId` to team `newId` (#135: a device
+ * adopting the id a Drive folder belongs to), leaving nothing under the
+ * old id.
+ */
+export function moveTeamScopedData(oldId: string, newId: string): void {
+	for (const key of TEAM_SCOPED_KEYS) {
+		const value = readItem(teamScoped(key, oldId));
+		if (value !== null) writeItem(teamScoped(key, newId), value);
+		removeItem(teamScoped(key, oldId));
+	}
 }
 
 /** The saved value, or null if there is none or storage is unavailable. */
@@ -91,6 +107,7 @@ export function removeItem(key: string): void {
 export function clearAppData(teamIds: readonly string[]): void {
 	removeItem(STORAGE_KEYS.coachName);
 	removeItem(STORAGE_KEYS.teams);
+	removeItem(STORAGE_KEYS.deviceId);
 	for (const teamId of teamIds) {
 		for (const key of TEAM_SCOPED_KEYS) removeItem(teamScoped(key, teamId));
 	}

@@ -346,14 +346,53 @@ export const TEXT = {
 			noFolderChosen: "Ingen mapp vald än.",
 			backingUp: "Säkerhetskopierar …",
 			restoring: "Läser in från Google Drive …",
-			backedUp: (count: number) =>
-				count === 0
+			backedUp: (matches: number, stateSaved: boolean) => {
+				const parts = [
+					...(matches > 0
+						? [
+								`${matches} ${matches === 1 ? "match" : "matcher"} säkerhetskopierades.`,
+							]
+						: []),
+					...(stateSaved ? ["Trupp och anteckningar sparades."] : []),
+				];
+				return parts.length === 0
 					? "Allt var redan säkerhetskopierat."
-					: `${count} ${count === 1 ? "match" : "matcher"} säkerhetskopierades.`,
-			restored: (count: number) =>
-				count === 0
-					? "Inget nytt att läsa in."
-					: `${count} ${count === 1 ? "match" : "matcher"} lästes in.`,
+					: parts.join(" ");
+			},
+			restored: (r: {
+				downloaded: number;
+				notesChanged: boolean;
+				squadRestored: boolean;
+				ignored: number;
+			}) => {
+				const news = [
+					...(r.downloaded > 0
+						? [
+								`${r.downloaded} ${r.downloaded === 1 ? "match" : "matcher"} lästes in.`,
+							]
+						: []),
+					...(r.notesChanged ? ["Anteckningarna uppdaterades."] : []),
+					...(r.squadRestored ? ["Truppen lästes in."] : []),
+				];
+				const skipped =
+					r.ignored > 0
+						? [
+								`${r.ignored} ${r.ignored === 1 ? "fil" : "filer"} i mappen hör inte till det här laget eller gick inte att läsa och hoppades över.`,
+							]
+						: [];
+				return [
+					...(news.length === 0 ? ["Inget nytt att läsa in."] : news),
+					...skipped,
+				].join(" ");
+			},
+			folderRefused: {
+				severalTeams:
+					"Mappen innehåller filer från flera lag. Välj en mapp för just det här laget.",
+				otherTeam:
+					"Mappen tillhör ett annat lag. Välj en egen mapp för det här laget, eller läs in från den här mappen i ett tomt lag.",
+				belongsToOtherLocalTeam:
+					"Mappen tillhör ett annat lag på den här enheten. Byt till det laget först.",
+			},
 			needPassword: "Ange ett lösenord för säkerhetskopian först.",
 			wrongPassword:
 				"Fel lösenord, eller filen har ändrats. Kontrollera lösenordet och försök igen.",

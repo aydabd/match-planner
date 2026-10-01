@@ -7,8 +7,14 @@ import {
 	withActiveTeam,
 	withRenamedTeam,
 	withTeam,
+	withTeamIdChanged,
 } from "../core/teams.js";
-import { readItem, STORAGE_KEYS, writeItem } from "./appStorage.js";
+import {
+	moveTeamScopedData,
+	readItem,
+	STORAGE_KEYS,
+	writeItem,
+} from "./appStorage.js";
 
 const DEFAULT_TEAM_NAME = "Mitt lag";
 
@@ -77,4 +83,31 @@ export function switchTeam(teamId: string): void {
 
 export function renameTeam(teamId: string, name: string): void {
 	saveTeamsFile(withRenamedTeam(ensureDefaultTeam(), teamId, name));
+}
+
+/** The ids of every team except the active one. */
+export function otherTeamIds(): string[] {
+	const file = ensureDefaultTeam();
+	return file.teams.map((t) => t.id).filter((id) => id !== file.activeTeamId);
+}
+
+/**
+ * Give the active team the id `newId` and move its saved data to it (#135:
+ * a device taking on the team id a Drive folder belongs to, so both
+ * compute the same file names). Returns false, changing nothing, if
+ * another team on this device already has that id.
+ */
+export function adoptTeamId(newId: string): boolean {
+	const file = ensureDefaultTeam();
+	const oldId = activeTeamId();
+	if (newId === oldId) return true;
+	let changed: TeamsFile;
+	try {
+		changed = withTeamIdChanged(file, oldId, newId);
+	} catch {
+		return false;
+	}
+	moveTeamScopedData(oldId, newId);
+	saveTeamsFile(changed);
+	return true;
 }
