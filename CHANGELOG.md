@@ -3,6 +3,14 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.19.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.18.0...matchplanner-v0.19.0) (2026-10-01)
+
+
+### Features
+
+* **ui:** add a secondary nav across the statistics pages ([#132](https://github.com/aydabd/match-planner/issues/132)) ([f633b3b](https://github.com/aydabd/match-planner/commit/f633b3b3a80888617314e55cfe980a907ef38785))
+* **ui:** split statistics into statistics, season report and player notes pages ([#131](https://github.com/aydabd/match-planner/issues/131)) ([032c1e2](https://github.com/aydabd/match-planner/commit/032c1e2691a22c110da8cbaaa7cae8711ed81343))
+
 ## [0.18.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.17.2...matchplanner-v0.18.0) (2026-10-01)
 
 
