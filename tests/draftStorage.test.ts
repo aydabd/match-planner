@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { newRoster, rosterToJson } from "../src/core/storage.js";
+import { STORAGE_KEYS, teamScoped } from "../src/ui/appStorage.js";
 import { loadDraft, saveDraft } from "../src/ui/draftStorage.js";
+import { activeTeamId } from "../src/ui/teamStorage.js";
 import { BrokenStorage, useMemoryStorage } from "./support/memoryStorage.js";
 
-const KEY = "matchplanner:draft:v1";
+const key = () => teamScoped(STORAGE_KEYS.draft, activeTeamId());
 const EMPTY_DRAFT = newRoster({ formatId: "7v7:2-3-1", rotationSeconds: 600 });
 
 describe("squad draft storage", () => {
@@ -53,14 +55,14 @@ describe("squad draft storage", () => {
 			players: [{ id: "p1", name: "Alva" }],
 		});
 		saveDraft(draft);
-		expect(storage().getItem(KEY)).toBe(rosterToJson(draft));
+		expect(storage().getItem(key())).toBe(rosterToJson(draft));
 	});
 
 	it.each([
 		["corrupted JSON", "{not json"],
 		["an invalid squad file", JSON.stringify({ schemaVersion: 99 })],
 	])("falls back to an empty squad for %s", (_, raw) => {
-		storage().setItem(KEY, raw);
+		storage().setItem(key(), raw);
 		expect(loadDraft()).toEqual(EMPTY_DRAFT);
 	});
 

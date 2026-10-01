@@ -4,11 +4,12 @@ import {
 	type StoredReport,
 	withReport,
 } from "../core/report.js";
-import { readItem, STORAGE_KEYS, writeItem } from "./appStorage.js";
+import { readItem, STORAGE_KEYS, teamScoped, writeItem } from "./appStorage.js";
+import { activeTeamId } from "./teamStorage.js";
 
 /** The kept reports, newest first. Damaged entries are left out. */
 export function loadReports(): StoredReport[] {
-	const raw = readItem(STORAGE_KEYS.reports);
+	const raw = readItem(teamScoped(STORAGE_KEYS.reports, activeTeamId()));
 	if (!raw) return [];
 	try {
 		const parsed: unknown = JSON.parse(raw);
@@ -21,7 +22,7 @@ export function loadReports(): StoredReport[] {
 /** Keep a report on this device (the last LIMITS.storedReports matches). */
 export function saveReport(report: StoredReport): void {
 	writeItem(
-		STORAGE_KEYS.reports,
+		teamScoped(STORAGE_KEYS.reports, activeTeamId()),
 		JSON.stringify(withReport(loadReports(), report, LIMITS.storedReports)),
 	);
 }

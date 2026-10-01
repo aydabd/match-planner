@@ -1,13 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
+import { STORAGE_KEYS, teamScoped } from "../src/ui/appStorage.js";
 import {
 	clearSession,
 	loadSession,
 	type MatchSession,
 	saveSession,
 } from "../src/ui/sessionStorage.js";
+import { activeTeamId } from "../src/ui/teamStorage.js";
 import { BrokenStorage, useMemoryStorage } from "./support/memoryStorage.js";
 
-const KEY = "matchplanner:session:v1";
+const key = () => teamScoped(STORAGE_KEYS.session, activeTeamId());
 
 function session(overrides: Partial<MatchSession> = {}): MatchSession {
 	return {
@@ -67,7 +69,7 @@ describe("match session storage", () => {
 	const { storage } = useMemoryStorage();
 
 	it("resumes a match saved before periods existed, in period 1 of the team size's match", () => {
-		storage().setItem(KEY, JSON.stringify(VERSION_1));
+		storage().setItem(key(), JSON.stringify(VERSION_1));
 
 		expect(loadSession()).toEqual(
 			session({
@@ -97,7 +99,7 @@ describe("match session storage", () => {
 		saveSession(session());
 		clearSession();
 		expect(loadSession()).toBeNull();
-		expect(storage().getItem(KEY)).toBeNull();
+		expect(storage().getItem(key())).toBeNull();
 	});
 
 	it.each([
@@ -135,7 +137,7 @@ describe("match session storage", () => {
 			JSON.stringify({ ...session(), schedulerOrder: undefined }),
 		],
 	])("ignores %s instead of crashing", (_, raw) => {
-		storage().setItem(KEY, raw);
+		storage().setItem(key(), raw);
 		expect(loadSession()).toBeNull();
 	});
 

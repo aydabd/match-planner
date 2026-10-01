@@ -5,7 +5,8 @@ import {
 	type RosterFile,
 	rosterToJson,
 } from "../core/storage.js";
-import { readItem, STORAGE_KEYS, writeItem } from "./appStorage.js";
+import { readItem, STORAGE_KEYS, teamScoped, writeItem } from "./appStorage.js";
+import { activeTeamId } from "./teamStorage.js";
 
 /** A new squad: no players, the default format and its default minutes. */
 export function emptyDraft(): RosterFile {
@@ -14,7 +15,7 @@ export function emptyDraft(): RosterFile {
 
 /** Load the saved draft, or an empty squad if there is none or it is unreadable. */
 export function loadDraft(): RosterFile {
-	const raw = readItem(STORAGE_KEYS.draft);
+	const raw = readItem(teamScoped(STORAGE_KEYS.draft, activeTeamId()));
 	if (raw) {
 		try {
 			return parseRosterFile(JSON.parse(raw), { allowEmptySquad: true });
@@ -26,5 +27,8 @@ export function loadDraft(): RosterFile {
 }
 
 export function saveDraft(roster: RosterFile): void {
-	writeItem(STORAGE_KEYS.draft, rosterToJson(roster));
+	writeItem(
+		teamScoped(STORAGE_KEYS.draft, activeTeamId()),
+		rosterToJson(roster),
+	);
 }

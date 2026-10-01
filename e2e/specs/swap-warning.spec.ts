@@ -10,9 +10,16 @@ import { SECOND_SWAP, SQUAD } from "../support/squads.js";
 
 /** The match as the app saved it, read straight from browser storage. */
 async function savedMatch(page: Page): Promise<MatchSession> {
-	const raw = await page.evaluate(() =>
-		localStorage.getItem("matchplanner:session:v1"),
-	);
+	const raw = await page.evaluate(() => {
+		// Session is scoped to the active team (#118): matchplanner:session:v1
+		// suffixed with its id.
+		const teams = JSON.parse(
+			localStorage.getItem("matchplanner:teams:v1") ?? "{}",
+		);
+		return localStorage.getItem(
+			`matchplanner:session:v1:${teams.activeTeamId}`,
+		);
+	});
 	if (!raw) throw new Error("no saved match");
 	return JSON.parse(raw) as MatchSession;
 }

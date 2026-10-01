@@ -7,7 +7,14 @@ import type {
 	SchedulerState,
 	TempSwap,
 } from "../core/types.js";
-import { readItem, removeItem, STORAGE_KEYS, writeItem } from "./appStorage.js";
+import {
+	readItem,
+	removeItem,
+	STORAGE_KEYS,
+	teamScoped,
+	writeItem,
+} from "./appStorage.js";
+import { activeTeamId } from "./teamStorage.js";
 
 export type { MutableAssignment, TempSwap };
 
@@ -53,7 +60,10 @@ export interface MatchSession {
 }
 
 export function saveSession(session: MatchSession): void {
-	writeItem(STORAGE_KEYS.session, JSON.stringify(session));
+	writeItem(
+		teamScoped(STORAGE_KEYS.session, activeTeamId()),
+		JSON.stringify(session),
+	);
 }
 
 /**
@@ -141,7 +151,7 @@ function isResumable(s: Record<string, unknown>): boolean {
 }
 
 export function loadSession(): MatchSession | null {
-	const raw = readItem(STORAGE_KEYS.session);
+	const raw = readItem(teamScoped(STORAGE_KEYS.session, activeTeamId()));
 	if (!raw) return null;
 	try {
 		const parsed = JSON.parse(raw) as unknown;
@@ -155,5 +165,5 @@ export function loadSession(): MatchSession | null {
 }
 
 export function clearSession(): void {
-	removeItem(STORAGE_KEYS.session);
+	removeItem(teamScoped(STORAGE_KEYS.session, activeTeamId()));
 }
