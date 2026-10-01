@@ -1,4 +1,4 @@
-import type { Locator, Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 /** The statistics pages (#119): import match files and read the tables on
  * /statistics/, the season report on /statistics/sasongsrapport/, and the
@@ -84,6 +84,10 @@ export class HistoryPage {
 	async importFiles(
 		files: readonly { name: string; contents: string }[],
 	): Promise<void> {
+		// The first render fills the match count, and it runs after the
+		// page's script has attached the input's change handler; setting files
+		// earlier would fire a change event nobody is listening to yet.
+		await expect(this.count).not.toBeEmpty();
 		await this.root.locator("#historyImportInput").setInputFiles(
 			files.map((file) => ({
 				name: file.name,

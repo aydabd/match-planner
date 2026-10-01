@@ -392,8 +392,15 @@ export function createStatisticsView(): { refresh: () => void } {
 	const messages = byId("historyMessages");
 	const input = byId("historyImportInput") as HTMLInputElement;
 
+	// refresh() is async and called again by every import, restore and the
+	// first render; only the newest call may draw, or a slow earlier one
+	// (started before an import) would overwrite the fresh result.
+	let latestRender = 0;
+
 	async function refresh(): Promise<void> {
+		const thisRender = ++latestRender;
 		const { history } = await loadSeasonData();
+		if (thisRender !== latestRender) return;
 		byId("historyCount").textContent =
 			history.matches === 0
 				? TEXT.history.empty
