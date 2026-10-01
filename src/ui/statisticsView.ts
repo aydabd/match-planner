@@ -26,7 +26,8 @@ import { confirmWithSecondTap } from "./confirmButton.js";
 import { byId, card, downloadJson, table } from "./domHelpers.js";
 import { loadDraft, saveDraft } from "./draftStorage.js";
 import { createDriveAuth } from "./driveAuth.js";
-import { createDriveBackup } from "./driveBackup.js";
+import { createDriveBackup, DriveFolderError } from "./driveBackup.js";
+import { createDriveClient } from "./driveClient.js";
 import {
 	DRIVE_APP_ID,
 	DRIVE_CLIENT_ID,
@@ -184,8 +185,15 @@ function setUpDriveBackup(refresh: () => void): void {
 	const status = byId("driveStatus");
 	const t = TEXT.history.drive;
 
+	/** The sentence for why a backup or restore did not go through. */
+	function driveFailure(err: unknown): string {
+		if (err instanceof SecurePackageError) return t.wrongPassword;
+		if (err instanceof DriveFolderError) return t.folderRefused[err.reason];
+		return t.failed;
+	}
+
 	const auth = createDriveAuth(DRIVE_CLIENT_ID, DRIVE_SCOPE);
-	const backup = createDriveBackup(auth);
+	const backup = createDriveBackup(createDriveClient(() => auth.accessToken()));
 
 	function showFolder(id: string, name: string): void {
 		writeItem(teamScoped(STORAGE_KEYS.driveFolderId, activeTeamId()), id);
@@ -266,11 +274,13 @@ function setUpDriveBackup(refresh: () => void): void {
 		status.textContent = t.backingUp;
 		backupBtn.disabled = true;
 		try {
-			const { uploaded } = await backup.backup(folderId, passwordInput.value);
-			status.textContent = t.backedUp(uploaded);
+			const { uploaded, stateSaved } = await backup.backup(
+				folderId,
+				passwordInput.value,
+			);
+			status.textContent = t.backedUp(uploaded, stateSaved);
 		} catch (err) {
-			status.textContent =
-				err instanceof SecurePackageError ? t.wrongPassword : t.failed;
+			status.textContent = driveFailure(err);
 		} finally {
 			backupBtn.disabled = false;
 		}
@@ -286,15 +296,11 @@ function setUpDriveBackup(refresh: () => void): void {
 		status.textContent = t.restoring;
 		restoreBtn.disabled = true;
 		try {
-			const { downloaded } = await backup.restore(
-				folderId,
-				passwordInput.value,
-			);
-			status.textContent = t.restored(downloaded);
+			const result = await backup.restore(folderId, passwordInput.value);
+			status.textContent = t.restored(result);
 			refresh();
 		} catch (err) {
-			status.textContent =
-				err instanceof SecurePackageError ? t.wrongPassword : t.failed;
+			status.textContent = driveFailure(err);
 		} finally {
 			restoreBtn.disabled = false;
 		}

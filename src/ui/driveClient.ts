@@ -1,35 +1,28 @@
 import type { DriveFileEntry } from "../core/driveSync.js";
 
 /**
- * The Drive REST calls backup (#56, #70) needs, kept to exactly the
+ * The Drive REST calls backup (#56, #70, #135) needs, kept to exactly the
  * `drive.file` scope allows: read/write JSON files in a folder the coach
  * picked (src/ui/drivePicker.ts). No DOM here, but it depends on `fetch`,
  * so - like driveAuth.ts - it lives in src/ui, not src/core.
  *
- * Every match file is uploaded once and never edited again (#70's
- * src/core/driveSync.ts comment explains why that matters for concurrent
- * coaches), so there is no "update an existing file" case to handle here
- * any more - every upload is a plain create.
+ * It lists, creates, updates and downloads files by name and id and knows
+ * nothing about what they mean: which file is whose, and what a name
+ * stands for, is core/driveNames.ts and driveBackup.ts. Match files are
+ * only ever created; a device updates only its own notes and squad files,
+ * so no two devices ever write the same file.
  */
 
 const FILES_URL = "https://www.googleapis.com/drive/v3/files";
 const UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files";
-const MATCH_FILE_SUFFIX = ".json";
-/** The pre-#70 manifest file name: excluded so an old one left in the
- * folder from before this version is never mistaken for a match file
- * (it also ends in ".json", but has no `audit`, so parsing it as one
- * would fail). */
-const LEGACY_MANIFEST_NAME = "manifest.json";
 
 export interface DriveClient {
-	/** Every match file already in `folderId`, matchId read from its filename. */
-	listMatchFiles(folderId: string): Promise<DriveFileEntry[]>;
-	/** Create `<matchId>.json` in `folderId` holding `contents` verbatim. */
-	uploadMatch(
-		folderId: string,
-		matchId: string,
-		contents: string,
-	): Promise<void>;
+	/** Every file in `folderId`, by name and Drive id. */
+	listFiles(folderId: string): Promise<DriveFileEntry[]>;
+	/** Create `name` in `folderId` holding `contents` verbatim. */
+	createFile(folderId: string, name: string, contents: string): Promise<void>;
+	/** Replace the contents of the file with Drive id `fileId`. */
+	updateFile(fileId: string, contents: string): Promise<void>;
 	/** The raw parsed JSON of a file by its Drive id. */
 	downloadJson(fileId: string): Promise<unknown>;
 }
@@ -50,7 +43,7 @@ async function driveFetch(
 export function createDriveClient(
 	accessToken: () => Promise<string>,
 ): DriveClient {
-	async function listMatchFiles(folderId: string): Promise<DriveFileEntry[]> {
+	async function listFiles(folderId: string): Promise<DriveFileEntry[]> {
 		const query = `'${folderId}' in parents and trashed=false`;
 		const entries: DriveFileEntry[] = [];
 		let pageToken: string | undefined;
@@ -69,12 +62,7 @@ export function createDriveClient(
 				nextPageToken?: string;
 			};
 			for (const file of body.files ?? []) {
-				if (file.name === LEGACY_MANIFEST_NAME) continue;
-				if (!file.name.endsWith(MATCH_FILE_SUFFIX)) continue;
-				entries.push({
-					matchId: file.name.slice(0, -MATCH_FILE_SUFFIX.length),
-					fileId: file.id,
-				});
+				entries.push({ name: file.name, fileId: file.id });
 			}
 			pageToken = body.nextPageToken;
 		} while (pageToken !== undefined);
@@ -90,16 +78,13 @@ export function createDriveClient(
 		return response.json();
 	}
 
-	async function uploadMatch(
+	async function createFile(
 		folderId: string,
-		matchId: string,
+		name: string,
 		contents: string,
 	): Promise<void> {
 		const token = await accessToken();
-		const metadata = {
-			name: `${matchId}${MATCH_FILE_SUFFIX}`,
-			parents: [folderId],
-		};
+		const metadata = { name, parents: [folderId] };
 		const boundary = "matchplanner-drive-boundary";
 		const body = [
 			`--${boundary}`,
@@ -119,5 +104,18 @@ export function createDriveClient(
 		});
 	}
 
-	return { listMatchFiles, uploadMatch, downloadJson };
+	async function updateFile(fileId: string, contents: string): Promise<void> {
+		const token = await accessToken();
+		await driveFetch(
+			token,
+			`${UPLOAD_URL}/${fileId}?uploadType=media&fields=id`,
+			{
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: contents,
+			},
+		);
+	}
+
+	return { listFiles, createFile, updateFile, downloadJson };
 }

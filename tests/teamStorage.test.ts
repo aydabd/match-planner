@@ -1,8 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+	readItem,
+	STORAGE_KEYS,
+	teamScoped,
+	writeItem,
+} from "../src/ui/appStorage.js";
+import {
 	activeTeamId,
+	adoptTeamId,
 	createTeam,
 	listTeams,
+	otherTeamIds,
 	renameTeam,
 	switchTeam,
 } from "../src/ui/teamStorage.js";
@@ -51,5 +59,54 @@ describe("teamStorage", () => {
 		const defaultTeam = listTeams()[0];
 		renameTeam(defaultTeam?.id ?? "", "P8 5v5");
 		expect(listTeams()).toEqual([{ id: defaultTeam?.id, name: "P8 5v5" }]);
+	});
+
+	describe("adoptTeamId (#135)", () => {
+		it("gives the active team the new id and moves its saved data along", () => {
+			const old = activeTeamId();
+			writeItem(teamScoped(STORAGE_KEYS.matches, old), "[matches]");
+			writeItem(teamScoped(STORAGE_KEYS.driveFolderId, old), "folder-1");
+
+			expect(adoptTeamId("adopted-id")).toBe(true);
+
+			expect(activeTeamId()).toBe("adopted-id");
+			expect(listTeams().map((t) => t.id)).toEqual(["adopted-id"]);
+			expect(readItem(teamScoped(STORAGE_KEYS.matches, "adopted-id"))).toBe(
+				"[matches]",
+			);
+			expect(
+				readItem(teamScoped(STORAGE_KEYS.driveFolderId, "adopted-id")),
+			).toBe("folder-1");
+			expect(readItem(teamScoped(STORAGE_KEYS.matches, old))).toBeNull();
+			expect(readItem(teamScoped(STORAGE_KEYS.driveFolderId, old))).toBeNull();
+		});
+
+		it("refuses an id another team on this device already has, changing nothing", () => {
+			const first = listTeams()[0]?.id ?? "";
+			const second = createTeam("P11 7v7");
+			writeItem(teamScoped(STORAGE_KEYS.matches, second.id), "[second]");
+
+			expect(adoptTeamId(first)).toBe(false);
+
+			expect(activeTeamId()).toBe(second.id);
+			expect(readItem(teamScoped(STORAGE_KEYS.matches, second.id))).toBe(
+				"[second]",
+			);
+		});
+
+		it("does nothing when asked to adopt the id the team already has", () => {
+			const id = activeTeamId();
+			expect(adoptTeamId(id)).toBe(true);
+			expect(activeTeamId()).toBe(id);
+		});
+	});
+
+	it("lists the ids of the teams other than the active one", () => {
+		const first = listTeams()[0]?.id ?? "";
+		expect(otherTeamIds()).toEqual([]);
+		const second = createTeam("P11 7v7");
+		expect(otherTeamIds()).toEqual([first]);
+		switchTeam(first);
+		expect(otherTeamIds()).toEqual([second.id]);
 	});
 });
