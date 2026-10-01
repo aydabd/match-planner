@@ -23,6 +23,9 @@ export const STORAGE_KEYS = {
 	driveFolderId: "matchplanner:driveFolderId:v1",
 	/** That folder's display name, so the coach can see where it is (#70). */
 	driveFolderName: "matchplanner:driveFolderName:v1",
+	/** The teams a coach runs, and which one is active (#118). Not itself
+	 * team-scoped - it is the list teamScoped() needs a team id from. */
+	teams: "matchplanner:teams:v1",
 } as const;
 
 // Deliberately absent from STORAGE_KEYS, and never written to localStorage:
@@ -31,8 +34,19 @@ export const STORAGE_KEYS = {
 
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
 
+/**
+ * `key`, scoped to one team (#118): two teams never read or write each
+ * other's draft, matches, player notes, session, reports or Drive folder
+ * choice. Not yet used by any storage module - that lands in the next
+ * change, which also moves clearAppData() over to clearing every team's
+ * scoped keys instead of these unscoped ones.
+ */
+export function teamScoped(key: StorageKey, teamId: string): string {
+	return `${key}:${teamId}`;
+}
+
 /** The saved value, or null if there is none or storage is unavailable. */
-export function readItem(key: StorageKey): string | null {
+export function readItem(key: string): string | null {
 	try {
 		return localStorage.getItem(key);
 	} catch {
@@ -40,7 +54,7 @@ export function readItem(key: StorageKey): string | null {
 	}
 }
 
-export function writeItem(key: StorageKey, value: string): void {
+export function writeItem(key: string, value: string): void {
 	try {
 		localStorage.setItem(key, value);
 	} catch {
@@ -48,7 +62,7 @@ export function writeItem(key: StorageKey, value: string): void {
 	}
 }
 
-export function removeItem(key: StorageKey): void {
+export function removeItem(key: string): void {
 	try {
 		localStorage.removeItem(key);
 	} catch {
