@@ -95,6 +95,9 @@ export class HistoryPage {
 				buffer: Buffer.from(file.contents),
 			})),
 		);
+		// The import reads and stores the files asynchronously and then says
+		// so; leaving the page before that would abandon it half done.
+		await expect(this.messages.first()).toBeVisible();
 	}
 
 	/** The row of a player in one of the tables ("Startat och speltid", ...). */

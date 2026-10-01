@@ -32,9 +32,7 @@ import { TEXT } from "./text.js";
 /** Which of the reason keys TEXT.history.playerNotes.reason declares. */
 const REASONS: readonly AbsenceReason[] = ["injury", "illness", "other"];
 
-/** A ladder as steps, the reached ones marked done. Shared by the editable
- * checkpoint field (player notes) and the read-only per-player view
- * (Översikt) - same rendering, so a level means the same thing in both. */
+/** A ladder as steps, the reached ones marked done. */
 function checkpointLadderList(
 	labels: readonly string[],
 	level: number,
