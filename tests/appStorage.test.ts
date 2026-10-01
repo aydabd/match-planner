@@ -13,6 +13,16 @@ import {
 } from "../src/ui/appStorage.js";
 import { BrokenStorage, useMemoryStorage } from "./support/memoryStorage.js";
 
+const TEAM_SCOPED_KEYS = [
+	STORAGE_KEYS.draft,
+	STORAGE_KEYS.session,
+	STORAGE_KEYS.reports,
+	STORAGE_KEYS.matches,
+	STORAGE_KEYS.playerNotes,
+	STORAGE_KEYS.driveFolderId,
+	STORAGE_KEYS.driveFolderName,
+];
+
 describe("appStorage", () => {
 	const { storage } = useMemoryStorage();
 
@@ -29,16 +39,32 @@ describe("appStorage", () => {
 		);
 	});
 
-	it("clears everything the app saves, and nothing else", () => {
-		for (const key of Object.values(STORAGE_KEYS)) writeItem(key, "x");
+	it("clears every team's scoped data, the coach name and the teams list, and nothing else", () => {
+		writeItem(STORAGE_KEYS.coachName, "x");
+		for (const teamId of ["t1", "t2"]) {
+			for (const key of TEAM_SCOPED_KEYS) {
+				writeItem(teamScoped(key, teamId), "x");
+			}
+		}
+		writeItem(STORAGE_KEYS.teams, "x");
 		storage().setItem("another-app", "keep me");
 
-		clearAppData();
+		clearAppData(["t1", "t2"]);
 
-		for (const key of Object.values(STORAGE_KEYS)) {
-			expect(readItem(key)).toBeNull();
+		expect(readItem(STORAGE_KEYS.coachName)).toBeNull();
+		expect(readItem(STORAGE_KEYS.teams)).toBeNull();
+		for (const teamId of ["t1", "t2"]) {
+			for (const key of TEAM_SCOPED_KEYS) {
+				expect(readItem(teamScoped(key, teamId))).toBeNull();
+			}
 		}
 		expect(storage().getItem("another-app")).toBe("keep me");
+	});
+
+	it("leaves a team's data alone when it is not in the given team ids", () => {
+		writeItem(teamScoped(STORAGE_KEYS.matches, "t1"), "keep me");
+		clearAppData(["t2"]);
+		expect(readItem(teamScoped(STORAGE_KEYS.matches, "t1"))).toBe("keep me");
 	});
 
 	it("keeps working when the browser blocks storage", () => {
@@ -46,7 +72,7 @@ describe("appStorage", () => {
 		expect(readItem(STORAGE_KEYS.draft)).toBeNull();
 		expect(() => writeItem(STORAGE_KEYS.draft, "x")).not.toThrow();
 		expect(() => removeItem(STORAGE_KEYS.draft)).not.toThrow();
-		expect(() => clearAppData()).not.toThrow();
+		expect(() => clearAppData(["t1"])).not.toThrow();
 	});
 });
 

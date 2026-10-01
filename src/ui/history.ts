@@ -48,7 +48,7 @@ import {
 	playerDevelopment,
 	recentStartFrequency,
 } from "../core/visualizations.js";
-import { readItem, STORAGE_KEYS, writeItem } from "./appStorage.js";
+import { readItem, STORAGE_KEYS, teamScoped, writeItem } from "./appStorage.js";
 import { confirmWithSecondTap } from "./confirmButton.js";
 import { loadDraft, saveDraft } from "./draftStorage.js";
 import { createDriveAuth } from "./driveAuth.js";
@@ -63,6 +63,7 @@ import { pickFolder } from "./drivePicker.js";
 import { keepMatchFiles, loadMatchFiles } from "./matchFileStorage.js";
 import { loadPlayerNotes, savePlayerNotes } from "./playerNotesStorage.js";
 import { lineName } from "./reportText.js";
+import { activeTeamId } from "./teamStorage.js";
 import { TEXT } from "./text.js";
 
 function byId(id: string): HTMLElement {
@@ -371,8 +372,8 @@ function setUpDriveBackup(refresh: () => void): void {
 	const backup = createDriveBackup(auth);
 
 	function showFolder(id: string, name: string): void {
-		writeItem(STORAGE_KEYS.driveFolderId, id);
-		writeItem(STORAGE_KEYS.driveFolderName, name);
+		writeItem(teamScoped(STORAGE_KEYS.driveFolderId, activeTeamId()), id);
+		writeItem(teamScoped(STORAGE_KEYS.driveFolderName, activeTeamId()), name);
 		folderLink.textContent = name;
 		folderLink.href = `https://drive.google.com/drive/folders/${id}`;
 		folderStatus.hidden = false;
@@ -382,8 +383,12 @@ function setUpDriveBackup(refresh: () => void): void {
 		restoreBtn.hidden = false;
 	}
 
-	const storedFolderId = readItem(STORAGE_KEYS.driveFolderId);
-	const storedFolderName = readItem(STORAGE_KEYS.driveFolderName);
+	const storedFolderId = readItem(
+		teamScoped(STORAGE_KEYS.driveFolderId, activeTeamId()),
+	);
+	const storedFolderName = readItem(
+		teamScoped(STORAGE_KEYS.driveFolderName, activeTeamId()),
+	);
 	if (storedFolderId !== null && storedFolderName !== null) {
 		showFolder(storedFolderId, storedFolderName);
 	}
@@ -418,7 +423,9 @@ function setUpDriveBackup(refresh: () => void): void {
 				// active (it is still in storage, and backup/restore still
 				// work against it) - only claim "no folder chosen" when
 				// that is actually true.
-				const currentName = readItem(STORAGE_KEYS.driveFolderName);
+				const currentName = readItem(
+					teamScoped(STORAGE_KEYS.driveFolderName, activeTeamId()),
+				);
 				status.textContent =
 					currentName !== null ? t.folderLabel(currentName) : t.noFolderChosen;
 			}
@@ -430,7 +437,7 @@ function setUpDriveBackup(refresh: () => void): void {
 	});
 
 	function currentFolderId(): string | null {
-		return readItem(STORAGE_KEYS.driveFolderId);
+		return readItem(teamScoped(STORAGE_KEYS.driveFolderId, activeTeamId()));
 	}
 
 	backupBtn.addEventListener("click", async () => {

@@ -5,7 +5,12 @@ import { SECOND_SWAP } from "../support/squads.js";
 /** Pretend the page was closed for a while: the last save is older. */
 async function backdateSave(page: Page, minutes: number): Promise<void> {
 	await page.evaluate((ms) => {
-		const key = "matchplanner:session:v1";
+		// Session is scoped to the active team (#118): matchplanner:session:v1
+		// suffixed with its id.
+		const teams = JSON.parse(
+			localStorage.getItem("matchplanner:teams:v1") ?? "{}",
+		);
+		const key = `matchplanner:session:v1:${teams.activeTeamId}`;
 		const session = JSON.parse(localStorage.getItem(key) ?? "{}");
 		session.lastTickMs -= ms;
 		localStorage.setItem(key, JSON.stringify(session));

@@ -35,11 +35,23 @@ export const STORAGE_KEYS = {
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
 
 /**
- * `key`, scoped to one team (#118): two teams never read or write each
- * other's draft, matches, player notes, session, reports or Drive folder
- * choice. Not yet used by any storage module - that lands in the next
- * change, which also moves clearAppData() over to clearing every team's
- * scoped keys instead of these unscoped ones.
+ * Every key that holds one team's own data (#118): everything except
+ * coachName (the coach's own identity, not a team's) and teams (the list of
+ * teams itself, read before a team id is even known).
+ */
+const TEAM_SCOPED_KEYS: readonly StorageKey[] = [
+	STORAGE_KEYS.draft,
+	STORAGE_KEYS.session,
+	STORAGE_KEYS.reports,
+	STORAGE_KEYS.matches,
+	STORAGE_KEYS.playerNotes,
+	STORAGE_KEYS.driveFolderId,
+	STORAGE_KEYS.driveFolderName,
+];
+
+/**
+ * `key`, scoped to one team: two teams never read or write each other's
+ * draft, matches, player notes, session, reports or Drive folder choice.
  */
 export function teamScoped(key: StorageKey, teamId: string): string {
 	return `${key}:${teamId}`;
@@ -70,9 +82,18 @@ export function removeItem(key: string): void {
 	}
 }
 
-/** Remove everything the app has saved, leaving other sites' data alone. */
-export function clearAppData(): void {
-	for (const key of Object.values(STORAGE_KEYS)) removeItem(key);
+/**
+ * Remove everything the app has saved, leaving other sites' data alone.
+ * `teamIds` must list every team the coach has (teamStorage.ts's
+ * listTeams()), so every team's scoped data is cleared, not just the
+ * active one's.
+ */
+export function clearAppData(teamIds: readonly string[]): void {
+	removeItem(STORAGE_KEYS.coachName);
+	removeItem(STORAGE_KEYS.teams);
+	for (const teamId of teamIds) {
+		for (const key of TEAM_SCOPED_KEYS) removeItem(teamScoped(key, teamId));
+	}
 }
 
 /** Prefix of the offline caches this app's service worker creates. */

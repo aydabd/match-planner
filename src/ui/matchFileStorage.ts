@@ -4,11 +4,12 @@ import {
 	matchFileToJson,
 	parseMatchFile,
 } from "../core/matchFile.js";
-import { readItem, STORAGE_KEYS, writeItem } from "./appStorage.js";
+import { readItem, STORAGE_KEYS, teamScoped, writeItem } from "./appStorage.js";
+import { activeTeamId } from "./teamStorage.js";
 
 /** The kept match files, oldest first. A damaged entry is left out. */
 export function loadMatchFiles(): MatchFile[] {
-	const raw = readItem(STORAGE_KEYS.matches);
+	const raw = readItem(teamScoped(STORAGE_KEYS.matches, activeTeamId()));
 	if (!raw) return [];
 	try {
 		const parsed: unknown = JSON.parse(raw);
@@ -38,7 +39,7 @@ export function keepMatchFiles(added: readonly MatchFile[]): {
 		added,
 	);
 	writeItem(
-		STORAGE_KEYS.matches,
+		teamScoped(STORAGE_KEYS.matches, activeTeamId()),
 		JSON.stringify(files.map((f) => JSON.parse(matchFileToJson(f)))),
 	);
 	return { newMatches, alreadyKnown };
