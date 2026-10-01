@@ -158,6 +158,27 @@ h3 {
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
+/* Team switcher (src/ui/page.ts), rendered into #teamSwitcher: always
+ * visible so a coach always knows which team's data they are looking at.
+ * Its select/input size overrides live further down, after the shared
+ * select/input rule they need to win over. */
+.team-switcher {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	margin-left: auto;
+	font-size: 0.8125rem;
+}
+.team-switcher-new-form {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+/* .team-switcher-new-form sets display:inline-flex, which would otherwise
+ * override the hidden attribute. */
+.team-switcher-new-form[hidden] {
+	display: none;
+}
 /* Shared cross-page nav (src/ui/page.ts), rendered into #pageNav. */
 /* Always its own full-width row below whatever else is in the header
  * (brand, and on some pages a page-specific action) - cramming it into
@@ -388,6 +409,18 @@ input[type="date"] {
 	padding: 10px 12px;
 	font: inherit;
 	font-size: 1rem;
+}
+.team-switcher select {
+	width: auto;
+	min-height: 0;
+	padding: 2px 6px;
+	font-size: 0.8125rem;
+}
+.team-switcher-new-form input {
+	width: 10em;
+	min-height: 0;
+	padding: 2px 6px;
+	font-size: 0.8125rem;
 }
 ::placeholder {
 	color: var(--ink-2);
