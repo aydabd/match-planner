@@ -241,18 +241,17 @@ function formatUuid(bytes: Uint8Array): string {
 }
 
 /**
- * A stable, deterministic UUIDv5 (RFC 4122 §4.3) for a player's canonical
- * name under `namespace` (defaults to `PLAYER_ID_NAMESPACE`). The same
- * name always yields the same id, so it can be used as a join key across
- * match files without ever storing the name itself outside an encrypted
- * payload.
+ * A UUIDv5 (RFC 4122 §4.3) of `name` exactly as given, under `namespace`:
+ * no case folding or trimming. For ids built from other ids (Drive file
+ * names, #135), where "A" and "a" must stay different. Player names go
+ * through `uuidv5` below, which canonicalizes first.
  */
-export async function uuidv5(
+export async function uuidv5Raw(
 	name: string,
-	namespace: string = PLAYER_ID_NAMESPACE,
+	namespace: string,
 ): Promise<string> {
 	const namespaceBytes = parseUuid(namespace);
-	const nameBytes = new TextEncoder().encode(canonicalizePlayerName(name));
+	const nameBytes = new TextEncoder().encode(name);
 	const combined = new Uint8Array(namespaceBytes.length + nameBytes.length);
 	combined.set(namespaceBytes, 0);
 	combined.set(nameBytes, namespaceBytes.length);
@@ -261,4 +260,18 @@ export async function uuidv5(
 	bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x50; // version 5
 	bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80; // variant RFC 4122
 	return formatUuid(bytes);
+}
+
+/**
+ * A stable, deterministic UUIDv5 (RFC 4122 §4.3) for a player's canonical
+ * name under `namespace` (defaults to `PLAYER_ID_NAMESPACE`). The same
+ * name always yields the same id, so it can be used as a join key across
+ * match files without ever storing the name itself outside an encrypted
+ * payload.
+ */
+export function uuidv5(
+	name: string,
+	namespace: string = PLAYER_ID_NAMESPACE,
+): Promise<string> {
+	return uuidv5Raw(canonicalizePlayerName(name), namespace);
 }
