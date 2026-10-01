@@ -3,6 +3,20 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.18.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.17.2...matchplanner-v0.18.0) (2026-10-01)
+
+
+### Features
+
+* **core:** add teams.ts for the team/squad data boundary ([#123](https://github.com/aydabd/match-planner/issues/123)) ([4c21a64](https://github.com/aydabd/match-planner/commit/4c21a6414091619403cdcdb3111df586216735c0))
+* **ui:** add a team switcher to the shared header ([#126](https://github.com/aydabd/match-planner/issues/126)) ([b45b17f](https://github.com/aydabd/match-planner/commit/b45b17fd6fc3c2caa8d2377715d6817e501ba6e1))
+* **ui:** add teamScoped() and a teamStorage wrapper ([#124](https://github.com/aydabd/match-planner/issues/124)) ([4c7af3b](https://github.com/aydabd/match-planner/commit/4c7af3be8bab5bdbde51daf92937a05bfd188ed1))
+
+
+### Bug Fixes
+
+* **ui:** scope per-team storage to the active team ([#125](https://github.com/aydabd/match-planner/issues/125)) ([4688661](https://github.com/aydabd/match-planner/commit/468866146280b756d9ad48f6600c914c3071ae35))
+
 ## [0.17.2](https://github.com/aydabd/match-planner/compare/matchplanner-v0.17.1...matchplanner-v0.17.2) (2026-09-30)
 
 
