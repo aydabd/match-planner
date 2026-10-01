@@ -1,3 +1,10 @@
+import { LIMITS } from "../core/limits.js";
+import {
+	activeTeamId,
+	createTeam,
+	listTeams,
+	switchTeam,
+} from "./teamStorage.js";
 import { TEXT } from "./text.js";
 
 /** One entry per real URL the app serves. Order here is nav order. */
@@ -46,6 +53,92 @@ function renderNav(current: PageId): void {
 	);
 }
 
+/**
+ * The team switcher in the shared header (#118): a <select> of every team
+ * plus a "Nytt lag" control, always visible so a coach always knows which
+ * team's data they are looking at. Changing the select only enables "Byt" -
+ * it does not switch or reload by itself (WCAG 3.2.2 "On Input": a form
+ * control must not change context on its own), so a keyboard user stepping
+ * through options, or a coach who scrolls the focused select by accident,
+ * never loses their place mid-match. Creating a team still reloads right
+ * away, since that is a deliberate action on its own button, not a side
+ * effect of moving focus through a list.
+ */
+function renderTeamSwitcher(): void {
+	const container = document.getElementById("teamSwitcher");
+	if (!container) return;
+	const t = TEXT.teamSwitcher;
+
+	const select = document.createElement("select");
+	select.id = "teamSwitcherSelect";
+	select.setAttribute("aria-label", t.label);
+	const current = activeTeamId();
+	for (const team of listTeams()) {
+		const option = document.createElement("option");
+		option.value = team.id;
+		option.textContent = team.name;
+		option.selected = team.id === current;
+		select.appendChild(option);
+	}
+
+	const switchBtn = document.createElement("button");
+	switchBtn.type = "button";
+	switchBtn.className = "btn btn-ghost";
+	switchBtn.id = "teamSwitcherSwitchBtn";
+	switchBtn.textContent = t.switchTeam;
+	switchBtn.disabled = true;
+	select.addEventListener("change", () => {
+		switchBtn.disabled = select.value === current;
+	});
+	switchBtn.addEventListener("click", () => {
+		switchTeam(select.value);
+		location.reload();
+	});
+
+	const newTeamBtn = document.createElement("button");
+	newTeamBtn.type = "button";
+	newTeamBtn.className = "btn btn-ghost";
+	newTeamBtn.id = "teamSwitcherNewBtn";
+	newTeamBtn.textContent = t.newTeam;
+
+	const form = document.createElement("form");
+	form.className = "team-switcher-new-form";
+	form.hidden = true;
+	const nameInput = document.createElement("input");
+	nameInput.type = "text";
+	nameInput.id = "teamSwitcherNameInput";
+	nameInput.setAttribute("aria-label", t.newTeamNameLabel);
+	nameInput.maxLength = LIMITS.teamNameLength;
+	const createBtn = document.createElement("button");
+	createBtn.type = "submit";
+	createBtn.className = "btn btn-primary";
+	createBtn.textContent = t.create;
+	const cancelBtn = document.createElement("button");
+	cancelBtn.type = "button";
+	cancelBtn.className = "btn btn-ghost";
+	cancelBtn.textContent = t.cancel;
+	form.append(nameInput, createBtn, cancelBtn);
+
+	newTeamBtn.addEventListener("click", () => {
+		newTeamBtn.hidden = true;
+		form.hidden = false;
+		nameInput.focus();
+	});
+	cancelBtn.addEventListener("click", () => {
+		form.hidden = true;
+		newTeamBtn.hidden = false;
+	});
+	form.addEventListener("submit", (event) => {
+		event.preventDefault();
+		const name = nameInput.value.trim();
+		if (name === "") return;
+		createTeam(name);
+		location.reload();
+	});
+
+	container.replaceChildren(select, switchBtn, newTeamBtn, form);
+}
+
 function registerServiceWorker(): void {
 	if (!("serviceWorker" in navigator)) return;
 	window.addEventListener("load", () => {
@@ -67,5 +160,6 @@ export function initPage(current: PageId): void {
 	stampVersion();
 	stampCopyright();
 	renderNav(current);
+	renderTeamSwitcher();
 	registerServiceWorker();
 }

@@ -7,6 +7,8 @@
  * with the active team's id.
  */
 
+import { LIMITS } from "./limits.js";
+
 export interface Team {
 	id: string;
 	name: string;
@@ -42,6 +44,11 @@ export class TeamsError extends Error {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** Trimmed and capped at LIMITS.teamNameLength, same discipline as a player note. */
+function sanitizedName(name: string): string {
+	return name.trim().slice(0, LIMITS.teamNameLength);
+}
 
 function parseTeam(raw: unknown): Team {
 	const fail = () => new TeamsError("Invalid team entry", { code: "teams" });
@@ -82,9 +89,10 @@ export function teamsFileToJson(file: TeamsFile): string {
 
 /** Add `team`, or replace it if a team with the same id already exists. */
 export function withTeam(file: TeamsFile, team: Team): TeamsFile {
+	const sanitized: Team = { id: team.id, name: sanitizedName(team.name) };
 	return {
 		schemaVersion: 1,
-		teams: [...file.teams.filter((t) => t.id !== team.id), team],
+		teams: [...file.teams.filter((t) => t.id !== team.id), sanitized],
 		activeTeamId: file.activeTeamId,
 	};
 }
@@ -106,7 +114,9 @@ export function withRenamedTeam(
 ): TeamsFile {
 	return {
 		schemaVersion: 1,
-		teams: file.teams.map((t) => (t.id === teamId ? { ...t, name } : t)),
+		teams: file.teams.map((t) =>
+			t.id === teamId ? { ...t, name: sanitizedName(name) } : t,
+		),
 		activeTeamId: file.activeTeamId,
 	};
 }

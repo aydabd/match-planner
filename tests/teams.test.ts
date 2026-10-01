@@ -67,6 +67,14 @@ describe("withTeam", () => {
 		expect(file.teams).toEqual([{ id: "t1", name: "P8 5v5" }]);
 	});
 
+	it("trims and caps the name at LIMITS.teamNameLength", () => {
+		const file = withTeam(EMPTY_TEAMS_FILE, {
+			id: "t1",
+			name: `  ${"x".repeat(100)}  `,
+		});
+		expect(file.teams[0]?.name).toBe("x".repeat(40));
+	});
+
 	it("leaves activeTeamId untouched", () => {
 		const file = withTeam(withActiveTeam(EMPTY_TEAMS_FILE, "t1"), {
 			id: "t2",
@@ -93,6 +101,12 @@ describe("withRenamedTeam", () => {
 		expect(withRenamedTeam(withP8, "t1", "P8 5v5").teams).toEqual([
 			{ id: "t1", name: "P8 5v5" },
 		]);
+	});
+
+	it("trims and caps the new name at LIMITS.teamNameLength", () => {
+		const withP8 = withTeam(EMPTY_TEAMS_FILE, { id: "t1", name: "P8" });
+		const renamed = withRenamedTeam(withP8, "t1", `  ${"y".repeat(100)}  `);
+		expect(renamed.teams[0]?.name).toBe("y".repeat(40));
 	});
 
 	it("is a no-op when no team has that id", () => {

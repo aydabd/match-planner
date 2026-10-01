@@ -38,6 +38,8 @@ export const LIMITS = {
 	playerNoteLength: 500,
 	/** Most development notes kept per player; the oldest is dropped first. */
 	developmentNotesPerPlayer: 200,
+	/** Longest team/squad name, in characters (#118). */
+	teamNameLength: 40,
 } as const;
 
 /**

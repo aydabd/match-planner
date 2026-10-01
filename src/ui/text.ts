@@ -46,6 +46,15 @@ export const TEXT = {
 		statistics: "Statistik",
 		about: "Om",
 	},
+	/** The team switcher in the shared header (src/ui/page.ts, #118). */
+	teamSwitcher: {
+		label: "Lag",
+		switchTeam: "Byt",
+		newTeam: "Nytt lag",
+		newTeamNameLabel: "Namn på det nya laget",
+		create: "Skapa",
+		cancel: "Avbryt",
+	},
 	setup: {
 		emptySquad: "Inga spelare än. Lägg till dem som är med idag.",
 		playerNameLabel: (position: number) => `Namn, spelare ${position}`,
