@@ -88,9 +88,8 @@ test.describe("Secure export and import (#81)", () => {
 		await history.importFiles([{ name: "match.json", contents: MATCH }]);
 		await expect(history.count).toHaveText("1 match över 1 månad.");
 
-		const reportCard = history.root.locator("section.card").filter({
-			has: page.getByRole("heading", { name: "Säsongsrapport" }),
-		});
+		await history.gotoSeasonReport();
+		const reportCard = history.seasonReportCard;
 		const exportButton = reportCard.getByRole("button", {
 			name: "Spara säsongsrapport (krypterad)",
 		});
@@ -124,9 +123,8 @@ test.describe("Secure export and import (#81)", () => {
 
 		// Export the season report (a different SecurePackage payload shape)
 		// with the same password the import will use.
-		const reportCard = history.root.locator("section.card").filter({
-			has: page.getByRole("heading", { name: "Säsongsrapport" }),
-		});
+		await history.gotoSeasonReport();
+		const reportCard = history.seasonReportCard;
 		await reportCard.getByLabel("Lösenord för filen").fill(password);
 		const download = page.waitForEvent("download");
 		await reportCard
@@ -135,6 +133,8 @@ test.describe("Secure export and import (#81)", () => {
 		const file = await download;
 		const contents = await readFile(await file.path(), "utf8");
 
+		// Importing a bundle is a data-management action: back on /statistics/.
+		await page.goto("statistics/");
 		await history.secureImportFileInput.setInputFiles({
 			name: "sasongsrapport.json",
 			mimeType: "application/json",

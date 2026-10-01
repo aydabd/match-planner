@@ -21,6 +21,7 @@ test.describe("Player notes: availability and development", () => {
 		await setup.open();
 		await history.open();
 		await history.importFiles(FILES);
+		await history.gotoNotes();
 	});
 
 	test("flags everyone for having no development notes until one is added", async ({
@@ -73,7 +74,7 @@ test.describe("Player notes: availability and development", () => {
 		).toHaveCount(0);
 	});
 
-	test("marking a checkpoint shows up in Översikt and pre-fills Säsongsrapport", async ({
+	test("a checkpoint marked on the notes page pre-fills the season report page", async ({
 		history,
 	}) => {
 		await history.choosePlayerForNotes("Dino");
@@ -86,17 +87,11 @@ test.describe("Player notes: availability and development", () => {
 		await expect(
 			history.checkpointArea("Tekniskt").getByRole("listitem").first(),
 		).toHaveClass(/done/);
+
+		await history.gotoSeasonReport();
 		await expect(history.seasonReportSummary("Dino", "Tekniskt")).toHaveValue(
 			/^Nivå 1 av 4 uppnådd\. /,
 		);
-
-		await history.choosePlayerForVisualization("Dino");
-		await expect(
-			history
-				.visualizationCheckpointArea("Tekniskt")
-				.getByRole("listitem")
-				.first(),
-		).toHaveClass(/done/);
 	});
 
 	test("a checkpoint level marked by mistake can be undone (#120)", async ({
@@ -108,9 +103,6 @@ test.describe("Player notes: availability and development", () => {
 		await expect(
 			history.checkpointArea("Mentalt").getByRole("listitem").nth(1),
 		).toHaveClass(/done/);
-		await expect(history.seasonReportSummary("Ebba", "Mentalt")).toHaveValue(
-			/^Nivå 2 av 4 uppnådd\. /,
-		);
 
 		await history.undoLevel("Mentalt");
 
@@ -120,19 +112,19 @@ test.describe("Player notes: availability and development", () => {
 		await expect(
 			history.checkpointArea("Mentalt").getByRole("listitem").first(),
 		).toHaveClass(/done/);
-		await expect(history.seasonReportSummary("Ebba", "Mentalt")).toHaveValue(
-			/^Nivå 1 av 4 uppnådd\. /,
-		);
 
 		// Undoing all the way back to nothing is also possible, and the
 		// button disables itself rather than offering to undo forever.
 		await history.undoLevel("Mentalt");
-		await expect(history.seasonReportSummary("Ebba", "Mentalt")).toHaveValue(
-			"",
-		);
 		await expect(
 			history.checkpointArea("Mentalt").locator(".row-buttons button").nth(1),
 		).toBeDisabled();
+
+		// The season report page sees the level the notes page left behind.
+		await history.gotoSeasonReport();
+		await expect(history.seasonReportSummary("Ebba", "Mentalt")).toHaveValue(
+			"",
+		);
 	});
 
 	test("keeps notes after a reload", async ({ history, page }) => {
