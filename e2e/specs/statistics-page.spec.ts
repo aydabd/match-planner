@@ -41,3 +41,42 @@ test.describe("Statistics page", () => {
 		await expect(history.count).toHaveText("1 match över 1 månad.");
 	});
 });
+
+/** The season report and the player notes are their own real pages (#119):
+ * reachable by URL, still correct after a reload, with Statistik current. */
+for (const { path, heading } of [
+	{ path: "statistics/sasongsrapport/", heading: "Säsongsrapport" },
+	{ path: "statistics/anteckningar/", heading: "Spelaranteckningar" },
+]) {
+	test.describe(`Statistics sub-page ${path}`, () => {
+		test("loads directly and works after a refresh", async ({ page }) => {
+			await page.goto(path);
+			await expect(
+				page.getByRole("heading", { name: heading, level: 1 }),
+			).toBeVisible();
+
+			await page.reload();
+			await expect(
+				page.getByRole("heading", { name: heading, level: 1 }),
+			).toBeVisible();
+		});
+
+		test("shows the shared nav with Statistik marked current", async ({
+			page,
+		}) => {
+			await page.goto(path);
+			await expect(
+				page
+					.locator("#pageNav")
+					.getByRole("link", { name: "Statistik", exact: true }),
+			).toHaveAttribute("aria-current", "page");
+		});
+
+		test("says so when there are no matches yet", async ({ history, page }) => {
+			await page.goto(path);
+			await expect(history.count).toHaveText(
+				"Inga matcher än. Spela en match eller läs in matchfiler.",
+			);
+		});
+	});
+}

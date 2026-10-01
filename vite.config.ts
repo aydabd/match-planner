@@ -23,10 +23,18 @@ if (!licenseLine?.trim()) {
 }
 const copyright = licenseLine.trim();
 
-// The app's five real URLs (issue #93). Each has its own index.html and Vite
-// entry; "" is the root page. Kept in one place so the build input and the
+// The app's real URLs (issue #93; #119 added two under statistics/). Each has
+// its own index.html and Vite entry; "" is the root page. Kept in one place so the build input and the
 // service worker's precache list can never drift apart.
-const PAGE_DIRS = ["", "match/", "report/", "statistics/", "about/"];
+const PAGE_DIRS = [
+	"",
+	"match/",
+	"report/",
+	"statistics/",
+	"statistics/sasongsrapport/",
+	"statistics/anteckningar/",
+	"about/",
+];
 
 /** Precached so every page works fully offline after its first visit. */
 const precachePaths = [

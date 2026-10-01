@@ -1,6 +1,6 @@
 import "../style.css";
-import { createHistoryView } from "../history.js";
 import { initPage } from "../page.js";
+import { createStatisticsView } from "../statisticsView.js";
 
 initPage("statistics");
-createHistoryView().refresh();
+createStatisticsView().refresh();

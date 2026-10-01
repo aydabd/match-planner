@@ -287,7 +287,6 @@ export const TEXT = {
 				`Startfrekvens i de senaste ${matches} ${matches === 1 ? "matchen" : "matcherna"}`,
 			axisMinutes: "Minuter",
 			axisPercent: "Andel starter (%)",
-			developmentTitle: "Utveckling per spelare",
 			chartDescription: "Samma uppgifter finns i tabellerna nedan.",
 		},
 		seasonReport: {

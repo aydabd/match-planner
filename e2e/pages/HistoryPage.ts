@@ -1,6 +1,8 @@
-import type { Locator, Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
-/** The season history screen: import match files, read the statistics. */
+/** The statistics pages (#119): import match files and read the tables on
+ * /statistics/, the season report on /statistics/sasongsrapport/, and the
+ * player notes on /statistics/anteckningar/. All three share `#historyView`. */
 export class HistoryPage {
 	readonly root: Locator;
 	readonly count: Locator;
@@ -15,7 +17,6 @@ export class HistoryPage {
 	readonly playerNotesCard: Locator;
 	readonly playerNotesFeedback: Locator;
 	readonly seasonReportCard: Locator;
-	readonly visualizationCard: Locator;
 	readonly secureExportPasswordInput: Locator;
 	readonly secureExportButton: Locator;
 	readonly secureImportFileInput: Locator;
@@ -52,9 +53,6 @@ export class HistoryPage {
 		this.seasonReportCard = this.root.locator("section.card").filter({
 			has: page.getByRole("heading", { name: "Säsongsrapport" }),
 		});
-		this.visualizationCard = this.root.locator("section.card").filter({
-			has: page.getByRole("heading", { name: "Översikt" }),
-		});
 		this.secureExportPasswordInput = this.root.locator(
 			"#secureExportPasswordInput",
 		);
@@ -73,9 +71,23 @@ export class HistoryPage {
 		await this.page.getByRole("link", { name: "Visa spelarhistorik" }).click();
 	}
 
+	/** A real navigation to the season report page, by URL. */
+	async gotoSeasonReport(): Promise<void> {
+		await this.page.goto("statistics/sasongsrapport/");
+	}
+
+	/** A real navigation to the player notes page, by URL. */
+	async gotoNotes(): Promise<void> {
+		await this.page.goto("statistics/anteckningar/");
+	}
+
 	async importFiles(
 		files: readonly { name: string; contents: string }[],
 	): Promise<void> {
+		// The first render fills the match count, and it runs after the
+		// page's script has attached the input's change handler; setting files
+		// earlier would fire a change event nobody is listening to yet.
+		await expect(this.count).not.toBeEmpty();
 		await this.root.locator("#historyImportInput").setInputFiles(
 			files.map((file) => ({
 				name: file.name,
@@ -83,6 +95,9 @@ export class HistoryPage {
 				buffer: Buffer.from(file.contents),
 			})),
 		);
+		// The import reads and stores the files asynchronously and then says
+		// so; leaving the page before that would abandon it half done.
+		await expect(this.messages.first()).toBeVisible();
 	}
 
 	/** The row of a player in one of the tables ("Startat och speltid", ...). */
@@ -158,7 +173,7 @@ export class HistoryPage {
 		return this.playerNotesCard.locator(".history-messages li");
 	}
 
-	/** The checkpoint field for one area, in "Anteckningar per spelare". */
+	/** The checkpoint field for one area, in the "Anteckningar per spelare" card. */
 	checkpointArea(
 		area: "Fysiskt" | "Mentalt" | "Tekniskt" | "Taktiskt",
 	): Locator {
@@ -194,7 +209,7 @@ export class HistoryPage {
 	}
 
 	/** The pre-filled, editable development summary for one player and area
-	 * in the Säsongsrapport card. */
+	 * in the Säsongsrapport card (on its own page). */
 	seasonReportSummary(
 		name: string,
 		area: "Fysiskt" | "Mentalt" | "Tekniskt" | "Taktiskt",
@@ -203,20 +218,5 @@ export class HistoryPage {
 			.locator("section.season-report-player")
 			.filter({ has: this.page.getByRole("heading", { name, exact: true }) })
 			.getByLabel(area, { exact: true });
-	}
-
-	/** One area's checkpoint ladder in the Översikt card's per-player view. */
-	visualizationCheckpointArea(
-		area: "Fysiskt" | "Mentalt" | "Tekniskt" | "Taktiskt",
-	): Locator {
-		return this.visualizationCard.locator(".checkpoint-area").filter({
-			has: this.page.getByRole("heading", { name: area, exact: true }),
-		});
-	}
-
-	async choosePlayerForVisualization(name: string): Promise<void> {
-		await this.visualizationCard
-			.getByLabel("Välj spelare")
-			.selectOption({ label: name });
 	}
 }
