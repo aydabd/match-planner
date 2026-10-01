@@ -7,6 +7,7 @@ import { HistoryPage } from "./pages/HistoryPage.js";
 import { MatchPage } from "./pages/MatchPage.js";
 import { ReportPage } from "./pages/ReportPage.js";
 import { SetupPage } from "./pages/SetupPage.js";
+import { TeamSwitcher } from "./pages/TeamSwitcher.js";
 import { SQUAD } from "./support/squads.js";
 
 /** A fixed moment for every test's fake clock. */
@@ -17,6 +18,7 @@ interface Fixtures {
 	match: MatchPage;
 	report: ReportPage;
 	history: HistoryPage;
+	teamSwitcher: TeamSwitcher;
 	/** A match started with the test squad; the clock is not running yet. */
 	startedMatch: MatchPage;
 }
@@ -46,6 +48,9 @@ export const test = base.extend<Fixtures>({
 	},
 	report: async ({ page }, use) => {
 		await use(new ReportPage(page));
+	},
+	teamSwitcher: async ({ page }, use) => {
+		await use(new TeamSwitcher(page));
 	},
 	startedMatch: async ({ setup, match }, use) => {
 		await setup.open();
