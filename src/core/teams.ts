@@ -120,3 +120,29 @@ export function withRenamedTeam(
 		activeTeamId: file.activeTeamId,
 	};
 }
+
+/**
+ * Give the team `oldId` the id `newId`, keeping its name and position, and
+ * keep it the active team if it was (#135: a device adopts the team id a
+ * Drive folder belongs to). Refuses an id another team already has, since
+ * that would merge two teams, and a team that does not exist.
+ */
+export function withTeamIdChanged(
+	file: TeamsFile,
+	oldId: string,
+	newId: string,
+): TeamsFile {
+	if (!file.teams.some((t) => t.id === oldId)) {
+		throw new TeamsError("No team has that id", { code: "teams" });
+	}
+	if (file.teams.some((t) => t.id === newId)) {
+		throw new TeamsError("Another team already has that id", {
+			code: "teams",
+		});
+	}
+	return {
+		schemaVersion: 1,
+		teams: file.teams.map((t) => (t.id === oldId ? { ...t, id: newId } : t)),
+		activeTeamId: file.activeTeamId === oldId ? newId : file.activeTeamId,
+	};
+}
