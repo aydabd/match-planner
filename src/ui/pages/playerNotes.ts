@@ -2,5 +2,5 @@ import "../style.css";
 import { initPage } from "../page.js";
 import { createPlayerNotesView } from "../playerNotesView.js";
 
-initPage("statistics");
+initPage("statistics", "notes");
 createPlayerNotesView().refresh();
