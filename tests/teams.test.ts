@@ -7,6 +7,7 @@ import {
 	withActiveTeam,
 	withRenamedTeam,
 	withTeam,
+	withTeamIdChanged,
 } from "../src/core/teams.js";
 
 describe("TeamsFile - parsing and round trip", () => {
@@ -112,5 +113,42 @@ describe("withRenamedTeam", () => {
 	it("is a no-op when no team has that id", () => {
 		const withP8 = withTeam(EMPTY_TEAMS_FILE, { id: "t1", name: "P8" });
 		expect(withRenamedTeam(withP8, "missing", "X")).toEqual(withP8);
+	});
+});
+
+describe("withTeamIdChanged - adopting the id a Drive folder belongs to (#135)", () => {
+	const two = withActiveTeam(
+		withTeam(withTeam(EMPTY_TEAMS_FILE, { id: "t1", name: "P8" }), {
+			id: "t2",
+			name: "P11",
+		}),
+		"t1",
+	);
+
+	it("gives the team its new id, keeping its name and place, and follows it as the active team", () => {
+		const changed = withTeamIdChanged(two, "t1", "new-id");
+		expect(changed.teams.map((t) => [t.id, t.name]).sort()).toEqual([
+			["new-id", "P8"],
+			["t2", "P11"],
+		]);
+		expect(changed.activeTeamId).toBe("new-id");
+	});
+
+	it("leaves the active team alone when another team changes id", () => {
+		expect(withTeamIdChanged(two, "t2", "new-id").activeTeamId).toBe("t1");
+	});
+
+	it("refuses an id another team already has, which would merge two teams", () => {
+		expect(() => withTeamIdChanged(two, "t1", "t2")).toThrow(TeamsError);
+	});
+
+	it("refuses a team that does not exist", () => {
+		expect(() => withTeamIdChanged(two, "nope", "new-id")).toThrow(TeamsError);
+	});
+
+	it("does not touch the file it was given", () => {
+		const before = JSON.stringify(two);
+		withTeamIdChanged(two, "t1", "new-id");
+		expect(JSON.stringify(two)).toBe(before);
 	});
 });
