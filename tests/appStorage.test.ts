@@ -8,6 +8,7 @@ import {
 	readItem,
 	removeItem,
 	STORAGE_KEYS,
+	teamScoped,
 	writeItem,
 } from "../src/ui/appStorage.js";
 import { BrokenStorage, useMemoryStorage } from "./support/memoryStorage.js";
@@ -20,6 +21,12 @@ describe("appStorage", () => {
 		expect(readItem(STORAGE_KEYS.draft)).toBe("hello");
 		removeItem(STORAGE_KEYS.draft);
 		expect(readItem(STORAGE_KEYS.draft)).toBeNull();
+	});
+
+	it("scopes a key to a team by suffixing it with the team id", () => {
+		expect(teamScoped(STORAGE_KEYS.matches, "t1")).toBe(
+			"matchplanner:matches:v1:t1",
+		);
 	});
 
 	it("clears everything the app saves, and nothing else", () => {
