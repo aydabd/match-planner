@@ -48,7 +48,6 @@ export const TEXT = {
 	},
 	/** The secondary nav on the three statistics pages (src/ui/page.ts, #119). */
 	statisticsNav: {
-		label: "Statistiksidor",
 		overview: "Spelstatistik",
 		seasonReport: "Säsongsrapport",
 		notes: "Anteckningar",
