@@ -3,6 +3,15 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.20.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.19.0...matchplanner-v0.20.0) (2026-10-01)
+
+
+### Features
+
+* **core:** add team-bound Drive payloads, a notes merge and withTeamIdChanged ([#138](https://github.com/aydabd/match-planner/issues/138)) ([19c27ba](https://github.com/aydabd/match-planner/commit/19c27bad5a968f23b902a4e1364e693fc1a43533))
+* **core:** deterministic UUIDv5 Drive file names per team ([#137](https://github.com/aydabd/match-planner/issues/137)) ([4253205](https://github.com/aydabd/match-planner/commit/425320521777b5e508b746fb33bfe36bcaa6fa38))
+* **ui:** sync matches, squad and notes with team-bound Drive files ([#139](https://github.com/aydabd/match-planner/issues/139)) ([89f722c](https://github.com/aydabd/match-planner/commit/89f722c101077a088b5bc227b7b3c4f6263b7f0b))
+
 ## [0.19.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.18.0...matchplanner-v0.19.0) (2026-10-01)
 
 
