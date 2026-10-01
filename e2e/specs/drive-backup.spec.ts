@@ -397,4 +397,54 @@ test.describe("Google Drive backup and restore", () => {
 
 		await otherContext.close();
 	});
+
+	test("backing up a team only uploads that team's own matches (#118)", async ({
+		history,
+		setup,
+		teamSwitcher,
+		page,
+	}) => {
+		const drive = createFakeDrive();
+		await mockGoogle(page.context(), drive);
+
+		await setup.open();
+		await history.open();
+		await history.importFiles([{ name: "match.json", contents: MATCH }]);
+		await expect(history.count).toHaveText("1 match över 1 månad.");
+
+		const password = "hemligt-lösenord";
+		await history.driveConnectButton.click();
+		await expect(history.driveStatus).toHaveText("Kopplad till Google Drive.");
+		await history.driveChooseFolderButton.click();
+		await expect(history.driveStatus).toHaveText("Mapp: MatchPlanner-mapp");
+		await history.drivePasswordInput.fill(password);
+		await history.driveBackupButton.click();
+		await expect(history.driveStatus).toHaveText(
+			"1 match säkerhetskopierades.",
+		);
+
+		// A second team, on the same device, pointed at the same shared Drive
+		// folder (this test's fake picker always "picks" the same folder id):
+		// its own backup must never claim team A's already-backed-up match as
+		// new, since it never had that match locally in the first place.
+		await setup.open();
+		await teamSwitcher.createTeam("P11 7v7");
+		await history.open();
+		await expect(history.count).toHaveText(
+			"Inga matcher än. Spela en match eller läs in matchfiler.",
+		);
+
+		await history.driveConnectButton.click();
+		await expect(history.driveStatus).toHaveText("Kopplad till Google Drive.");
+		await history.driveChooseFolderButton.click();
+		await expect(history.driveStatus).toHaveText("Mapp: MatchPlanner-mapp");
+		await history.drivePasswordInput.fill(password);
+		await history.driveBackupButton.click();
+		await expect(history.driveStatus).toHaveText(
+			"Allt var redan säkerhetskopierat.",
+		);
+		await expect(history.count).toHaveText(
+			"Inga matcher än. Spela en match eller läs in matchfiler.",
+		);
+	});
 });
