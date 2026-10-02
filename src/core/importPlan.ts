@@ -73,8 +73,7 @@ export function classifyFiles(files: readonly InputFile[]): {
 		let reason: SkipReason | null = null;
 		if (index >= LIMITS.importFiles) reason = "tooMany";
 		else if (bytes > LIMITS.importFileBytes) reason = "tooLarge";
-		else if (totalBytes + bytes > LIMITS.importTotalBytes)
-			reason = "tooMany";
+		else if (totalBytes + bytes > LIMITS.importTotalBytes) reason = "tooMany";
 		if (reason === null) {
 			totalBytes += bytes;
 			reason = classify(file, classified);
