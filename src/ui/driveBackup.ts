@@ -1,17 +1,22 @@
-import { driveFileName, teamMarkerName } from "../core/driveNames.js";
+import {
+	driveFileName,
+	parseTeamFolderName,
+	teamFolderName,
+	teamMarkerName,
+} from "../core/driveNames.js";
 import {
 	type DrivePayload,
 	parseDrivePayload,
 	payloadFileName,
 } from "../core/drivePayload.js";
 import {
+	chooseTeamFolder,
 	classifyFolder,
 	type DriveFileEntry,
-	decideFolder,
-	type FolderMarker,
 	filesToRestore,
 	matchesToBackUp,
 	pickSquad,
+	type TeamFolder,
 } from "../core/driveSync.js";
 import type { MatchFile } from "../core/matchFile.js";
 import { mergePlayerNotes } from "../core/notesMerge.js";
@@ -29,22 +34,29 @@ import type { DriveClient } from "./driveClient.js";
 import { keepMatchFiles, loadMatchFiles } from "./matchFileStorage.js";
 import { loadPlayerNotes, savePlayerNotes } from "./playerNotesStorage.js";
 import { activeTeamIsEmpty } from "./teamEmpty.js";
-import { activeTeamId, adoptTeamId, otherTeamIds } from "./teamStorage.js";
+import {
+	activeTeamId,
+	activeTeamName,
+	adoptTeamId,
+	otherTeamIds,
+} from "./teamStorage.js";
 
 /**
- * Backup and restore (#56, #70, #135), wiring the pure planning in
+ * Backup and restore (#56, #70, #135, #142), wiring the pure planning in
  * core/driveSync.ts to the Drive calls in driveClient.ts, this device's own
  * data, and the encryption in core/securePackage.ts (#81): every file is
  * encrypted with the coach's password, so a Drive folder shared between
  * coaches (chosen via drivePicker.ts) is safe without relying on Drive's
  * own access control.
  *
- * A folder holds one team: a team marker file names it, every file's name
- * is built from that team's id (core/driveNames.ts) and every file's
- * contents repeat the id (core/drivePayload.ts). A restore on a device
- * whose team is still empty takes on the folder's team id, so both compute
- * the same names; anything that would mix two teams is refused, and a file
- * that is not this team's is ignored.
+ * The coach picks one root folder. Each team keeps its files in a subfolder
+ * of its own inside it, named by the team's id (core/driveNames.ts); every
+ * file's name is built from that id too, every file's contents repeat it
+ * (core/drivePayload.ts), and an encrypted team marker in the subfolder
+ * holds the team's name. A restore on a device whose team is still empty
+ * takes on the id and name of a team in the root - asking which, if there
+ * are several; anything that would mix two teams is refused, and a file
+ * that is not the team's is ignored.
  *
  * The password is never kept anywhere - not in appStorage, not on this
  * object - a coach types it in for each backup/restore call.
@@ -63,22 +75,38 @@ export interface RestoreResult {
 	notesChanged: boolean;
 	/** Whether a squad was taken because this device had none. */
 	squadRestored: boolean;
-	/** Files in the folder that are not this team's, or not readable. */
+	/** Files in the team's folder that are not its own, or not readable. */
 	ignored: number;
 }
 
-export interface DriveBackup {
-	/** Upload what is not yet in `folderId`, encrypted with `password`. */
-	backup(folderId: string, password: string): Promise<BackupResult>;
-	/** Take what this device lacks from `folderId`. */
-	restore(folderId: string, password: string): Promise<RestoreResult>;
+/** A team in the root folder, for the coach to choose from. */
+export interface TeamOption {
+	teamId: string;
+	/** "" if the team's marker has no name. */
+	name: string;
 }
 
-/** Why a folder was refused; src/ui/text.ts turns it into a sentence. */
-export type FolderProblem =
-	| "severalTeams"
-	| "otherTeam"
-	| "belongsToOtherLocalTeam";
+export type RestoreOutcome =
+	| ({ kind: "restored" } & RestoreResult)
+	| { kind: "choose"; teams: TeamOption[] };
+
+export interface DriveBackup {
+	/** Upload what is not yet in this team's folder under `rootId`. */
+	backup(rootId: string, password: string): Promise<BackupResult>;
+	/**
+	 * Take what this device lacks from the root folder. When several teams
+	 * could be restored into an empty one the outcome is a choice; call
+	 * again with the chosen `teamId`.
+	 */
+	restore(
+		rootId: string,
+		password: string,
+		teamId?: string,
+	): Promise<RestoreOutcome>;
+}
+
+/** Why a restore was refused; src/ui/text.ts turns it into a sentence. */
+export type FolderProblem = "otherTeam" | "belongsToOtherLocalTeam";
 
 export class DriveFolderError extends Error {
 	constructor(readonly reason: FolderProblem) {
@@ -86,6 +114,13 @@ export class DriveFolderError extends Error {
 		this.name = "DriveFolderError";
 	}
 }
+
+const NOTHING: RestoreResult = {
+	downloaded: 0,
+	notesChanged: false,
+	squadRestored: false,
+	ignored: 0,
+};
 
 export function createDriveBackup(client: DriveClient): DriveBackup {
 	const seal = async (password: string, payload: DrivePayload) =>
@@ -118,13 +153,14 @@ export function createDriveBackup(client: DriveClient): DriveBackup {
 		}
 	}
 
-	function decide(markers: FolderMarker[]) {
-		return decideFolder({
-			localTeamId: activeTeamId(),
-			localIsEmpty: activeTeamIsEmpty(),
-			otherLocalTeamIds: otherTeamIds(),
-			markers,
-		});
+	/** Every team subfolder of the root; other folders are not ours. */
+	async function teamFolders(rootId: string): Promise<TeamFolder[]> {
+		const folders: TeamFolder[] = [];
+		for (const folder of await client.listFolders(rootId)) {
+			const teamId = parseTeamFolderName(folder.name);
+			if (teamId !== null) folders.push({ teamId, folderId: folder.folderId });
+		}
+		return folders;
 	}
 
 	/** Write `payload` to `name`: create it, or update the file only if its contents changed. */
@@ -146,25 +182,31 @@ export function createDriveBackup(client: DriveClient): DriveBackup {
 	}
 
 	async function backup(
-		folderId: string,
+		rootId: string,
 		password: string,
 	): Promise<BackupResult> {
-		const listing = classifyFolder(await client.listFiles(folderId));
-		const decision = decide(listing.markers);
-		if (decision.action === "refuse") {
-			throw new DriveFolderError(decision.reason);
-		}
-		// Backing up never takes on another team's id: that is what restore
-		// is for. A team with data would otherwise be mixed into theirs.
-		if (decision.action === "adopt") throw new DriveFolderError("otherTeam");
+		// A team with nothing saved has nothing to put in Drive; do not clutter
+		// the coach's root folder with an empty team folder.
+		if (activeTeamIsEmpty()) return { uploaded: 0, stateSaved: false };
 		const teamId = activeTeamId();
-		if (decision.action === "claim") {
-			await client.createFile(
-				folderId,
-				teamMarkerName(teamId),
-				await seal(password, { schemaVersion: 1, kind: "team", teamId }),
-			);
-		}
+		// Two phones making this team's folder at the same moment leave two;
+		// every phone uses the one that sorts first, so they converge.
+		const own = (await teamFolders(rootId))
+			.filter((folder) => folder.teamId === teamId)
+			.sort((x, y) => (x.folderId < y.folderId ? -1 : 1))[0];
+		const folderId =
+			own?.folderId ??
+			(await client.createFolder(rootId, teamFolderName(teamId)));
+		const listing = classifyFolder(await client.listFiles(folderId));
+
+		const marker = listing.markers.find((m) => m.teamId === teamId);
+		await writeOwn(
+			folderId,
+			marker && { name: teamMarkerName(teamId), fileId: marker.fileId },
+			teamMarkerName(teamId),
+			{ schemaVersion: 1, kind: "team", teamId, teamName: activeTeamName() },
+			password,
+		);
 
 		const localByName = new Map<string, MatchFile>();
 		for (const match of loadMatchFiles()) {
@@ -226,41 +268,43 @@ export function createDriveBackup(client: DriveClient): DriveBackup {
 		return { uploaded: toUpload.length, stateSaved };
 	}
 
-	async function restore(
-		folderId: string,
+	/** The marker of the team whose folder is `folder`, opened with the password. */
+	async function openMarker(
+		folder: TeamFolder,
 		password: string,
-	): Promise<RestoreResult> {
-		const nothing: RestoreResult = {
-			downloaded: 0,
-			notesChanged: false,
-			squadRestored: false,
-			ignored: 0,
-		};
-		const listing = classifyFolder(await client.listFiles(folderId));
-		const decision = decide(listing.markers);
-		if (decision.action === "refuse") {
-			throw new DriveFolderError(decision.reason);
-		}
-		// No marker: no team has written here, so there is nothing of ours.
-		if (decision.action === "claim") return nothing;
-
+	): Promise<{
+		entries: ReturnType<typeof classifyFolder>;
+		name: string;
+	} | null> {
+		const entries = classifyFolder(await client.listFiles(folder.folderId));
+		const marker = entries.markers.find((m) => m.teamId === folder.teamId);
+		if (marker === undefined) return null;
 		// The marker is encrypted too: opening it proves the password before
 		// anything on this device is changed, and proves it names this team.
-		const marker = listing.markers[0];
-		if (marker === undefined) return nothing;
-		const markerPayload = await open(password, marker.fileId);
-		if (
-			markerPayload.kind !== "team" ||
-			markerPayload.teamId !== marker.teamId
-		) {
-			throw new SecurePackageError("Marker does not match its name", {
+		const payload = await open(password, marker.fileId);
+		if (payload.kind !== "team" || payload.teamId !== folder.teamId) {
+			throw new SecurePackageError("Marker does not match its folder", {
 				code: "wrongPasswordOrTampered",
 			});
 		}
-		if (decision.action === "adopt" && !adoptTeamId(decision.teamId)) {
+		return { entries, name: payload.teamName ?? "" };
+	}
+
+	/** Restore the team in `folder`, first taking on its id and name if `adopt`. */
+	async function restoreFrom(
+		folder: TeamFolder,
+		password: string,
+		adopt: boolean,
+	): Promise<RestoreResult> {
+		const opened = await openMarker(folder, password);
+		// A folder with no marker yet (a backup still being written) has
+		// nothing to verify the password against, so nothing is taken from it.
+		if (opened === null) return NOTHING;
+		if (adopt && !adoptTeamId(folder.teamId, opened.name)) {
 			throw new DriveFolderError("belongsToOtherLocalTeam");
 		}
 		const teamId = activeTeamId();
+		const listing = opened.entries;
 
 		let ignored = 0;
 		const localNames = new Set<string>();
@@ -297,6 +341,63 @@ export function createDriveBackup(client: DriveClient): DriveBackup {
 
 		const { newMatches } = keepMatchFiles(matches);
 		return { downloaded: newMatches, notesChanged, squadRestored, ignored };
+	}
+
+	async function restore(
+		rootId: string,
+		password: string,
+		chosenTeamId?: string,
+	): Promise<RestoreOutcome> {
+		const choice = chooseTeamFolder({
+			localTeamId: activeTeamId(),
+			localIsEmpty: activeTeamIsEmpty(),
+			otherLocalTeamIds: otherTeamIds(),
+			folders: await teamFolders(rootId),
+		});
+		switch (choice.action) {
+			case "none":
+				return { kind: "restored", ...NOTHING };
+			case "refuse":
+				throw new DriveFolderError(choice.reason);
+			case "use":
+				return {
+					kind: "restored",
+					...(await restoreFrom(
+						{ teamId: activeTeamId(), folderId: choice.folderId },
+						password,
+						false,
+					)),
+				};
+			case "adopt":
+				return {
+					kind: "restored",
+					...(await restoreFrom(choice, password, true)),
+				};
+			case "choose": {
+				const chosen = choice.teams.find((t) => t.teamId === chosenTeamId);
+				if (chosen !== undefined) {
+					return {
+						kind: "restored",
+						...(await restoreFrom(chosen, password, true)),
+					};
+				}
+				const teams: TeamOption[] = [];
+				for (const folder of choice.teams) {
+					const opened = await openMarker(folder, password);
+					teams.push({ teamId: folder.teamId, name: opened?.name ?? "" });
+				}
+				teams.sort((x, y) =>
+					x.name !== y.name
+						? x.name < y.name
+							? -1
+							: 1
+						: x.teamId < y.teamId
+							? -1
+							: 1,
+				);
+				return { kind: "choose", teams };
+			}
+		}
 	}
 
 	return { backup, restore };

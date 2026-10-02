@@ -183,6 +183,9 @@ function setUpDriveBackup(refresh: () => void): void {
 	const backupBtn = byId("driveBackupBtn") as HTMLButtonElement;
 	const restoreBtn = byId("driveRestoreBtn") as HTMLButtonElement;
 	const status = byId("driveStatus");
+	const teamChoice = byId("driveTeamChoice");
+	const teamSelect = byId("driveTeamSelect") as HTMLSelectElement;
+	const restoreTeamBtn = byId("driveRestoreTeamBtn") as HTMLButtonElement;
 	const t = TEXT.history.drive;
 
 	/** The sentence for why a backup or restore did not go through. */
@@ -286,7 +289,12 @@ function setUpDriveBackup(refresh: () => void): void {
 		}
 	});
 
-	restoreBtn.addEventListener("click", async () => {
+	/**
+	 * Restore from the picked folder. When the folder holds several teams
+	 * and this one is empty the coach is asked which (#142): the choice is
+	 * shown, and "Läs in laget" restores that team.
+	 */
+	async function runRestore(teamId?: string): Promise<void> {
 		const folderId = currentFolderId();
 		if (folderId === null) return;
 		if (passwordInput.value === "") {
@@ -295,16 +303,43 @@ function setUpDriveBackup(refresh: () => void): void {
 		}
 		status.textContent = t.restoring;
 		restoreBtn.disabled = true;
+		restoreTeamBtn.disabled = true;
 		try {
-			const result = await backup.restore(folderId, passwordInput.value);
-			status.textContent = t.restored(result);
+			const outcome = await backup.restore(
+				folderId,
+				passwordInput.value,
+				teamId,
+			);
+			if (outcome.kind === "choose") {
+				teamSelect.replaceChildren(
+					...outcome.teams.map((team, index) => {
+						const option = document.createElement("option");
+						option.value = team.teamId;
+						option.textContent =
+							team.name === "" ? t.unnamedTeam(index + 1) : team.name;
+						return option;
+					}),
+				);
+				teamChoice.hidden = false;
+				status.textContent = t.chooseTeam;
+				return;
+			}
+			teamChoice.hidden = true;
+			status.textContent = t.restored(outcome);
 			refresh();
 		} catch (err) {
 			status.textContent = driveFailure(err);
 		} finally {
 			restoreBtn.disabled = false;
+			restoreTeamBtn.disabled = false;
 		}
-	});
+	}
+
+	restoreBtn.addEventListener("click", () => void runRestore());
+	restoreTeamBtn.addEventListener(
+		"click",
+		() => void runRestore(teamSelect.value),
+	);
 }
 
 /**

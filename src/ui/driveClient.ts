@@ -16,9 +16,20 @@ import type { DriveFileEntry } from "../core/driveSync.js";
 const FILES_URL = "https://www.googleapis.com/drive/v3/files";
 const UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files";
 
+export interface DriveFolderEntry {
+	name: string;
+	folderId: string;
+}
+
+const FOLDER_MIME = "application/vnd.google-apps.folder";
+
 export interface DriveClient {
 	/** Every file in `folderId`, by name and Drive id. */
 	listFiles(folderId: string): Promise<DriveFileEntry[]>;
+	/** Every subfolder of `parentId`, by name and Drive id. */
+	listFolders(parentId: string): Promise<DriveFolderEntry[]>;
+	/** Create the subfolder `name` in `parentId`; returns its Drive id. */
+	createFolder(parentId: string, name: string): Promise<string>;
 	/** Create `name` in `folderId` holding `contents` verbatim. */
 	createFile(folderId: string, name: string, contents: string): Promise<void>;
 	/** Replace the contents of the file with Drive id `fileId`. */
@@ -43,9 +54,13 @@ async function driveFetch(
 export function createDriveClient(
 	accessToken: () => Promise<string>,
 ): DriveClient {
-	async function listFiles(folderId: string): Promise<DriveFileEntry[]> {
-		const query = `'${folderId}' in parents and trashed=false`;
-		const entries: DriveFileEntry[] = [];
+	/** Every id and name in `folderId` that matches `extra` (a Drive query clause). */
+	async function listChildren(
+		folderId: string,
+		extra: string,
+	): Promise<{ id: string; name: string }[]> {
+		const query = `'${folderId}' in parents and trashed=false${extra}`;
+		const entries: { id: string; name: string }[] = [];
 		let pageToken: string | undefined;
 		do {
 			const token = await accessToken();
@@ -61,12 +76,43 @@ export function createDriveClient(
 				files?: { id: string; name: string }[];
 				nextPageToken?: string;
 			};
-			for (const file of body.files ?? []) {
-				entries.push({ name: file.name, fileId: file.id });
-			}
+			entries.push(...(body.files ?? []));
 			pageToken = body.nextPageToken;
 		} while (pageToken !== undefined);
 		return entries;
+	}
+
+	async function listFiles(folderId: string): Promise<DriveFileEntry[]> {
+		const children = await listChildren(
+			folderId,
+			` and mimeType!='${FOLDER_MIME}'`,
+		);
+		return children.map((file) => ({ name: file.name, fileId: file.id }));
+	}
+
+	async function listFolders(parentId: string): Promise<DriveFolderEntry[]> {
+		const children = await listChildren(
+			parentId,
+			` and mimeType='${FOLDER_MIME}'`,
+		);
+		return children.map((folder) => ({
+			name: folder.name,
+			folderId: folder.id,
+		}));
+	}
+
+	async function createFolder(parentId: string, name: string): Promise<string> {
+		const token = await accessToken();
+		const response = await driveFetch(token, `${FILES_URL}?fields=id`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				name,
+				mimeType: FOLDER_MIME,
+				parents: [parentId],
+			}),
+		});
+		return ((await response.json()) as { id: string }).id;
 	}
 
 	async function downloadJson(fileId: string): Promise<unknown> {
@@ -117,5 +163,12 @@ export function createDriveClient(
 		);
 	}
 
-	return { listFiles, createFile, updateFile, downloadJson };
+	return {
+		listFiles,
+		listFolders,
+		createFolder,
+		createFile,
+		updateFile,
+		downloadJson,
+	};
 }

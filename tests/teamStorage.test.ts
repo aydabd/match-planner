@@ -7,6 +7,7 @@ import {
 } from "../src/ui/appStorage.js";
 import {
 	activeTeamId,
+	activeTeamName,
 	adoptTeamId,
 	createTeam,
 	listTeams,
@@ -94,6 +95,11 @@ describe("teamStorage", () => {
 			);
 		});
 
+		it("takes the folder's team name too when given one (#142)", () => {
+			expect(adoptTeamId("adopted-id", "P11 Blå")).toBe(true);
+			expect(listTeams()).toEqual([{ id: "adopted-id", name: "P11 Blå" }]);
+		});
+
 		it("does nothing when asked to adopt the id the team already has", () => {
 			const id = activeTeamId();
 			expect(adoptTeamId(id)).toBe(true);
@@ -108,5 +114,10 @@ describe("teamStorage", () => {
 		expect(otherTeamIds()).toEqual([first]);
 		switchTeam(first);
 		expect(otherTeamIds()).toEqual([second.id]);
+	});
+
+	it("reports the active team's name", () => {
+		createTeam("P11 7v7");
+		expect(activeTeamName()).toBe("P11 7v7");
 	});
 });

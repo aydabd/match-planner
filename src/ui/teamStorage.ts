@@ -85,6 +85,12 @@ export function renameTeam(teamId: string, name: string): void {
 	saveTeamsFile(withRenamedTeam(ensureDefaultTeam(), teamId, name));
 }
 
+/** The name of the active team. */
+export function activeTeamName(): string {
+	const file = ensureDefaultTeam();
+	return file.teams.find((t) => t.id === file.activeTeamId)?.name ?? "";
+}
+
 /** The ids of every team except the active one. */
 export function otherTeamIds(): string[] {
 	const file = ensureDefaultTeam();
@@ -94,16 +100,17 @@ export function otherTeamIds(): string[] {
 /**
  * Give the active team the id `newId` and move its saved data to it (#135:
  * a device taking on the team id a Drive folder belongs to, so both
- * compute the same file names). Returns false, changing nothing, if
+ * compute the same file names), and its name when one is given (#142).
+ * Returns false, changing nothing, if
  * another team on this device already has that id.
  */
-export function adoptTeamId(newId: string): boolean {
+export function adoptTeamId(newId: string, name?: string): boolean {
 	const file = ensureDefaultTeam();
 	const oldId = activeTeamId();
 	if (newId === oldId) return true;
 	let changed: TeamsFile;
 	try {
-		changed = withTeamIdChanged(file, oldId, newId);
+		changed = withTeamIdChanged(file, oldId, newId, name);
 	} catch {
 		return false;
 	}
