@@ -1,26 +1,17 @@
 import {
 	EXPORT_BUNDLE_VERSION,
 	type ExportBundle,
-	parseExportBundle,
 } from "../core/exportBundle.js";
 import { LIMITS } from "../core/limits.js";
-import {
-	type MatchFile,
-	MatchFileError,
-	parseMatchFile,
-} from "../core/matchFile.js";
 import { isAcceptableNewPassword } from "../core/passwords.js";
 import {
-	decryptJson,
 	encryptJson,
-	parseSecurePackage,
 	SecurePackageError,
 	securePackageToJson,
 } from "../core/securePackage.js";
 import { readItem, STORAGE_KEYS, teamScoped, writeItem } from "./appStorage.js";
-import { confirmWithSecondTap } from "./confirmButton.js";
 import { byId, downloadJson } from "./domHelpers.js";
-import { loadDraft, saveDraft } from "./draftStorage.js";
+import { loadDraft } from "./draftStorage.js";
 import { createDriveAuth } from "./driveAuth.js";
 import {
 	createDriveBackup,
@@ -37,8 +28,9 @@ import {
 } from "./driveConfig.js";
 import { pickFolder } from "./drivePicker.js";
 import { loadSeasonData } from "./historyData.js";
-import { keepMatchFiles, loadMatchFiles } from "./matchFileStorage.js";
-import { loadPlayerNotes, savePlayerNotes } from "./playerNotesStorage.js";
+import { setUpImport } from "./importView.js";
+import { loadMatchFiles } from "./matchFileStorage.js";
+import { loadPlayerNotes } from "./playerNotesStorage.js";
 import { activeTeamId } from "./teamStorage.js";
 import { TEXT } from "./text.js";
 
@@ -240,15 +232,11 @@ function setUpDriveBackup(refresh: () => void): void {
  * everything to another device without Google Drive. Purely local: no
  * network, no sign-in.
  */
-function setUpSecureExport(refresh: () => void): void {
+function setUpSecureExport(): void {
 	const passwordInput = byId("secureExportPasswordInput") as HTMLInputElement;
 	const exportBtn = byId("secureExportBtn") as HTMLButtonElement;
-	const fileInput = byId("secureImportFileInput") as HTMLInputElement;
-	const importBtn = byId("secureImportBtn") as HTMLButtonElement;
 	const status = byId("secureExportStatus");
 	const t = TEXT.history.secureExport;
-
-	let pendingFile: File | null = null;
 
 	exportBtn.addEventListener("click", async () => {
 		if (passwordInput.value === "") {
@@ -273,86 +261,6 @@ function setUpSecureExport(refresh: () => void): void {
 		status.textContent = t.exported;
 		passwordInput.value = "";
 	});
-
-	fileInput.addEventListener("change", () => {
-		pendingFile = fileInput.files?.[0] ?? null;
-		importBtn.disabled = pendingFile === null;
-	});
-
-	confirmWithSecondTap(importBtn, {
-		confirmLabel: t.confirmImport,
-		onConfirm: () => {
-			void (async () => {
-				const file = pendingFile;
-				if (file === null) return;
-				if (passwordInput.value === "") {
-					status.textContent = t.needPassword;
-					return;
-				}
-				status.textContent = t.importing;
-				try {
-					const pkg = parseSecurePackage(JSON.parse(await file.text()));
-					const bundle = parseExportBundle(
-						await decryptJson(passwordInput.value, pkg),
-					);
-					if (bundle.roster) saveDraft(bundle.roster);
-					savePlayerNotes(bundle.playerNotes);
-					keepMatchFiles(bundle.matches);
-					status.textContent = t.imported;
-					refresh();
-				} catch (err) {
-					// ExportBundleError only happens after decryptJson already
-					// succeeded - the password was right and the file was not
-					// tampered with, it just isn't a valid export bundle (the
-					// coach picked a different encrypted file by mistake).
-					// "wrong password" would send them chasing a problem that
-					// isn't there.
-					status.textContent =
-						err instanceof SecurePackageError ? t.wrongPassword : t.unreadable;
-				} finally {
-					pendingFile = null;
-					fileInput.value = "";
-					importBtn.disabled = true;
-					passwordInput.value = "";
-				}
-			})();
-		},
-	});
-}
-
-/** Read the match files a coach picked and keep the new ones. */
-function setUpMatchImport(refresh: () => void): void {
-	const messages = byId("historyMessages");
-	const input = byId("historyImportInput") as HTMLInputElement;
-	input.addEventListener("change", async () => {
-		const files = [...(input.files ?? [])];
-		input.value = "";
-		messages.replaceChildren();
-		const parsed: MatchFile[] = [];
-		for (const file of files) {
-			const li = document.createElement("li");
-			try {
-				parsed.push(parseMatchFile(JSON.parse(await file.text())));
-				continue;
-			} catch (err) {
-				li.textContent = TEXT.history.refused(
-					file.name,
-					err instanceof MatchFileError
-						? TEXT.history.problem(err.problem)
-						: TEXT.history.unreadable,
-				);
-				li.classList.add("error");
-			}
-			messages.append(li);
-		}
-		if (parsed.length > 0) {
-			const { newMatches, alreadyKnown } = keepMatchFiles(parsed);
-			const li = document.createElement("li");
-			li.textContent = TEXT.history.importResult(newMatches, alreadyKnown);
-			messages.prepend(li);
-		}
-		refresh();
-	});
 }
 
 /**
@@ -372,9 +280,9 @@ export function createDataView(): { refresh: () => void } {
 				: TEXT.history.matchesCount(history.matches, history.months.length);
 	}
 
-	setUpMatchImport(refresh);
+	setUpImport(refresh);
 	setUpDriveBackup(refresh);
-	setUpSecureExport(refresh);
+	setUpSecureExport();
 	void refresh();
 	return { refresh };
 }

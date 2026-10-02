@@ -31,19 +31,56 @@
         <h1 id="dataTitle" tabindex="-1">Data</h1>
         <p class="lede">Hämta in matcher, trupp och anteckningar, skicka ut allt i en krypterad fil och håll laget säkerhetskopierat i Google Drive. Allt på ett ställe.</p>
       </div>
-      <section class="card" aria-labelledby="historyImportTitle">
-        <h2 id="historyImportTitle">Läs in matchfiler</h2>
+      <section class="card" aria-labelledby="importTitle" id="importCard">
+        <h2 id="importTitle">1. Hämta in</h2>
+        <p class="hint" id="importHint"></p>
         <div class="row-buttons">
           <label class="btn btn-secondary file-btn">
-            Välj matchfiler
-            <input id="historyImportInput" class="visually-hidden" type="file" accept="application/json" multiple />
+            Välj filer
+            <input id="importFilesInput" class="visually-hidden" type="file" multiple />
+          </label>
+          <label class="btn btn-secondary file-btn">
+            Välj mapp
+            <input id="importFolderInput" class="visually-hidden" type="file" webkitdirectory multiple />
           </label>
         </div>
-        <div class="hint" role="status"><ul class="history-messages" id="historyMessages"></ul></div>
+        <p class="hint" id="importFolderHint"></p>
+        <ul class="history-messages" id="importSummary" role="status"></ul>
+        <ul class="history-messages" id="importSkipped"></ul>
+        <div class="field" id="importPasswordField" hidden>
+          <label class="field-label" for="importPasswordInput">Lösenord för de krypterade filerna</label>
+          <input type="password" id="importPasswordInput" autocomplete="off">
+          <div class="row-buttons">
+            <button type="button" id="importUnlockBtn" class="btn btn-secondary">Lås upp</button>
+          </div>
+          <p class="hint" id="importProgressText" role="status"></p>
+        </div>
+        <div class="field" id="importTeamChoice" hidden>
+          <label class="field-label" for="importTeamSelect">Lag att läsa in</label>
+          <select id="importTeamSelect"></select>
+          <p class="hint" id="importTeamHint"></p>
+        </div>
+        <div class="row-buttons">
+          <button type="button" id="importApplyBtn" class="btn btn-primary" disabled>Läs in</button>
+        </div>
+        <ul class="history-messages" id="importMessages" role="status"></ul>
+        <p class="hint" id="importDriveHint" hidden></p>
         <p class="hint" id="historyCount"></p>
       </section>
+      <section class="card" aria-labelledby="secureExportTitle" id="secureExportCard">
+        <h2 id="secureExportTitle">2. Skicka ut</h2>
+        <p class="hint">Sparar truppen, alla matcher och spelaranteckningar i en enda krypterad fil, skyddad med ett lösenord du väljer. Bra för att flytta allt till en annan enhet utan Google Drive. Läs in filen igen under Hämta in.</p>
+        <div class="field">
+          <label class="field-label" for="secureExportPasswordInput">Lösenord</label>
+          <input type="password" id="secureExportPasswordInput" autocomplete="off">
+        </div>
+        <div class="row-buttons">
+          <button type="button" id="secureExportBtn" class="btn btn-secondary">Exportera allt (krypterat)</button>
+        </div>
+        <p class="hint" id="secureExportStatus" role="status"></p>
+      </section>
       <section class="card" aria-labelledby="historyBackupTitle" id="historyBackupCard" hidden>
-        <h2 id="historyBackupTitle">Säkerhetskopiera till Google Drive</h2>
+        <h2 id="historyBackupTitle">3. Håll i Drive</h2>
         <p class="hint">Kopplas till ditt eget Google-konto. Appen sparar bara sina egna filer i Drive - aldrig resten av din Drive. Filerna krypteras med ett lösenord du väljer, så en mapp du delar med andra ledare är säker även om Drive-behörigheten inte är det. Välj en mapp en gång - varje lag får en egen undermapp i den.</p>
         <div class="row-buttons">
           <button type="button" id="driveConnectBtn" class="btn btn-secondary">Koppla Google Drive</button>
@@ -66,23 +103,6 @@
           </div>
         </div>
         <p class="hint" id="driveStatus" role="status"></p>
-      </section>
-      <section class="card" aria-labelledby="secureExportTitle" id="secureExportCard">
-        <h2 id="secureExportTitle">Säker export och import</h2>
-        <p class="hint">Sparar truppen, alla matcher och spelaranteckningar i en enda krypterad fil, skyddad med ett lösenord du väljer. Bra för att flytta allt till en annan enhet utan Google Drive.</p>
-        <div class="field">
-          <label class="field-label" for="secureExportPasswordInput">Lösenord</label>
-          <input type="password" id="secureExportPasswordInput" autocomplete="off">
-        </div>
-        <div class="row-buttons">
-          <button type="button" id="secureExportBtn" class="btn btn-secondary">Exportera allt (krypterat)</button>
-          <label class="btn btn-secondary file-btn">
-            Välj krypterad fil
-            <input id="secureImportFileInput" class="visually-hidden" type="file" accept="application/json" />
-          </label>
-          <button type="button" id="secureImportBtn" class="btn btn-secondary" disabled>Importera</button>
-        </div>
-        <p class="hint" id="secureExportStatus" role="status"></p>
       </section>
     </section>
 

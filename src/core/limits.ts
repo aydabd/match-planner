@@ -50,6 +50,8 @@ export const LIMITS = {
 	importFiles: 500,
 	/** Most bytes the Data page reads at once, over all files (#154). */
 	importTotalBytes: 50 * 1024 * 1024,
+	/** Skipped files listed by name on the Data page; the rest are counted (#154). */
+	importListedProblems: 10,
 } as const;
 
 /**

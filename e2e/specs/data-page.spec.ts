@@ -45,7 +45,7 @@ test.describe("Data page", () => {
 		page,
 	}) => {
 		await data.goto();
-		for (const heading of ["Läs in matchfiler", "Säker export och import"]) {
+		for (const heading of ["1. Hämta in", "2. Skicka ut"]) {
 			await expect(
 				data.root.getByRole("heading", { name: heading }),
 			).toBeVisible();
@@ -54,8 +54,9 @@ test.describe("Data page", () => {
 		await expect(history.root).toBeVisible();
 		for (const heading of [
 			"Läs in matchfiler",
-			"Säker export och import",
-			"Säkerhetskopiera till Google Drive",
+			"Hämta in",
+			"Skicka ut",
+			"Håll i Drive",
 		]) {
 			await expect(
 				history.root.getByRole("heading", { name: heading }),

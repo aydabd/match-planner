@@ -402,7 +402,9 @@ h3 {
  * attribute: the Drive card's password field and team picker show only
  * when there is something to type into or choose (#142, #147). */
 #drivePasswordField[hidden],
-#driveTeamChoice[hidden] {
+#driveTeamChoice[hidden],
+#importPasswordField[hidden],
+#importTeamChoice[hidden] {
 	display: none;
 }
 .player-row .keeper-toggle {

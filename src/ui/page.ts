@@ -95,7 +95,7 @@ function renderLinks<Id extends string>(
  * away, since that is a deliberate action on its own button, not a side
  * effect of moving focus through a list.
  */
-function renderTeamSwitcher(): void {
+export function renderTeamSwitcher(): void {
 	const container = document.getElementById("teamSwitcher");
 	if (!container) return;
 	const t = TEXT.teamSwitcher;
