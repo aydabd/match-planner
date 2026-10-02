@@ -17,6 +17,8 @@ import { newRoster } from "../src/core/storage.js";
 import { loadDraft, saveDraft } from "../src/ui/draftStorage.js";
 import {
 	createDriveBackup,
+	DriveMarkerError,
+	PasswordTooShortError,
 	type RestoreOutcome,
 	type RestoreResult,
 } from "../src/ui/driveBackup.js";
@@ -37,7 +39,7 @@ import { makeMatchFile } from "./support/matchFiles.js";
 import { MemoryStorage } from "./support/memoryStorage.js";
 
 const ROOT = "root-1";
-const PASSWORD = "hemligt";
+const PASSWORD = "hemligt-lösenord";
 
 /** One phone: its own storage, so its own device id, teams and data. */
 function device() {
@@ -83,7 +85,12 @@ const NOTHING_NEW: RestoreResult = {
 };
 
 /** A team on a phone with two matches, a squad and a note, backed up to ROOT. */
-async function teamWithData(drive: FakeDrive, seed: number, name?: string) {
+async function teamWithData(
+	drive: FakeDrive,
+	seed: number,
+	name?: string,
+	password = PASSWORD,
+) {
 	const phone = device();
 	let teamId = "";
 	await phone.run(async () => {
@@ -99,7 +106,7 @@ async function teamWithData(drive: FakeDrive, seed: number, name?: string) {
 			}),
 		);
 		savePlayerNotes(note("alva", `Anteckning ${seed}`));
-		await backupOf(drive).backup(ROOT, PASSWORD);
+		await backupOf(drive).backup(ROOT, password);
 		teamId = activeTeamId();
 	});
 	return { phone, teamId };
@@ -551,6 +558,213 @@ describe("Drive restore - files inside a team folder that are not the team's", (
 				downloaded: 0,
 				ignored: 2,
 			});
+		});
+	});
+});
+
+describe("Drive restore - teams with different passwords share one root (#147)", () => {
+	const BLUE_PW = "blå-lösenord-1";
+	const P13_PW = "p13-lösenord-2";
+
+	async function twoTeams() {
+		const drive = new FakeDrive();
+		const blue = await teamWithData(drive, 1, "P11 Blå", BLUE_PW);
+		const p13 = await teamWithData(drive, 5, "P13", P13_PW);
+		return { drive, blue, p13 };
+	}
+
+	it("restores the team the password opens, straight away, without asking and without touching the other", async () => {
+		const { drive, blue, p13 } = await twoTeams();
+		const p13Folder = drive.folderId(ROOT, teamFolderName(p13.teamId)) ?? "";
+		const p13Before = JSON.stringify(
+			[...drive.files].filter(([, f]) => f.folderId === p13Folder),
+		);
+		await device().run(async () => {
+			expect(await restored(drive, BLUE_PW)).toMatchObject({
+				downloaded: 2,
+				squadRestored: true,
+			});
+			expect(activeTeamId()).toBe(blue.teamId);
+			expect(listTeams()[0]?.name).toBe("P11 Blå");
+			expect(
+				loadMatchFiles()
+					.map((m) => m.audit.matchId)
+					.sort(),
+			).toEqual(["m1a", "m1b"]);
+		});
+		expect(
+			JSON.stringify(
+				[...drive.files].filter(([, f]) => f.folderId === p13Folder),
+			),
+		).toBe(p13Before);
+	});
+
+	it("restores the other team with the other password", async () => {
+		const { drive, p13 } = await twoTeams();
+		await device().run(async () => {
+			await restored(drive, P13_PW);
+			expect(activeTeamId()).toBe(p13.teamId);
+			expect(listTeams()[0]?.name).toBe("P13");
+			expect(
+				loadMatchFiles()
+					.map((m) => m.audit.matchId)
+					.sort(),
+			).toEqual(["m5a", "m5b"]);
+		});
+	});
+
+	it("gives a password that opens no team the wrong-password error, and changes nothing", async () => {
+		const { drive } = await twoTeams();
+		await device().run(async () => {
+			const before = { id: activeTeamId(), name: listTeams()[0]?.name };
+			await expect(
+				backupOf(drive).restore(ROOT, "gissning-1234"),
+			).rejects.toBeInstanceOf(SecurePackageError);
+			expect({ id: activeTeamId(), name: listTeams()[0]?.name }).toEqual(
+				before,
+			);
+			expect(loadMatchFiles()).toEqual([]);
+			expect(loadDraft().players).toEqual([]);
+		});
+	});
+
+	it("asks only between the teams the password opens", async () => {
+		const drive = new FakeDrive();
+		const a = await teamWithData(drive, 1, "P11 Blå", BLUE_PW);
+		const b = await teamWithData(drive, 5, "F12 Röd", BLUE_PW);
+		await teamWithData(drive, 9, "P13", P13_PW);
+		await device().run(async () => {
+			const outcome = await backupOf(drive).restore(ROOT, BLUE_PW);
+			expect(outcome).toEqual({
+				kind: "choose",
+				teams: [
+					{ teamId: b.teamId, name: "F12 Röd" },
+					{ teamId: a.teamId, name: "P11 Blå" },
+				],
+			});
+		});
+	});
+
+	it("never offers a team the password does not open, even by name", async () => {
+		const { drive, p13 } = await twoTeams();
+		await device().run(async () => {
+			const outcome = await backupOf(drive).restore(ROOT, BLUE_PW);
+			expect(JSON.stringify(outcome)).not.toContain(p13.teamId);
+			expect(JSON.stringify(outcome)).not.toContain("P13");
+		});
+	});
+
+	it("lets a team that has its own folder restore whatever the others use", async () => {
+		const { drive, blue } = await twoTeams();
+		await blue.phone.run(async () => {
+			expect(await restored(drive, BLUE_PW)).toEqual(NOTHING_NEW);
+		});
+	});
+
+	it("does not hide a marker that opens but is not a valid marker for its folder", async () => {
+		const { drive, blue, p13 } = await twoTeams();
+		// P13's folder now holds a marker that decrypts with P13's password
+		// but names the wrong team: that is damage, not "a different password".
+		const folder = drive.folderId(ROOT, teamFolderName(p13.teamId)) ?? "";
+		for (const file of drive.files.values()) {
+			if (file.folderId === folder && file.name === `team-${p13.teamId}.json`) {
+				file.contents = securePackageToJson(
+					await encryptJson(P13_PW, {
+						schemaVersion: 1,
+						kind: "team",
+						teamId: blue.teamId,
+						teamName: "Fel",
+					}),
+				);
+			}
+		}
+		await device().run(async () => {
+			await expect(
+				backupOf(drive).restore(ROOT, P13_PW),
+			).rejects.toBeInstanceOf(DriveMarkerError);
+		});
+	});
+});
+
+describe("Drive backup - the password a team's folder is first made with (#147)", () => {
+	it("refuses a password shorter than the minimum when the team's folder would be created, and writes nothing", async () => {
+		const drive = new FakeDrive();
+		await device().run(async () => {
+			keepMatchFiles([makeMatchFile({ matchId: "m1" })]);
+			await expect(backupOf(drive).backup(ROOT, "kort")).rejects.toBeInstanceOf(
+				PasswordTooShortError,
+			);
+			await expect(
+				backupOf(drive).backup(ROOT, "x".repeat(9)),
+			).rejects.toBeInstanceOf(PasswordTooShortError);
+		});
+		expect(drive.folders.size).toBe(0);
+		expect(drive.files.size).toBe(0);
+	});
+
+	it("accepts a password of exactly the minimum length", async () => {
+		const drive = new FakeDrive();
+		await device().run(async () => {
+			keepMatchFiles([makeMatchFile({ matchId: "m1" })]);
+			expect(
+				(await backupOf(drive).backup(ROOT, "x".repeat(10))).uploaded,
+			).toBe(1);
+		});
+	});
+
+	it("counts characters, not bytes, so a password in åäö is not penalised", async () => {
+		const drive = new FakeDrive();
+		await device().run(async () => {
+			keepMatchFiles([makeMatchFile({ matchId: "m1" })]);
+			await expect(
+				backupOf(drive).backup(ROOT, "ååååååååå"),
+			).rejects.toBeInstanceOf(PasswordTooShortError);
+			expect((await backupOf(drive).backup(ROOT, "åååååååååå")).uploaded).toBe(
+				1,
+			);
+		});
+	});
+
+	it("still lets a team whose folder already exists back up and restore with the password it was made with", async () => {
+		const drive = new FakeDrive();
+		const phone = device();
+		let teamId = "";
+		await phone.run(async () => {
+			keepMatchFiles([makeMatchFile({ matchId: "m1" })]);
+			teamId = activeTeamId();
+		});
+		// A folder from before the minimum existed: made with a short password.
+		const folder = await drive
+			.client()
+			.createFolder(ROOT, teamFolderName(teamId));
+		await drive.client().createFile(
+			folder,
+			`team-${teamId}.json`,
+			securePackageToJson(
+				await encryptJson("kort", {
+					schemaVersion: 1,
+					kind: "team",
+					teamId,
+					teamName: "Mitt lag",
+				}),
+			),
+		);
+		await phone.run(async () => {
+			keepMatchFiles([makeMatchFile({ matchId: "m2", seed: 2 })]);
+			expect((await backupOf(drive).backup(ROOT, "kort")).uploaded).toBe(2);
+		});
+		await device().run(async () => {
+			expect(await restored(drive, "kort")).toMatchObject({ downloaded: 2 });
+		});
+	});
+
+	it("does not apply the minimum to a restore", async () => {
+		const drive = new FakeDrive();
+		await teamWithData(drive, 1);
+		await device().run(async () => {
+			await expect(
+				backupOf(drive).restore(ROOT, "kort"),
+			).rejects.toBeInstanceOf(SecurePackageError);
 		});
 	});
 });

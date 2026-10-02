@@ -312,6 +312,8 @@ export const TEXT = {
 				level === 0 ? "" : `Nivå ${level} av ${of} uppnådd. `,
 			passwordLabel: "Lösenord för filen",
 			needPassword: "Ange ett lösenord för filen först.",
+			passwordTooShort: (min: number) =>
+				`Lösenordet måste vara minst ${min} tecken.`,
 			exportButton: "Spara säsongsrapport (krypterad)",
 			printButton: "Skriv ut / spara som PDF",
 		},
@@ -394,6 +396,10 @@ export const TEXT = {
 					"Mappen tillhör ett annat lag på den här enheten. Byt till det laget först.",
 			},
 			needPassword: "Ange ett lösenord för säkerhetskopian först.",
+			passwordTooShort: (min: number) =>
+				`Lösenordet för en ny säkerhetskopia måste vara minst ${min} tecken.`,
+			markerInvalid:
+				"Lagets fil i mappen är skadad eller hör inte till laget. Välj en annan mapp.",
 			wrongPassword:
 				"Fel lösenord, eller filen har ändrats. Kontrollera lösenordet och försök igen.",
 			failed: "Det gick inte att nå Google Drive just nu. Försök igen senare.",
@@ -402,6 +408,8 @@ export const TEXT = {
 		},
 		secureExport: {
 			needPassword: "Ange ett lösenord först.",
+			passwordTooShort: (min: number) =>
+				`Lösenordet måste vara minst ${min} tecken.`,
 			exported: "Allt exporterades till en krypterad fil.",
 			importing: "Läser in …",
 			imported: "Allt importerades.",
