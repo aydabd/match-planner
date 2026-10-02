@@ -85,17 +85,19 @@ test.describe("Season history", () => {
 		const broken = JSON.parse(FILES[0]?.contents ?? "{}");
 		broken.timeline[1].zones.back[0] = "nobody";
 		await data.open();
-		await data.importFiles([
+		await data.chooseFiles([
 			FILES[1] ?? { name: "", contents: "" },
 			{ name: "trasig.json", contents: JSON.stringify(broken) },
 			{ name: "inte-json.json", contents: "det här är text" },
 		]);
-
-		await expect(data.messages).toHaveText([
-			"1 ny match lästes in.",
-			"trasig.json: Händelse 2 i tidslinjen är ogiltig: spelaren finns inte i truppen.",
-			"inte-json.json: Filen kunde inte läsas. Välj en matchfil från MatchPlanner.",
+		// Each file is listed by what it is; the broken ones say why they are
+		// left out, and the good one is not held back.
+		await expect(data.importSkipped).toHaveText([
+			"trasig.json: känns inte igen som en fil från MatchPlanner.",
+			"inte-json.json: ingen JSON-fil.",
 		]);
+		await data.importApplyButton.click();
+		await expect(data.messages).toHaveText(["1 ny match lästes in."]);
 		await expect(data.count).toHaveText("1 match över 1 månad.");
 		await history.goto();
 		await expect(history.count).toHaveText("1 match över 1 månad.");

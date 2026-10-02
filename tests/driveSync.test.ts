@@ -143,11 +143,28 @@ describe("chooseTeamFolder - which team's folder in the root (#142)", () => {
 		expect(one).toEqual({ action: "choose", teams: [b, c] });
 	});
 
-	it("refuses to mix a team that has data with a folder that is not its own", () => {
-		expect(chooseTeamFolder({ ...base, folders: [b] })).toEqual({
-			action: "refuse",
-			reason: "otherTeam",
+	it("offers a team that has data the other teams' folders, in the same order whatever order they are listed", () => {
+		expect(chooseTeamFolder({ ...base, folders: [c, b] })).toEqual({
+			action: "different",
+			teams: [b, c],
 		});
+		expect(chooseTeamFolder({ ...base, folders: [b, c] })).toEqual({
+			action: "different",
+			teams: [b, c],
+		});
+	});
+
+	it("refuses a team that has data a folder another team on this device has", () => {
+		expect(
+			chooseTeamFolder({ ...base, otherLocalTeamIds: [TEAM_B], folders: [b] }),
+		).toEqual({ action: "refuse", reason: "belongsToOtherLocalTeam" });
+		expect(
+			chooseTeamFolder({
+				...base,
+				otherLocalTeamIds: [TEAM_B],
+				folders: [b, c],
+			}),
+		).toEqual({ action: "different", teams: [c] });
 	});
 
 	it("leaves out teams another team on this device already has, since adopting one would merge two teams", () => {

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { classifyFiles, type InputFile } from "../src/core/importPlan.js";
+import {
+	classifyFiles,
+	type InputFile,
+	screenBySize,
+} from "../src/core/importPlan.js";
 import { LIMITS } from "../src/core/limits.js";
 import { EMPTY_PLAYER_NOTES_FILE } from "../src/core/playerNotes.js";
 import { encryptJson } from "../src/core/securePackage.js";
@@ -137,5 +141,47 @@ describe("classifyFiles - team hint from the path", () => {
 		const path = `<img src=x onerror=alert(1)>/../${"‮"}x.json`;
 		const { files } = classifyFiles([json(path, makeMatchFile())]);
 		expect(files[0]?.path).toBe(path);
+	});
+});
+
+describe("classifyFiles - parsed values", () => {
+	it("hands back what each plain file parsed to, so nothing is parsed twice", () => {
+		const match = makeMatchFile({ matchId: "keep-me" });
+		const { files } = classifyFiles([json("m.json", match)]);
+		const [first] = files;
+		expect(first?.kind === "match" && first.value.audit.matchId).toBe(
+			"keep-me",
+		);
+	});
+});
+
+describe("screenBySize - what may be read at all", () => {
+	it("accepts what fits and skips the rest with a reason, by size alone", () => {
+		const big = LIMITS.importFileBytes + 1;
+		const { accepted, skipped } = screenBySize([
+			{ path: "a.json", size: 10 },
+			{ path: "big.json", size: big },
+			{ path: "b.json", size: 20 },
+		]);
+		expect(accepted.map((e) => e.path)).toEqual(["a.json", "b.json"]);
+		expect(skipped).toEqual([{ path: "big.json", reason: "tooLarge" }]);
+	});
+
+	it("stops accepting past the file-count and total-bytes caps", () => {
+		const many = Array.from({ length: LIMITS.importFiles + 1 }, (_, i) => ({
+			path: `f${i}`,
+			size: 1,
+		}));
+		expect(screenBySize(many).skipped).toEqual([
+			{ path: `f${LIMITS.importFiles}`, reason: "tooMany" },
+		]);
+		const chunk = LIMITS.importFileBytes;
+		const heavy = Array.from(
+			{ length: LIMITS.importTotalBytes / chunk + 1 },
+			(_, i) => ({ path: `h${i}`, size: chunk }),
+		);
+		const result = screenBySize(heavy);
+		expect(result.accepted).toHaveLength(LIMITS.importTotalBytes / chunk);
+		expect(result.skipped.map((s) => s.reason)).toEqual(["tooMany"]);
 	});
 });

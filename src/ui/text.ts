@@ -50,6 +50,112 @@ export const TEXT = {
 	data: {
 		open: "Hämta in, spara och synka data",
 	},
+	/** The choice a team with data gets for another team's files or Drive folder (#154). */
+	placement: {
+		intro: (source: "files" | "drive", name: string) =>
+			`${source === "files" ? "Filerna" : "Drive-mappen"} hör till ett annat lag${name === "" ? "" : ` ("${name}")`}, och det här laget har redan data. Inget har ändrats än.`,
+		numbers: (
+			source: "files" | "drive",
+			c: { local: number; incoming: number; merged: number },
+		) => {
+			const matches = (n: number) => `${n} ${n === 1 ? "match" : "matcher"}`;
+			return `Du har ${matches(c.local)}, ${source === "files" ? "filerna" : "Drive"} har ${c.incoming}, efter hopslagning ${c.merged}.`;
+		},
+		newTeam: "Läs in som nytt lag",
+		newTeamHint:
+			"Ett nytt lag skapas på den här enheten och datan hamnar där. Det här laget lämnas som det är.",
+		merge: "Slå ihop med det här laget",
+		mergeHint:
+			"Datan slås ihop med det här laget, som får samma lagid så att senare säkerhetskopior hamnar i samma Drive-mapp.",
+		confirmNote:
+			"Den gamla lagmappen i Drive, om det fanns en, lämnas där den är.",
+		confirm: "Slå ihop",
+		cancel: "Avbryt",
+	},
+	/** The "Hämta in" card on the Data page (#154). */
+	dataImport: {
+		hint: "Välj filer eller en hel mapp. Appen ser på innehållet vad varje fil är, inte på namnet. Inget lämnar den här enheten.",
+		folderHint:
+			"Att välja en hel mapp fungerar i datorns webbläsare. På en telefon: välj flera filer.",
+		chooseFiles: "Välj filer",
+		chooseFolder: "Välj mapp",
+		describe: (c: {
+			matches: number;
+			squads: number;
+			notePlayers: number;
+		}): string => {
+			const parts = [
+				...(c.matches > 0
+					? [`${c.matches} ${c.matches === 1 ? "match" : "matcher"}`]
+					: []),
+				...(c.squads > 0
+					? [`${c.squads} ${c.squads === 1 ? "truppfil" : "truppfiler"}`]
+					: []),
+				...(c.notePlayers > 0
+					? [`anteckningar för ${c.notePlayers} spelare`]
+					: []),
+			];
+			return parts.length === 0 ? "inget att läsa in" : parts.join(", ");
+		},
+		looseLine: (described: string) => `Filer utan lag: ${described}`,
+		teamLine: (name: string, shortId: string, described: string) =>
+			`Lag ${name === "" ? "utan namn" : `"${name}"`} (${shortId}): ${described}`,
+		needPassword: (files: number) =>
+			`${files} ${files === 1 ? "krypterad fil behöver" : "krypterade filer behöver"} lösenord.`,
+		lockedTeam: (shortId: string, files: number) =>
+			`Låst lag ${shortId} (${files} ${files === 1 ? "fil" : "filer"}): öppnas med ett annat lösenord.`,
+		skipped: {
+			tooLarge: (path: string, megabytes: number) =>
+				`${path}: för stor (högst ${megabytes} MB).`,
+			tooMany: (path: string) => `${path}: för många filer.`,
+			notJson: (path: string) => `${path}: ingen JSON-fil.`,
+			unrecognised: (path: string) =>
+				`${path}: känns inte igen som en fil från MatchPlanner.`,
+		},
+		damaged: {
+			invalidPayload: (path: string) =>
+				`${path}: Filen gick att öppna men är ingen exportfil eller lagfil från appen (en säsongsrapport kan till exempel inte läsas in).`,
+			wrongName: (path: string) =>
+				`${path}: Filen har bytt namn eller är en kopia och hoppas över.`,
+		},
+		moreSkipped: (count: number) => `… och ${count} till hoppades över.`,
+		passwordLabel: "Lösenord för de krypterade filerna",
+		unlock: "Lås upp",
+		needPasswordFirst: "Ange ett lösenord först.",
+		unlocking: (done: number, total: number) =>
+			`Låser upp fil ${done} av ${total} …`,
+		wrongPassword:
+			"Lösenordet öppnar ingen av de krypterade filerna. Kontrollera lösenordet och försök igen. Inget har ändrats.",
+		teamChoiceLabel: "Lag att läsa in",
+		teamChoiceHint:
+			"Filerna innehåller flera lag. Välj vilket som ska läsas in nu; ett till kan läsas in i ett nytt lag efteråt.",
+		unnamedTeam: (shortId: string) => `Lag utan namn (${shortId})`,
+		apply: "Läs in",
+		applying: "Läser in …",
+		unreadable: (path: string) => `${path}: Filen gick inte att läsa.`,
+		nothingNew: "Inget nytt att läsa in.",
+		result: (r: {
+			added: number;
+			known: number;
+			notesChanged: boolean;
+			squadTaken: boolean;
+		}): string => {
+			const parts = [
+				...(r.added > 0
+					? [
+							`${r.added} ${r.added === 1 ? "ny match" : "nya matcher"} lästes in${r.known > 0 ? `, ${r.known} fanns redan` : ""}.`,
+						]
+					: []),
+				...(r.notesChanged ? ["Anteckningarna uppdaterades."] : []),
+				...(r.squadTaken ? ["Truppen lästes in."] : []),
+			];
+			return parts.length === 0 ? "Inget nytt att läsa in." : parts.join(" ");
+		},
+		refusedBelongsToOtherLocalTeam:
+			"Filerna tillhör ett annat lag på den här enheten. Byt till det laget först.",
+		driveHint:
+			"Det här finns nu på enheten. Koppla Google Drive nedan och tryck Säkerhetskopiera för att spara det i Drive.",
+	},
 	/** The secondary nav on the three statistics pages (src/ui/page.ts, #119). */
 	statisticsNav: {
 		overview: "Spelstatistik",
@@ -394,8 +500,6 @@ export const TEXT = {
 			chooseTeam: "Mappen innehåller flera lag. Välj vilket som ska läsas in.",
 			unnamedTeam: (number: number) => `Lag ${number}`,
 			folderRefused: {
-				otherTeam:
-					"Mappen har inget lag som hör till det här laget. Läs in den i ett tomt lag, eller säkerhetskopiera det här laget dit i stället.",
 				belongsToOtherLocalTeam:
 					"Mappen tillhör ett annat lag på den här enheten. Byt till det laget först.",
 			},
@@ -415,12 +519,6 @@ export const TEXT = {
 			passwordTooShort: (min: number) =>
 				`Lösenordet måste vara minst ${min} tecken.`,
 			exported: "Allt exporterades till en krypterad fil.",
-			importing: "Läser in …",
-			imported: "Allt importerades.",
-			wrongPassword:
-				"Fel lösenord, eller filen har ändrats. Kontrollera lösenordet och försök igen.",
-			unreadable: "Filen kunde inte läsas som en exporterad fil.",
-			confirmImport: "Ersätt trupp och anteckningar?",
 		},
 		playerNotes: {
 			title: "Anteckningar per spelare",

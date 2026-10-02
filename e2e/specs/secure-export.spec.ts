@@ -46,33 +46,27 @@ test.describe("Secure export and import (#81)", () => {
 			"Inga matcher än. Spela en match eller läs in matchfiler.",
 		);
 
-		await otherHistory.secureImportFileInput.setInputFiles({
-			name: "export.json",
-			mimeType: "application/json",
-			buffer: Buffer.from(contents),
-		});
+		await otherHistory.chooseFiles([{ name: "export.json", contents }]);
+		await expect(otherHistory.importSummary).toHaveText([
+			"1 krypterad fil behöver lösenord.",
+		]);
 
 		// The wrong password is refused rather than importing garbage.
-		await otherHistory.secureExportPasswordInput.fill("fel lösenord");
-		await otherHistory.secureImportButton.click();
-		await otherHistory.secureImportButton.click();
-		await expect(otherHistory.secureExportStatus).toHaveText(
-			"Fel lösenord, eller filen har ändrats. Kontrollera lösenordet och försök igen.",
+		await otherHistory.unlock("fel lösenord");
+		await expect(otherHistory.messages).toHaveText([
+			"Lösenordet öppnar ingen av de krypterade filerna. Kontrollera lösenordet och försök igen. Inget har ändrats.",
+		]);
+		await expect(otherHistory.count).toHaveText(
+			"Inga matcher än. Spela en match eller läs in matchfiler.",
 		);
 
-		// Choosing the file again after a failed attempt (it's cleared after
-		// every attempt, same as a real re-pick) then using the right password.
-		await otherHistory.secureImportFileInput.setInputFiles({
-			name: "export.json",
-			mimeType: "application/json",
-			buffer: Buffer.from(contents),
-		});
-		await otherHistory.secureExportPasswordInput.fill(password);
-		await otherHistory.secureImportButton.click();
-		await otherHistory.secureImportButton.click();
-		await expect(otherHistory.secureExportStatus).toHaveText(
-			"Allt importerades.",
-		);
+		// The right password opens it, and "Läs in" takes it in.
+		await otherHistory.unlock(password);
+		await expect(otherHistory.importSummary).toHaveText([
+			"Filer utan lag: 1 match",
+		]);
+		await otherHistory.importApplyButton.click();
+		await expect(otherHistory.messages).toHaveText(["1 ny match lästes in."]);
 		await expect(otherHistory.count).toHaveText("1 match över 1 månad.");
 
 		await otherContext.close();
@@ -112,7 +106,7 @@ test.describe("Secure export and import (#81)", () => {
 		expect(JSON.stringify(contents)).not.toContain("Alva");
 	});
 
-	test("a file that decrypts fine but isn't an export bundle is refused as unreadable, not a wrong password", async ({
+	test("a file that decrypts fine but isn't an export is listed as such, not as a wrong password", async ({
 		data,
 		history,
 		setup,
@@ -135,18 +129,13 @@ test.describe("Secure export and import (#81)", () => {
 		const file = await download;
 		const contents = await readFile(await file.path(), "utf8");
 
-		// Importing a bundle is a data-management action: back on /data/.
+		// Importing is a data-management action: back on /data/.
 		await data.goto();
-		await data.secureImportFileInput.setInputFiles({
-			name: "sasongsrapport.json",
-			mimeType: "application/json",
-			buffer: Buffer.from(contents),
-		});
-		await data.secureExportPasswordInput.fill(password);
-		await data.secureImportButton.click();
-		await data.secureImportButton.click();
-		await expect(data.secureExportStatus).toHaveText(
-			"Filen kunde inte läsas som en exporterad fil.",
-		);
+		await data.chooseFiles([{ name: "sasongsrapport.json", contents }]);
+		await data.unlock(password);
+		await expect(data.importSummary).toHaveText([
+			"sasongsrapport.json: Filen gick att öppna men är ingen exportfil eller lagfil från appen (en säsongsrapport kan till exempel inte läsas in).",
+		]);
+		await expect(data.importApplyButton).toBeDisabled();
 	});
 });

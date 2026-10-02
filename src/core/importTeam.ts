@@ -16,6 +16,16 @@ export type TeamPlacement =
 	/** Another team on this device already has that id. */
 	| { action: "refuse"; reason: "belongsToOtherLocalTeam" };
 
+/** What a team with data does with another team's files: a new team, or a merge. */
+export type PlacementChoice = "new" | "merge";
+
+/** Matches on this device, in the files, and after merging them. */
+export interface MergeCounts {
+	local: number;
+	incoming: number;
+	merged: number;
+}
+
 export function placeTeam(input: {
 	localTeamId: string;
 	localIsEmpty: boolean;
@@ -36,10 +46,7 @@ export function placeTeam(input: {
  * Match counts for "Du har 1 match, Drive har 2, efter hopslagning 3": a
  * match both sides have counts once, because matches de-duplicate by id.
  */
-export function previewMerge(
-	local: TeamData,
-	incoming: TeamData,
-): { local: number; incoming: number; merged: number } {
+export function previewMerge(local: TeamData, incoming: TeamData): MergeCounts {
 	const ids = (data: TeamData) =>
 		new Set(data.matches.map((m) => m.audit.matchId));
 	const localIds = ids(local);

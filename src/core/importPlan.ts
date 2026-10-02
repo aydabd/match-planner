@@ -1,9 +1,9 @@
 import { parseTeamFolderName } from "./driveNames.js";
 import { LIMITS } from "./limits.js";
-import { parseMatchFile } from "./matchFile.js";
-import { parsePlayerNotesFile } from "./playerNotes.js";
-import { parseSecurePackage } from "./securePackage.js";
-import { parseRosterFile } from "./storage.js";
+import { type MatchFile, parseMatchFile } from "./matchFile.js";
+import { type PlayerNotesFile, parsePlayerNotesFile } from "./playerNotes.js";
+import { parseSecurePackage, type SecurePackage } from "./securePackage.js";
+import { parseRosterFile, type RosterFile } from "./storage.js";
 
 /**
  * What a chosen file is, decided from its contents and never from its name
@@ -19,12 +19,20 @@ export interface InputFile {
 	text: string;
 }
 
-export interface Classified {
+interface ClassifiedBase {
 	path: string;
-	kind: Exclude<FileKind, "unknown">;
 	/** From a `team-<uuid>` folder in the path; a hint only, contents decide. */
 	teamIdHint: string | null;
 }
+
+/** A file the importer can use, with what it parsed to. */
+export type Classified = ClassifiedBase &
+	(
+		| { kind: "match"; value: MatchFile }
+		| { kind: "squad"; value: RosterFile }
+		| { kind: "notes"; value: PlayerNotesFile }
+		| { kind: "package"; value: SecurePackage }
+	);
 
 export interface Skipped {
 	path: string;
@@ -42,8 +50,11 @@ function teamIdHint(path: string): string | null {
 	return null;
 }
 
-function kindOf(data: unknown): Classified["kind"] | null {
-	const attempts: [Classified["kind"], (data: unknown) => unknown][] = [
+function parsedAs(data: unknown): Pick<Classified, "kind" | "value"> | null {
+	const attempts: [
+		Classified["kind"],
+		(data: unknown) => Classified["value"],
+	][] = [
 		["match", parseMatchFile],
 		["squad", (d) => parseRosterFile(d)],
 		["notes", parsePlayerNotesFile],
@@ -51,8 +62,7 @@ function kindOf(data: unknown): Classified["kind"] | null {
 	];
 	for (const [kind, parse] of attempts) {
 		try {
-			parse(data);
-			return kind;
+			return { kind, value: parse(data) } as Pick<Classified, "kind" | "value">;
 		} catch {
 			// not this kind; try the next
 		}
@@ -60,39 +70,68 @@ function kindOf(data: unknown): Classified["kind"] | null {
 	return null;
 }
 
+/**
+ * Apply the caps to files known only by name and size, so a huge file or a
+ * folder of hundreds is refused before any of it is read into memory.
+ */
+export function screenBySize<T extends { path: string; size: number }>(
+	entries: readonly T[],
+): { accepted: T[]; skipped: Skipped[] } {
+	const accepted: T[] = [];
+	const skipped: Skipped[] = [];
+	let totalBytes = 0;
+	for (const [index, entry] of entries.entries()) {
+		let reason: SkipReason | null = null;
+		if (index >= LIMITS.importFiles) reason = "tooMany";
+		else if (entry.size > LIMITS.importFileBytes) reason = "tooLarge";
+		else if (totalBytes + entry.size > LIMITS.importTotalBytes)
+			reason = "tooMany";
+		if (reason === null) {
+			totalBytes += entry.size;
+			accepted.push(entry);
+		} else skipped.push({ path: entry.path, reason });
+	}
+	return { accepted, skipped };
+}
+
 /** Sort `files` into what the importer can use and what it skips, with a reason. */
 export function classifyFiles(files: readonly InputFile[]): {
 	files: Classified[];
 	skipped: Skipped[];
 } {
+	const sized = files.map((file) => ({
+		file,
+		path: file.path,
+		size: encoder.encode(file.text).length,
+	}));
+	const { accepted, skipped } = screenBySize(sized);
 	const classified: Classified[] = [];
-	const skipped: Skipped[] = [];
-	let totalBytes = 0;
-	for (const [index, file] of files.entries()) {
-		const bytes = encoder.encode(file.text).length;
-		let reason: SkipReason | null = null;
-		if (index >= LIMITS.importFiles) reason = "tooMany";
-		else if (bytes > LIMITS.importFileBytes) reason = "tooLarge";
-		else if (totalBytes + bytes > LIMITS.importTotalBytes) reason = "tooMany";
-		if (reason === null) {
-			totalBytes += bytes;
-			reason = classify(file, classified);
+	for (const { file } of accepted) {
+		let data: unknown;
+		try {
+			data = JSON.parse(file.text);
+		} catch {
+			skipped.push({ path: file.path, reason: "notJson" });
+			continue;
 		}
-		if (reason !== null) skipped.push({ path: file.path, reason });
+		const found = parsedAs(data);
+		if (found === null) {
+			skipped.push({ path: file.path, reason: "unrecognised" });
+			continue;
+		}
+		classified.push({
+			path: file.path,
+			teamIdHint: teamIdHint(file.path),
+			...found,
+		} as Classified);
 	}
+	// In the order the files were given, whatever step skipped them.
+	const position = new Map<string, number>();
+	for (const [index, file] of files.entries()) {
+		if (!position.has(file.path)) position.set(file.path, index);
+	}
+	skipped.sort(
+		(x, y) => (position.get(x.path) ?? 0) - (position.get(y.path) ?? 0),
+	);
 	return { files: classified, skipped };
-}
-
-/** Add `file` to `into` if its contents are a known kind; otherwise say why not. */
-function classify(file: InputFile, into: Classified[]): SkipReason | null {
-	let data: unknown;
-	try {
-		data = JSON.parse(file.text);
-	} catch {
-		return "notJson";
-	}
-	const kind = kindOf(data);
-	if (kind === null) return "unrecognised";
-	into.push({ path: file.path, kind, teamIdHint: teamIdHint(file.path) });
-	return null;
 }

@@ -30,6 +30,7 @@ import {
 import {
 	activeTeamId,
 	createTeam,
+	createTeamWithId,
 	listTeams,
 	renameTeam,
 	switchTeam,
@@ -403,18 +404,6 @@ describe("Drive restore - a team that has data", () => {
 		});
 	});
 
-	it("is refused another team's folder, and nothing changes", async () => {
-		const drive = new FakeDrive();
-		await teamWithData(drive, 1);
-		await device().run(async () => {
-			keepMatchFiles([makeMatchFile({ matchId: "mine", seed: 7 })]);
-			await expect(
-				backupOf(drive).restore(ROOT, PASSWORD),
-			).rejects.toMatchObject({ reason: "otherTeam" });
-			expect(loadMatchFiles().map((m) => m.audit.matchId)).toEqual(["mine"]);
-		});
-	});
-
 	it("can still back up into the same root, in a subfolder of its own", async () => {
 		const drive = new FakeDrive();
 		await teamWithData(drive, 1);
@@ -452,6 +441,158 @@ describe("Drive restore - a team that has data", () => {
 				reason: "belongsToOtherLocalTeam",
 			});
 			switchTeam(first);
+		});
+	});
+});
+
+describe("Drive restore - another team's folder than the one with data (#154)", () => {
+	/** A phone with one local match, facing a root that holds `drive`'s team. */
+	async function laptopFacingAPhoneTeam() {
+		const drive = new FakeDrive();
+		const phoneTeam = await teamWithData(drive, 1, "P11 Blå");
+		const laptop = device();
+		await laptop.run(() => {
+			keepMatchFiles([makeMatchFile({ matchId: "laptop", seed: 7 })]);
+		});
+		return { drive, phoneTeam, laptop };
+	}
+
+	async function differentTeam(
+		drive: FakeDrive,
+		password = PASSWORD,
+		teamId?: string,
+	) {
+		const outcome = await backupOf(drive).restore(ROOT, password, teamId);
+		if (outcome.kind !== "different-team") {
+			throw new Error(`expected a different team, got ${outcome.kind}`);
+		}
+		return outcome;
+	}
+
+	it("shows the numbers and changes nothing until one of the two choices is picked", async () => {
+		const { drive, phoneTeam, laptop } = await laptopFacingAPhoneTeam();
+		await laptop.run(async () => {
+			const before = activeTeamId();
+			expect(await differentTeam(drive)).toEqual({
+				kind: "different-team",
+				teamId: phoneTeam.teamId,
+				name: "P11 Blå",
+				counts: { local: 1, incoming: 2, merged: 3 },
+			});
+			expect(activeTeamId()).toBe(before);
+			expect(listTeams()).toHaveLength(1);
+			expect(loadMatchFiles().map((m) => m.audit.matchId)).toEqual(["laptop"]);
+		});
+	});
+
+	it("counts a match both sides have once", async () => {
+		const { drive, phoneTeam, laptop } = await laptopFacingAPhoneTeam();
+		await laptop.run(async () => {
+			keepMatchFiles([makeMatchFile({ matchId: "m1a", seed: 1 })]);
+			expect((await differentTeam(drive)).counts).toEqual({
+				local: 2,
+				incoming: 2,
+				merged: 3,
+			});
+			expect(phoneTeam.teamId).not.toBe(activeTeamId());
+		});
+	});
+
+	it('"new" makes a new team with the folder\'s id and name and leaves the existing team exactly as it was', async () => {
+		const { drive, phoneTeam, laptop } = await laptopFacingAPhoneTeam();
+		await laptop.run(async () => {
+			const mine = activeTeamId();
+			const mineName = listTeams()[0]?.name;
+			const outcome = await backupOf(drive).restore(
+				ROOT,
+				PASSWORD,
+				undefined,
+				"new",
+			);
+			expect(outcome).toMatchObject({ kind: "restored", downloaded: 2 });
+			expect(activeTeamId()).toBe(phoneTeam.teamId);
+			expect(listTeams().map((t) => [t.id, t.name])).toEqual([
+				[mine, mineName],
+				[phoneTeam.teamId, "P11 Blå"],
+			]);
+			expect(
+				loadMatchFiles()
+					.map((m) => m.audit.matchId)
+					.sort(),
+			).toEqual(["m1a", "m1b"]);
+			switchTeam(mine);
+			expect(loadMatchFiles().map((m) => m.audit.matchId)).toEqual(["laptop"]);
+		});
+	});
+
+	it('"merge" keeps every local match, adds the folder\'s, takes on its id, and the next backup goes to the same folder', async () => {
+		const { drive, phoneTeam, laptop } = await laptopFacingAPhoneTeam();
+		await laptop.run(async () => {
+			const name = listTeams()[0]?.name;
+			const outcome = await backupOf(drive).restore(
+				ROOT,
+				PASSWORD,
+				undefined,
+				"merge",
+			);
+			expect(outcome).toMatchObject({ kind: "restored", downloaded: 2 });
+			expect(listTeams()).toHaveLength(1);
+			expect(activeTeamId()).toBe(phoneTeam.teamId);
+			expect(listTeams()[0]?.name).toBe(name);
+			expect(
+				loadMatchFiles()
+					.map((m) => m.audit.matchId)
+					.sort(),
+			).toEqual(["laptop", "m1a", "m1b"]);
+
+			const backup = await backupOf(drive).backup(ROOT, PASSWORD);
+			expect(backup.uploaded).toBe(1);
+			expect(drive.folderNames(ROOT)).toHaveLength(1);
+		});
+	});
+
+	it("is refused when another team on this device already has the folder's id, and nothing changes", async () => {
+		const { drive, phoneTeam, laptop } = await laptopFacingAPhoneTeam();
+		await laptop.run(async () => {
+			const mine = activeTeamId();
+			createTeamWithId(phoneTeam.teamId, "Redan här");
+			switchTeam(mine);
+			await expect(
+				backupOf(drive).restore(ROOT, PASSWORD, undefined, "merge"),
+			).rejects.toMatchObject({ reason: "belongsToOtherLocalTeam" });
+			expect(activeTeamId()).toBe(mine);
+			expect(loadMatchFiles().map((m) => m.audit.matchId)).toEqual(["laptop"]);
+		});
+	});
+
+	it("gives a wrong password the wrong-password error and changes nothing", async () => {
+		const { drive, laptop } = await laptopFacingAPhoneTeam();
+		await laptop.run(async () => {
+			const before = activeTeamId();
+			await expect(
+				backupOf(drive).restore(ROOT, "fel-lösenord", undefined, "merge"),
+			).rejects.toBeInstanceOf(SecurePackageError);
+			expect(activeTeamId()).toBe(before);
+			expect(listTeams()).toHaveLength(1);
+		});
+	});
+
+	it("asks which team first when several folders qualify, then which of the two choices", async () => {
+		const { drive, phoneTeam, laptop } = await laptopFacingAPhoneTeam();
+		const red = await teamWithData(drive, 5, "F12 Röd");
+		await laptop.run(async () => {
+			const outcome = await backupOf(drive).restore(ROOT, PASSWORD);
+			expect(outcome).toEqual({
+				kind: "choose",
+				teams: [
+					{ teamId: red.teamId, name: "F12 Röd" },
+					{ teamId: phoneTeam.teamId, name: "P11 Blå" },
+				],
+			});
+			expect((await differentTeam(drive, PASSWORD, red.teamId)).name).toBe(
+				"F12 Röd",
+			);
+			expect(listTeams()).toHaveLength(1);
 		});
 	});
 });
