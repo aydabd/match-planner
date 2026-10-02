@@ -398,6 +398,13 @@ h3 {
 #startingKeeperField[hidden] {
 	display: none;
 }
+/* .field is display:flex, which would otherwise win over the hidden
+ * attribute: the Drive card's password field and team picker show only
+ * when there is something to type into or choose (#142, #147). */
+#drivePasswordField[hidden],
+#driveTeamChoice[hidden] {
+	display: none;
+}
 .player-row .keeper-toggle {
 	display: inline-flex;
 	align-items: center;
