@@ -3,6 +3,19 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.22.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.21.0...matchplanner-v0.22.0) (2026-10-02)
+
+
+### Features
+
+* **ui:** add a Content-Security-Policy to every built page ([#151](https://github.com/aydabd/match-planner/issues/151)) ([e2f66ae](https://github.com/aydabd/match-planner/commit/e2f66aedf47b5a7c42ca830169e5a77aef18ddf2))
+
+
+### Bug Fixes
+
+* **ui:** let teams with different passwords share one Drive root ([#149](https://github.com/aydabd/match-planner/issues/149)) ([f03fd76](https://github.com/aydabd/match-planner/commit/f03fd76b2f67883051ad584c3d889f87731757fd))
+* **ui:** refuse Drive ids and files that could harm a request ([#148](https://github.com/aydabd/match-planner/issues/148)) ([1cec75a](https://github.com/aydabd/match-planner/commit/1cec75abf5ceaff698706e8be2e9c71dc50ae59d))
+
 ## [0.21.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.20.0...matchplanner-v0.21.0) (2026-10-02)
 
 
