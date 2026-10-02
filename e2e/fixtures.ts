@@ -19,6 +19,12 @@ interface Fixtures {
 	report: ReportPage;
 	history: HistoryPage;
 	teamSwitcher: TeamSwitcher;
+	/**
+	 * Content-Security-Policy violations the browser reported (#147). Any left
+	 * at the end of a test fail it; a test that causes one on purpose clears
+	 * it after checking.
+	 */
+	cspViolations: string[];
 	/** A match started with the test squad; the clock is not running yet. */
 	startedMatch: MatchPage;
 }
@@ -30,7 +36,11 @@ interface Fixtures {
  * in parallel, and Playwright closes the context after each test.
  */
 export const test = base.extend<Fixtures>({
-	page: async ({ page }, use) => {
+	// biome-ignore lint/correctness/noEmptyPattern: Playwright needs a destructured first argument.
+	cspViolations: async ({}, use) => {
+		await use([]);
+	},
+	page: async ({ page, cspViolations }, use) => {
 		// Paused, so match time moves only through match.play(); real time
 		// passing during assertions can never change what a test sees.
 		// Installed a minute early and then paused at START: installing at
@@ -39,7 +49,15 @@ export const test = base.extend<Fixtures>({
 		// past").
 		await page.clock.install({ time: new Date(START.getTime() - 60_000) });
 		await page.clock.pauseAt(START);
+		// The Content-Security-Policy (#147) must never be in the way of the
+		// app: any violation the browser reports fails the test that caused it.
+		page.on("console", (message) => {
+			if (message.text().includes("Content Security Policy")) {
+				cspViolations.push(message.text());
+			}
+		});
 		await use(page);
+		baseExpect(cspViolations).toEqual([]);
 	},
 	setup: async ({ page }, use) => {
 		await use(new SetupPage(page));

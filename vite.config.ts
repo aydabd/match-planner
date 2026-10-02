@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { defineConfig, type Plugin } from "vite";
+import { CONTENT_SECURITY_POLICY } from "./src/core/csp.js";
 import {
 	CACHE_PREFIX,
 	cacheName,
@@ -65,8 +66,32 @@ function serviceWorker(appVersion: string): Plugin {
 	};
 }
 
+/**
+ * Puts the Content-Security-Policy (src/core/csp.ts, #147) in every built
+ * page. Build only: the dev server needs inline scripts and a websocket for
+ * hot reload, which the policy rightly forbids.
+ */
+function contentSecurityPolicy(): Plugin {
+	return {
+		name: "matchplanner-content-security-policy",
+		apply: "build",
+		transformIndexHtml() {
+			return [
+				{
+					tag: "meta",
+					attrs: {
+						"http-equiv": "Content-Security-Policy",
+						content: CONTENT_SECURITY_POLICY,
+					},
+					injectTo: "head-prepend",
+				},
+			];
+		},
+	};
+}
+
 export default defineConfig(({ mode }) => ({
-	plugins: [serviceWorker(version)],
+	plugins: [serviceWorker(version), contentSecurityPolicy()],
 	base: process.env.BASE_PATH ?? "/",
 	// Shown in the UI footer; comes from package.json, which release-please bumps.
 	define: {

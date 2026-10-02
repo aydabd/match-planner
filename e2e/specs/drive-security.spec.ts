@@ -39,7 +39,22 @@ async function newPhone(
 	});
 	await mockGoogle(context, drive);
 	const page = await context.newPage();
-	return { context, page, history: new HistoryPage(page) };
+	// Any Content-Security-Policy violation fails the test (#147).
+	const violations: string[] = [];
+	page.on("console", (message) => {
+		if (message.text().includes("Content Security Policy")) {
+			violations.push(message.text());
+		}
+	});
+	return {
+		context,
+		page,
+		history: new HistoryPage(page),
+		close: async () => {
+			expect(violations).toEqual([]);
+			await context.close();
+		},
+	};
 }
 
 async function connectAndPickFolder(history: HistoryPage): Promise<void> {
@@ -106,7 +121,7 @@ test.describe("Drive: teams with different passwords share one root (#147)", () 
 		await expect(blue.history.driveStatus).toHaveText("1 match lästes in.");
 		await expect(blue.history.count).toHaveText("1 match över 1 månad.");
 		await expect(blue.history.driveTeamSelect).toBeHidden();
-		await blue.context.close();
+		await blue.close();
 
 		// A coach with P13's password gets P13, a different match.
 		const p13 = await newPhone(browser, drive);
@@ -119,7 +134,7 @@ test.describe("Drive: teams with different passwords share one root (#147)", () 
 		await expect(
 			p13.history.row("Startat och speltid", SQUAD[0] ?? ""),
 		).toBeVisible();
-		await p13.context.close();
+		await p13.close();
 
 		// Someone guessing gets the wrong-password message and no data.
 		const guess = await newPhone(browser, drive);
@@ -135,7 +150,7 @@ test.describe("Drive: teams with different passwords share one root (#147)", () 
 			"Inga matcher än. Spela en match eller läs in matchfiler.",
 		);
 		await expect(guess.history.driveTeamSelect).toBeHidden();
-		await guess.context.close();
+		await guess.close();
 	});
 });
 
@@ -204,8 +219,8 @@ test.describe("Drive: what the app sends and keeps (#147)", () => {
 			);
 			for (const needle of needles) expect(stored).not.toContain(needle);
 		}
-		await writer.context.close();
-		await reader.context.close();
+		await writer.close();
+		await reader.close();
 	});
 
 	test("the password field is emptied after a backup and a restore, but kept while a team choice is waiting", async ({
@@ -252,7 +267,8 @@ test.describe("Drive: what the app sends and keeps (#147)", () => {
 			"Allt var redan säkerhetskopierat.",
 		);
 		await expect(phone.history.drivePasswordInput).toHaveValue("");
-		for (const context of [first, second, phone.context]) await context.close();
+		for (const context of [first, second]) await context.close();
+		await phone.close();
 	});
 
 	test("a short password is refused for a new backup and a new export, and nothing is written", async ({
@@ -358,7 +374,7 @@ test.describe("Drive: data from Drive and storage is never run or trusted (#147)
 				() => (window as unknown as { __pwned?: number }).__pwned,
 			),
 		).toBeUndefined();
-		await phone.context.close();
+		await phone.close();
 	});
 
 	test("a folder id in storage that could change a request never reaches Google", async ({
@@ -387,7 +403,7 @@ test.describe("Drive: data from Drive and storage is never run or trusted (#147)
 		);
 		expect(drivePaths).toEqual([]);
 		expect(drive.files.size).toBe(0);
-		await phone.context.close();
+		await phone.close();
 	});
 });
 
