@@ -26,8 +26,9 @@ export class SetupPage {
 	readonly emptySquadMessage: Locator;
 	readonly startButton: Locator;
 	readonly squadFileMessage: Locator;
-
-	private readonly squadFileSection: Locator;
+	readonly squadPasswordField: Locator;
+	readonly squadPasswordInput: Locator;
+	readonly saveSquadButton: Locator;
 
 	constructor(private readonly page: Page) {
 		this.root = page.locator("#setupView");
@@ -56,8 +57,11 @@ export class SetupPage {
 		this.startOverButton = this.root.locator("#startOverBtn");
 		this.startingKeeper = this.root.getByLabel("Startande målvakt");
 		this.clearAllButton = this.root.locator("#clearAllDataBtn");
-		this.squadFileSection = this.root.getByRole("group").filter({
-			hasText: "Spara eller hämta en trupp",
+		this.squadPasswordField = this.root.locator("#squadPasswordField");
+		this.squadPasswordInput = this.root.locator("#squadPasswordInput");
+		this.saveSquadButton = this.root.getByRole("button", {
+			name: "Spara trupp",
+			exact: true,
 		});
 	}
 
@@ -174,11 +178,8 @@ export class SetupPage {
 	}
 
 	async saveSquadToFile(): Promise<Download> {
-		await this.openSquadFileSection();
 		const download = this.page.waitForEvent("download");
-		await this.root
-			.getByRole("button", { name: "Spara trupp som fil" })
-			.click();
+		await this.saveSquadButton.click();
 		return download;
 	}
 
@@ -186,7 +187,6 @@ export class SetupPage {
 		name: string;
 		contents: string;
 	}): Promise<void> {
-		await this.openSquadFileSection();
 		await this.root.locator("#importInput").setInputFiles({
 			name: file.name,
 			mimeType: "application/json",
@@ -194,10 +194,9 @@ export class SetupPage {
 		});
 	}
 
-	private async openSquadFileSection(): Promise<void> {
-		const summary = this.squadFileSection.locator("summary");
-		if ((await this.squadFileSection.getAttribute("open")) === null) {
-			await summary.click();
-		}
+	/** Type the password for an encrypted file chosen in "Hämta trupp" and unlock it. */
+	async unlockSquadFile(password: string): Promise<void> {
+		await this.squadPasswordInput.fill(password);
+		await this.root.getByRole("button", { name: "Lås upp" }).click();
 	}
 }

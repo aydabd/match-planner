@@ -1,12 +1,12 @@
 import { getFormat, outfieldCount, teamSizeOf } from "../core/formations.js";
+import type { PackageFile } from "../core/importUnlock.js";
 import { LIMITS, numberWithin, rotationSecondsFrom } from "../core/limits.js";
 import { REGIONS, type RegionId } from "../core/policy.js";
+import { readSquadFile, squadFromPackage } from "../core/squadImport.js";
 import {
 	newRoster,
-	parseRosterFile,
 	policyOverrides,
 	type RosterFile,
-	StorageError,
 	squadFile,
 } from "../core/storage.js";
 import type { Player } from "../core/types.js";
@@ -98,6 +98,17 @@ export function createRosterView(callbacks: RosterViewCallbacks): void {
 	const importError = document.getElementById(
 		"importError",
 	) as HTMLParagraphElement;
+	const squadPasswordField = document.getElementById(
+		"squadPasswordField",
+	) as HTMLDivElement;
+	const squadPasswordInput = document.getElementById(
+		"squadPasswordInput",
+	) as HTMLInputElement;
+	const squadUnlockBtn = document.getElementById(
+		"squadUnlockBtn",
+	) as HTMLButtonElement;
+	/** An encrypted file chosen in "Hämta trupp", waiting for its password. */
+	let pendingPackage: PackageFile | null = null;
 	const startBtn = document.getElementById(
 		"startMatchBtn",
 	) as HTMLButtonElement;
@@ -372,25 +383,97 @@ export function createRosterView(callbacks: RosterViewCallbacks): void {
 		URL.revokeObjectURL(url);
 	});
 
+	/** Take `roster` as the squad being set up. */
+	function takeSquad(roster: RosterFile): void {
+		draft = roster;
+		formationValid = true;
+		formationPicker.reset(draft.formatId);
+		hideSquadPassword();
+		clearImportError();
+		persist();
+	}
+
+	function showImportMessage(message: string, error: boolean): void {
+		importError.textContent = message;
+		importError.classList.toggle("error", error);
+	}
+
+	function hideSquadPassword(): void {
+		pendingPackage = null;
+		squadPasswordInput.value = "";
+		squadPasswordField.hidden = true;
+	}
+
+	/** Hämta trupp: the same content-based importer as the Data page, asked for a squad. */
 	importInput.addEventListener("change", async () => {
 		const file = importInput.files?.[0];
 		importInput.value = "";
 		if (!file) return;
+		hideSquadPassword();
+		if (file.size > LIMITS.importFileBytes) {
+			showImportMessage(TEXT.squadFile.tooLarge, true);
+			return;
+		}
+		let text: string;
 		try {
-			const text = await file.text();
-			const imported = parseRosterFile(JSON.parse(text));
-			draft = imported;
-			formationValid = true;
-			formationPicker.reset(draft.formatId);
-			clearImportError();
-			persist();
-		} catch (err) {
-			const message =
-				err instanceof StorageError
-					? TEXT.squadFile.problem(err.problem)
-					: TEXT.squadFile.unreadable;
-			importError.textContent = message;
-			importError.classList.add("error");
+			text = await file.text();
+		} catch {
+			showImportMessage(TEXT.squadFile.unreadable, true);
+			return;
+		}
+		const result = readSquadFile({ path: file.name, text });
+		switch (result.kind) {
+			case "squad":
+				takeSquad(result.roster);
+				return;
+			case "needsPassword":
+				pendingPackage = { path: file.name, text, teamIdHint: null };
+				squadPasswordField.hidden = false;
+				showImportMessage(TEXT.squadFile.needPassword, false);
+				squadPasswordInput.focus();
+				return;
+			case "noSquad":
+				showImportMessage(TEXT.squadFile.noSquad, true);
+				return;
+			case "refused":
+				showImportMessage(
+					result.problem === "unreadable"
+						? TEXT.squadFile.unreadable
+						: result.problem === "tooLarge"
+							? TEXT.squadFile.tooLarge
+							: TEXT.squadFile.problem(result.problem),
+					true,
+				);
+		}
+	});
+
+	squadUnlockBtn.addEventListener("click", async () => {
+		const file = pendingPackage;
+		if (file === null) return;
+		const password = squadPasswordInput.value;
+		if (password === "") {
+			showImportMessage(TEXT.squadFile.needPasswordFirst, true);
+			return;
+		}
+		squadUnlockBtn.disabled = true;
+		try {
+			const result = await squadFromPackage(file, password);
+			if (result.kind === "squad") takeSquad(result.roster);
+			else if (result.kind === "locked") {
+				showImportMessage(TEXT.squadFile.wrongPassword, true);
+			} else {
+				hideSquadPassword();
+				showImportMessage(
+					result.kind === "noSquad"
+						? TEXT.squadFile.noSquad
+						: TEXT.squadFile.unreadable,
+					true,
+				);
+			}
+		} finally {
+			// The password is only used to unlock; it is not kept.
+			squadPasswordInput.value = "";
+			squadUnlockBtn.disabled = false;
 		}
 	});
 
@@ -402,6 +485,7 @@ export function createRosterView(callbacks: RosterViewCallbacks): void {
 				draft = emptyDraft();
 				formationValid = true;
 				formationPicker.reset(draft.formatId);
+				hideSquadPassword();
 				clearImportError();
 				clearSession();
 				persist();

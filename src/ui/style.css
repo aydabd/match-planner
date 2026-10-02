@@ -404,7 +404,8 @@ h3 {
 #drivePasswordField[hidden],
 #driveTeamChoice[hidden],
 #importPasswordField[hidden],
-#importTeamChoice[hidden] {
+#importTeamChoice[hidden],
+#squadPasswordField[hidden] {
 	display: none;
 }
 .player-row .keeper-toggle {

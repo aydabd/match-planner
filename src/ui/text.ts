@@ -212,6 +212,13 @@ export const TEXT = {
 	squadFile: {
 		unreadable:
 			"Filen kunde inte läsas. Välj en fil som sparats från MatchPlanner.",
+		tooLarge: "Filen är för stor för att vara en truppfil.",
+		noSquad:
+			"Filen innehåller ingen trupp. Välj en truppfil eller en krypterad exportfil.",
+		needPassword: "Filen är krypterad. Ange lösenordet för att hämta truppen.",
+		needPasswordFirst: "Ange ett lösenord först.",
+		wrongPassword:
+			"Fel lösenord, eller filen har ändrats. Kontrollera lösenordet och försök igen.",
 		problem(problem: SquadFileProblem): string {
 			switch (problem.code) {
 				case "unknownFormat":

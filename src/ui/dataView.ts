@@ -268,7 +268,7 @@ function setUpDriveBackup(callbacks: {
 }
 
 /**
- * The "Säker export och import" card (#81): a coach's whole local season -
+ * The "Skicka ut" card (#81): a coach's whole local season -
  * roster draft, every match file, player notes - as one file protected by
  * one password (core/exportBundle.ts, core/securePackage.ts), for moving
  * everything to another device without Google Drive. Purely local: no
