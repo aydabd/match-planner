@@ -1,6 +1,14 @@
 import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import type { Browser } from "@playwright/test";
+import { matchFileToJson } from "../../src/core/matchFile.js";
+import { EMPTY_PLAYER_NOTES_FILE } from "../../src/core/playerNotes.js";
+import {
+	encryptJson,
+	securePackageToJson,
+} from "../../src/core/securePackage.js";
+import { newRoster, rosterToJson } from "../../src/core/storage.js";
+import { makeMatchFile } from "../../tests/support/matchFiles.js";
 import { expect, test } from "../fixtures.js";
 import { MatchPage } from "../pages/MatchPage.js";
 import { SetupPage } from "../pages/SetupPage.js";
@@ -159,5 +167,103 @@ test.describe("Saving and loading a squad file", () => {
 			"Filen kunde inte läsas. Välj en fil som sparats från MatchPlanner.",
 		);
 		await expect(setup.emptySquadMessage).toBeVisible();
+	});
+
+	test("the start page says Trupp, with no leftover of the old wording", async ({
+		setup,
+		page,
+	}) => {
+		await setup.open();
+		await expect(
+			setup.root.getByRole("heading", { name: "Trupp", level: 2, exact: true }),
+		).toBeVisible();
+		await expect(setup.saveSquadButton).toBeVisible();
+		await expect(
+			setup.root.getByRole("button", { name: "Hämta trupp" }),
+		).toBeVisible();
+		await expect(page.getByText("Spara eller hämta en trupp")).toHaveCount(0);
+		await expect(page.getByText("Hämta trupp från fil")).toHaveCount(0);
+	});
+
+	test("the squad can be fetched from an encrypted export, after its password", async ({
+		setup,
+	}) => {
+		const password = "hemligt-lösenord";
+		const bundle = {
+			schemaVersion: 1,
+			roster: newRoster({
+				formatId: "7v7:2-3-1",
+				players: SQUAD.map((name, i) => ({ id: `p${i + 1}`, name })),
+			}),
+			matches: [],
+			playerNotes: EMPTY_PLAYER_NOTES_FILE,
+		};
+		const contents = securePackageToJson(await encryptJson(password, bundle));
+		await setup.open();
+		await expect(setup.squadPasswordField).toBeHidden();
+
+		await setup.loadSquadFromFile({ name: "export.json", contents });
+		await expect(setup.squadPasswordField).toBeVisible();
+		await expect(setup.squadFileMessage).toHaveText(
+			"Filen är krypterad. Ange lösenordet för att hämta truppen.",
+		);
+		await expect(setup.emptySquadMessage).toBeVisible();
+
+		await setup.unlockSquadFile("fel-lösenord");
+		await expect(setup.squadFileMessage).toHaveText(
+			"Fel lösenord, eller filen har ändrats. Kontrollera lösenordet och försök igen.",
+		);
+		await expect(setup.emptySquadMessage).toBeVisible();
+
+		await setup.unlockSquadFile(password);
+		await expect(setup.players).toHaveInputValues(SQUAD);
+		await expect(setup.squadPasswordField).toBeHidden();
+		await expect(setup.squadPasswordInput).toHaveValue("");
+	});
+
+	test("an export with no squad says so, and changes nothing", async ({
+		setup,
+	}) => {
+		const password = "hemligt-lösenord";
+		const bundle = {
+			schemaVersion: 1,
+			roster: null,
+			matches: [makeMatchFile({ matchId: "m1" })],
+			playerNotes: EMPTY_PLAYER_NOTES_FILE,
+		};
+		await setup.open();
+		await setup.loadSquadFromFile({
+			name: "export.json",
+			contents: securePackageToJson(await encryptJson(password, bundle)),
+		});
+		await setup.unlockSquadFile(password);
+		await expect(setup.squadFileMessage).toHaveText(
+			"Filen innehåller ingen trupp. Välj en truppfil eller en krypterad exportfil.",
+		);
+		await expect(setup.emptySquadMessage).toBeVisible();
+	});
+
+	test("a match file is understood but has no squad", async ({ setup }) => {
+		await setup.open();
+		await setup.loadSquadFromFile({
+			name: "match.json",
+			contents: matchFileToJson(makeMatchFile({ matchId: "m1" })),
+		});
+		await expect(setup.squadFileMessage).toHaveText(
+			"Filen innehåller ingen trupp. Välj en truppfil eller en krypterad exportfil.",
+		);
+	});
+
+	test("a squad file that is wrong says what is wrong with it", async ({
+		setup,
+	}) => {
+		await setup.open();
+		await setup.loadSquadFromFile({
+			name: "tom.json",
+			contents: rosterToJson(newRoster({ formatId: "7v7:2-3-1" })),
+		});
+		await expect(setup.squadFileMessage).toHaveText(
+			"Filen innehåller inga spelare.",
+		);
 	});
 });

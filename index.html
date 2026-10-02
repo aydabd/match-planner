@@ -115,18 +115,25 @@
         </div>
       </details>
 
-      <details class="card disclosure">
-        <summary>Spara eller hämta en trupp</summary>
-        <p class="hint">Spara truppen som en fil och hämta den igen nästa match, så slipper du skriva in alla namn.</p>
+      <section class="card" aria-labelledby="squadFileTitle">
+        <h2 id="squadFileTitle">Trupp</h2>
+        <p class="hint">Spara truppen som en fil och hämta den igen nästa match, så slipper du skriva in alla namn. Hämta trupp tar en truppfil eller en krypterad exportfil. Flera filer, matcher och Google Drive finns under Data.</p>
         <div class="row-buttons">
-          <button type="button" id="exportBtn" class="btn btn-secondary">Spara trupp som fil</button>
+          <button type="button" id="exportBtn" class="btn btn-secondary">Spara trupp</button>
           <label class="btn btn-secondary file-btn">
-            Hämta trupp från fil
-            <input id="importInput" class="visually-hidden" type="file" accept="application/json" />
+            Hämta trupp
+            <input id="importInput" class="visually-hidden" type="file" />
           </label>
         </div>
+        <div class="field" id="squadPasswordField" hidden>
+          <label class="field-label" for="squadPasswordInput">Lösenord för den krypterade filen</label>
+          <input type="password" id="squadPasswordInput" autocomplete="off">
+          <div class="row-buttons">
+            <button type="button" id="squadUnlockBtn" class="btn btn-secondary">Lås upp</button>
+          </div>
+        </div>
         <p class="hint" id="importError" role="status"></p>
-      </details>
+      </section>
 
       <details class="card disclosure" id="reportsSection" hidden>
         <summary>Tidigare matchrapporter</summary>

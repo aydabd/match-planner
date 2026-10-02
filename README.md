@@ -105,10 +105,18 @@ statisk - ingen backend, inga hemligheter, ingen databas.
 
 ## Dela trupper mellan tränare
 
-Export-knappen i appen skapar en `.json`-fil (schemaversionerad, se
-`src/core/storage.ts`). Vem som helst kan importera den filen i sin egen
-instans av appen - ingen inloggning, inget konto, ingen delad databas. All
-data lagras lokalt i webbläsarens `localStorage` hos varje tränare.
+**Spara trupp** på startsidan skapar en `.json`-fil (schemaversionerad, se
+`src/core/storage.ts`). Vem som helst kan hämta den i sin egen instans av
+appen med **Hämta trupp** - ingen inloggning, inget konto, ingen delad
+databas. All data lagras lokalt i webbläsarens `localStorage` hos varje
+tränare.
+
+Sidan **Data** (`/data/`) samlar allt som flyttar data: den läser in filer
+eller en hel mapp och ser på innehållet, inte namnet, vad varje fil är
+(matchfil, truppfil, anteckningar, krypterad export eller Drive-fil), skickar
+ut allt i en krypterad fil och säkerhetskopierar till Google Drive. Inläsning
+tar bara till: den tar aldrig bort data, och samma filer två gånger ändrar
+ingenting.
 
 ## Säkerhet
 
