@@ -41,6 +41,22 @@ export function teamMarkerName(teamId: string): string {
 	return `team-${teamId}${SUFFIX}`;
 }
 
+/**
+ * The name of the subfolder that holds one team's files inside the coach's
+ * root Drive folder (#142): ids only, and no ".json", so it can never be
+ * mistaken for the marker file of the same team.
+ */
+export function teamFolderName(teamId: string): string {
+	return `team-${teamId}`;
+}
+
+/** The team id a subfolder name stands for, or null for any other folder. */
+export function parseTeamFolderName(name: string): string | null {
+	if (!name.startsWith("team-")) return null;
+	const id = name.slice("team-".length);
+	return UUID.test(id) ? id : null;
+}
+
 export type ParsedDriveFileName =
 	| { kind: DriveFileKind; id: string }
 	| { kind: "team"; id: string };

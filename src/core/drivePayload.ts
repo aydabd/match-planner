@@ -1,4 +1,5 @@
 import { driveFileName, teamMarkerName } from "./driveNames.js";
+import { LIMITS } from "./limits.js";
 import { type MatchFile, parseMatchFile } from "./matchFile.js";
 import { type PlayerNotesFile, parsePlayerNotesFile } from "./playerNotes.js";
 import { parseRosterFile, type RosterFile } from "./storage.js";
@@ -26,7 +27,13 @@ export type DrivePayload =
 			deviceId: string;
 			roster: RosterFile;
 	  }
-	| { schemaVersion: 1; kind: "team"; teamId: string };
+	| {
+			schemaVersion: 1;
+			kind: "team";
+			teamId: string;
+			/** Shown when a restore offers several teams (#142). */
+			teamName?: string;
+	  };
 
 export type DrivePayloadProblem =
 	| { code: "notObject" }
@@ -79,8 +86,18 @@ export function parseDrivePayload(raw: unknown): DrivePayload {
 			: content();
 	try {
 		switch (raw.kind) {
-			case "team":
-				return { schemaVersion: 1, kind: "team", teamId };
+			case "team": {
+				if (raw.teamName === undefined) {
+					return { schemaVersion: 1, kind: "team", teamId };
+				}
+				if (typeof raw.teamName !== "string") return content();
+				return {
+					schemaVersion: 1,
+					kind: "team",
+					teamId,
+					teamName: raw.teamName.trim().slice(0, LIMITS.teamNameLength),
+				};
+			}
 			case "match":
 				return {
 					schemaVersion: 1,
