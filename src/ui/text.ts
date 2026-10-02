@@ -46,6 +46,10 @@ export const TEXT = {
 		statistics: "Statistik",
 		about: "Om",
 	},
+	/** The Data page (#154), reached from Start and Statistik. */
+	data: {
+		open: "Hämta in, spara och synka data",
+	},
 	/** The secondary nav on the three statistics pages (src/ui/page.ts, #119). */
 	statisticsNav: {
 		overview: "Spelstatistik",

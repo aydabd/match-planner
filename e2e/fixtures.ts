@@ -3,6 +3,7 @@ import {
 	expect as baseExpect,
 	type Locator,
 } from "@playwright/test";
+import { DataPage } from "./pages/DataPage.js";
 import { HistoryPage } from "./pages/HistoryPage.js";
 import { MatchPage } from "./pages/MatchPage.js";
 import { ReportPage } from "./pages/ReportPage.js";
@@ -18,6 +19,7 @@ interface Fixtures {
 	match: MatchPage;
 	report: ReportPage;
 	history: HistoryPage;
+	data: DataPage;
 	teamSwitcher: TeamSwitcher;
 	/**
 	 * Content-Security-Policy violations the browser reported (#147). Any left
@@ -67,6 +69,9 @@ export const test = base.extend<Fixtures>({
 	},
 	history: async ({ page }, use) => {
 		await use(new HistoryPage(page));
+	},
+	data: async ({ page }, use) => {
+		await use(new DataPage(page));
 	},
 	report: async ({ page }, use) => {
 		await use(new ReportPage(page));
