@@ -50,4 +50,46 @@ test.describe("Shared nav", () => {
 			page.getByRole("heading", { name: "Varför fungerar det så här?" }),
 		).toBeVisible();
 	});
+
+	test("the brand is a drawn mark beside the name, not an emoji", async ({
+		setup,
+	}) => {
+		await setup.open();
+		const brand = setup.root.locator(".topbar .brand").first();
+		await expect(brand).toHaveText("MatchPlanner");
+		await expect(brand.locator("svg.brand-mark")).toBeVisible();
+		await expect(brand).not.toContainText("⚽");
+	});
+
+	for (const url of [
+		"",
+		"match/",
+		"report/",
+		"statistics/",
+		"statistics/sasongsrapport/",
+		"statistics/anteckningar/",
+		"about/",
+		"data/",
+	])
+		test(`/${url} shows the drawn brand mark`, async ({ page }) => {
+			await page.goto(url);
+			await expect(page.locator(".topbar .brand svg.brand-mark")).toHaveCount(
+				1,
+			);
+		});
+
+	for (const icon of ["icon-192.svg", "icon-512.svg"])
+		test(`${icon} is a drawn mark, not an emoji`, async ({ page }) => {
+			const response = await page.request.get(icon);
+			expect(response.status()).toBe(200);
+			const body = await response.text();
+			expect(body).not.toContain("⚽");
+			expect(body).toContain("<rect");
+		});
+
+	test("the favicon is not the emoji", async ({ setup, page }) => {
+		await setup.open();
+		const href = await page.locator("link[rel=icon]").getAttribute("href");
+		expect(href).not.toContain("%E2%9A%BD");
+	});
 });
