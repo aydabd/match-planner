@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
 	driveFileName,
 	parseDriveFileName,
+	parseTeamFolderName,
+	teamFolderName,
 	teamMarkerName,
 } from "../src/core/driveNames.js";
 import { uuidv5Raw } from "../src/core/securePackage.js";
@@ -123,5 +125,30 @@ describe("parseDriveFileName", () => {
 
 	it("rejects a version-4 UUID where a UUIDv5 is required", () => {
 		expect(parseDriveFileName(`match-${TEAM_A}.json`)).toBeNull();
+	});
+});
+
+describe("team folder names (#142)", () => {
+	it("is team-<team id>, with no .json, so it can never be taken for a marker file", () => {
+		expect(teamFolderName(TEAM_A)).toBe(`team-${TEAM_A}`);
+		expect(parseDriveFileName(teamFolderName(TEAM_A))).toBeNull();
+	});
+
+	it("reads the team id back out of a folder name", () => {
+		expect(parseTeamFolderName(teamFolderName(TEAM_A))).toBe(TEAM_A);
+	});
+
+	it("returns null for any other folder", () => {
+		for (const name of [
+			"MatchPlanner",
+			"team-",
+			"team-not-a-uuid",
+			`team-${TEAM_A}.json`,
+			`Team-${TEAM_A}`,
+			`xteam-${TEAM_A}`,
+			"",
+		]) {
+			expect(parseTeamFolderName(name)).toBeNull();
+		}
 	});
 });

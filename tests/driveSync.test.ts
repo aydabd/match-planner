@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { driveFileName, teamMarkerName } from "../src/core/driveNames.js";
 import {
+	chooseTeamFolder,
 	classifyFolder,
 	type DriveFileEntry,
 	decideFolder,
@@ -155,5 +156,103 @@ describe("pickSquad", () => {
 		const a = roster("Alva");
 		const b = roster("Bo");
 		expect(pickSquad([a, b])).toEqual(pickSquad([b, a]));
+	});
+});
+
+describe("chooseTeamFolder - which team's folder in the root (#142)", () => {
+	const TEAM_C = "11111111-2222-4333-8444-555555555555";
+	const base = {
+		localTeamId: TEAM_A,
+		localIsEmpty: false,
+		otherLocalTeamIds: [] as string[],
+	};
+	const a = { teamId: TEAM_A, folderId: "fa" };
+	const b = { teamId: TEAM_B, folderId: "fb" };
+	const c = { teamId: TEAM_C, folderId: "fc" };
+
+	it("has nothing to restore from an empty root", () => {
+		expect(chooseTeamFolder({ ...base, folders: [] })).toEqual({
+			action: "none",
+		});
+	});
+
+	it("uses this team's own folder, whatever else is in the root", () => {
+		expect(chooseTeamFolder({ ...base, folders: [b, a, c] })).toEqual({
+			action: "use",
+			folderId: "fa",
+		});
+		expect(
+			chooseTeamFolder({ ...base, localIsEmpty: true, folders: [b, a] }),
+		).toEqual({
+			action: "use",
+			folderId: "fa",
+		});
+	});
+
+	it("adopts the only team in the root when this team is empty", () => {
+		expect(
+			chooseTeamFolder({ ...base, localIsEmpty: true, folders: [b] }),
+		).toEqual({
+			action: "adopt",
+			teamId: TEAM_B,
+			folderId: "fb",
+		});
+	});
+
+	it("asks which team when several qualify, in the same order whatever order they are listed", () => {
+		const one = chooseTeamFolder({
+			...base,
+			localIsEmpty: true,
+			folders: [c, b],
+		});
+		const two = chooseTeamFolder({
+			...base,
+			localIsEmpty: true,
+			folders: [b, c],
+		});
+		expect(one).toEqual(two);
+		expect(one).toEqual({ action: "choose", teams: [b, c] });
+	});
+
+	it("refuses to mix a team that has data with a folder that is not its own", () => {
+		expect(chooseTeamFolder({ ...base, folders: [b] })).toEqual({
+			action: "refuse",
+			reason: "otherTeam",
+		});
+	});
+
+	it("leaves out teams another team on this device already has, since adopting one would merge two teams", () => {
+		expect(
+			chooseTeamFolder({
+				...base,
+				localIsEmpty: true,
+				otherLocalTeamIds: [TEAM_B],
+				folders: [b, c],
+			}),
+		).toEqual({ action: "adopt", teamId: TEAM_C, folderId: "fc" });
+		expect(
+			chooseTeamFolder({
+				...base,
+				localIsEmpty: true,
+				otherLocalTeamIds: [TEAM_B],
+				folders: [b],
+			}),
+		).toEqual({ action: "refuse", reason: "belongsToOtherLocalTeam" });
+	});
+
+	it("treats two folders for the same team (made at the same moment) as one, the same one every time", () => {
+		const twin = { teamId: TEAM_B, folderId: "fb-twin" };
+		const first = chooseTeamFolder({
+			...base,
+			localIsEmpty: true,
+			folders: [b, twin],
+		});
+		const second = chooseTeamFolder({
+			...base,
+			localIsEmpty: true,
+			folders: [twin, b],
+		});
+		expect(first).toEqual(second);
+		expect(first.action).toBe("adopt");
 	});
 });

@@ -103,3 +103,42 @@ describe("payloadFileName", () => {
 		expect(await payloadFileName(marker)).toBe(`team-${TEAM}.json`);
 	});
 });
+
+describe("team marker with a team name (#142)", () => {
+	it("keeps the name, trimmed and capped, so a restore can offer teams by name", () => {
+		const named = parseDrivePayload({
+			schemaVersion: 1,
+			kind: "team",
+			teamId: TEAM,
+			teamName: "  P11 Blå  ",
+		});
+		expect(named).toEqual({
+			schemaVersion: 1,
+			kind: "team",
+			teamId: TEAM,
+			teamName: "P11 Blå",
+		});
+		const long = parseDrivePayload({
+			schemaVersion: 1,
+			kind: "team",
+			teamId: TEAM,
+			teamName: "x".repeat(100),
+		});
+		expect(long.kind === "team" && long.teamName).toHaveLength(40);
+	});
+
+	it("still reads a marker without a name", () => {
+		expect(parseDrivePayload(roundTrip(marker))).toEqual(marker);
+	});
+
+	it("refuses a name that is not text", () => {
+		expect(() =>
+			parseDrivePayload({
+				schemaVersion: 1,
+				kind: "team",
+				teamId: TEAM,
+				teamName: 5,
+			}),
+		).toThrow(DrivePayloadError);
+	});
+});
