@@ -3,6 +3,14 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.21.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.20.0...matchplanner-v0.21.0) (2026-10-02)
+
+
+### Features
+
+* **core:** name team subfolders and choose which one to restore ([#143](https://github.com/aydabd/match-planner/issues/143)) ([e61f7dd](https://github.com/aydabd/match-planner/commit/e61f7ddc28cee21d2d61208390dcb09db037ff75))
+* **ui:** keep each team in its own subfolder of one Drive root folder ([#144](https://github.com/aydabd/match-planner/issues/144)) ([2dd8da4](https://github.com/aydabd/match-planner/commit/2dd8da447a0f61178eeeae335db43979924ab07b))
+
 ## [0.20.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.19.0...matchplanner-v0.20.0) (2026-10-01)
 
 
