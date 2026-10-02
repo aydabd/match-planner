@@ -419,12 +419,14 @@ test.describe("Google Drive backup and restore", () => {
 		await history.drivePasswordInput.fill(password);
 		await expect(history.driveBackupButton).toBeVisible();
 
+		await history.drivePasswordInput.fill(password);
 		await history.driveBackupButton.click();
 		await expect(history.driveStatus).toHaveText(
 			"1 match säkerhetskopierades.",
 		);
 
 		// Backing up again finds nothing new to upload.
+		await history.drivePasswordInput.fill(password);
 		await history.driveBackupButton.click();
 		await expect(history.driveStatus).toHaveText(
 			"Allt var redan säkerhetskopierat.",
@@ -513,11 +515,13 @@ test.describe("Google Drive backup and restore", () => {
 		await expect(history.driveStatus).toHaveText("Mapp: MatchPlanner-mapp");
 		await history.drivePasswordInput.fill(password);
 		const filesBefore = drive.files.size;
+		await history.drivePasswordInput.fill(password);
 		await history.driveBackupButton.click();
 		await expect(history.driveStatus).toHaveText(
 			"Allt var redan säkerhetskopierat.",
 		);
 		expect(drive.files.size).toBe(filesBefore);
+		await history.drivePasswordInput.fill(password);
 		await history.driveRestoreButton.click();
 		await expect(history.driveStatus).toHaveText(
 			"Mappen tillhör ett annat lag på den här enheten. Byt till det laget först.",
@@ -536,6 +540,7 @@ test.describe("Google Drive backup and restore", () => {
 				),
 			},
 		]);
+		await history.drivePasswordInput.fill(password);
 		await history.driveBackupButton.click();
 		await expect(history.driveStatus).toHaveText(
 			"1 match säkerhetskopierades.",
@@ -582,6 +587,7 @@ test.describe("Google Drive backup and restore", () => {
 		});
 		await page.goto("statistics/");
 		await connectAndPickFolder(history);
+		await history.drivePasswordInput.fill(password);
 		await history.driveBackupButton.click();
 		await expect(history.driveStatus).toHaveText(
 			"1 match säkerhetskopierades. Trupp och anteckningar sparades.",
@@ -609,11 +615,13 @@ test.describe("Google Drive backup and restore", () => {
 			},
 		]);
 		await connectAndPickFolder(coachHistory);
+		await coachHistory.drivePasswordInput.fill(password);
 		await coachHistory.driveBackupButton.click();
 		await expect(coachHistory.driveStatus).toHaveText(
 			"1 match säkerhetskopierades.",
 		);
 		expect(subfolderNames(drive, "folder-1")).toHaveLength(2);
+		await coachHistory.drivePasswordInput.fill(password);
 		await coachHistory.driveRestoreButton.click();
 		await expect(coachHistory.driveStatus).toHaveText(
 			"Inget nytt att läsa in.",
@@ -631,6 +639,7 @@ test.describe("Google Drive backup and restore", () => {
 		await new SetupPage(otherPage).open();
 		await otherHistory.open();
 		await connectAndPickFolder(otherHistory);
+		await otherHistory.drivePasswordInput.fill(password);
 		await otherHistory.driveRestoreButton.click();
 		await expect(otherHistory.driveStatus).toHaveText(
 			"Mappen innehåller flera lag. Välj vilket som ska läsas in.",

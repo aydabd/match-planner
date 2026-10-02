@@ -20,6 +20,7 @@ import {
 } from "../core/driveSync.js";
 import type { MatchFile } from "../core/matchFile.js";
 import { mergePlayerNotes } from "../core/notesMerge.js";
+import { isAcceptableNewPassword } from "../core/passwords.js";
 import {
 	decryptJson,
 	encryptJson,
@@ -115,12 +116,41 @@ export class DriveFolderError extends Error {
 	}
 }
 
+/** A password shorter than LIMITS.minPasswordLength for a team's first backup (#147). */
+export class PasswordTooShortError extends Error {
+	constructor() {
+		super("Password is too short for a new backup");
+		this.name = "PasswordTooShortError";
+	}
+}
+
+/**
+ * A team marker that opened with the password but is not a valid marker for
+ * its folder (#147): damage, which must never be mistaken for "a team with a
+ * different password" and skipped.
+ */
+export class DriveMarkerError extends Error {
+	constructor() {
+		super("Team marker does not match its folder");
+		this.name = "DriveMarkerError";
+	}
+}
+
+/** Whether `err` just means this password does not open that file. */
+const isLocked = (err: unknown): boolean =>
+	err instanceof SecurePackageError || err instanceof SyntaxError;
+
 const NOTHING: RestoreResult = {
 	downloaded: 0,
 	notesChanged: false,
 	squadRestored: false,
 	ignored: 0,
 };
+
+interface OpenedMarker {
+	entries: ReturnType<typeof classifyFolder>;
+	name: string;
+}
 
 export function createDriveBackup(client: DriveClient): DriveBackup {
 	const seal = async (password: string, payload: DrivePayload) =>
@@ -194,10 +224,20 @@ export function createDriveBackup(client: DriveClient): DriveBackup {
 		const own = (await teamFolders(rootId))
 			.filter((folder) => folder.teamId === teamId)
 			.sort((x, y) => (x.folderId < y.folderId ? -1 : 1))[0];
+		const listing = own
+			? classifyFolder(await client.listFiles(own.folderId))
+			: classifyFolder([]);
+		// With no marker yet this backup sets the team's password, so it has
+		// to be a decent one. A team that already has one keeps using it.
+		if (
+			!listing.markers.some((m) => m.teamId === teamId) &&
+			!isAcceptableNewPassword(password)
+		) {
+			throw new PasswordTooShortError();
+		}
 		const folderId =
 			own?.folderId ??
 			(await client.createFolder(rootId, teamFolderName(teamId)));
-		const listing = classifyFolder(await client.listFiles(folderId));
 
 		const marker = listing.markers.find((m) => m.teamId === teamId);
 		await writeOwn(
@@ -272,10 +312,7 @@ export function createDriveBackup(client: DriveClient): DriveBackup {
 	async function openMarker(
 		folder: TeamFolder,
 		password: string,
-	): Promise<{
-		entries: ReturnType<typeof classifyFolder>;
-		name: string;
-	} | null> {
+	): Promise<OpenedMarker | null> {
 		const entries = classifyFolder(await client.listFiles(folder.folderId));
 		const marker = entries.markers.find((m) => m.teamId === folder.teamId);
 		if (marker === undefined) return null;
@@ -283,9 +320,7 @@ export function createDriveBackup(client: DriveClient): DriveBackup {
 		// anything on this device is changed, and proves it names this team.
 		const payload = await open(password, marker.fileId);
 		if (payload.kind !== "team" || payload.teamId !== folder.teamId) {
-			throw new SecurePackageError("Marker does not match its folder", {
-				code: "wrongPasswordOrTampered",
-			});
+			throw new DriveMarkerError();
 		}
 		return { entries, name: payload.teamName ?? "" };
 	}
@@ -295,8 +330,12 @@ export function createDriveBackup(client: DriveClient): DriveBackup {
 		folder: TeamFolder,
 		password: string,
 		adopt: boolean,
+		alreadyOpened?: OpenedMarker | null,
 	): Promise<RestoreResult> {
-		const opened = await openMarker(folder, password);
+		const opened =
+			alreadyOpened === undefined
+				? await openMarker(folder, password)
+				: alreadyOpened;
 		// A folder with no marker yet (a backup still being written) has
 		// nothing to verify the password against, so nothing is taken from it.
 		if (opened === null) return NOTHING;
@@ -374,18 +413,41 @@ export function createDriveBackup(client: DriveClient): DriveBackup {
 					...(await restoreFrom(choice, password, true)),
 				};
 			case "choose": {
-				const chosen = choice.teams.find((t) => t.teamId === chosenTeamId);
+				// Teams may have different passwords: only the ones this password
+				// opens are candidates. The others are neither offered nor read.
+				const unlocked: { folder: TeamFolder; opened: OpenedMarker }[] = [];
+				for (const folder of choice.teams) {
+					try {
+						const opened = await openMarker(folder, password);
+						if (opened !== null) unlocked.push({ folder, opened });
+					} catch (err) {
+						if (!isLocked(err)) throw err;
+					}
+				}
+				if (unlocked.length === 0) {
+					throw new SecurePackageError("No team opens with this password", {
+						code: "wrongPasswordOrTampered",
+					});
+				}
+				const chosen =
+					unlocked.length === 1
+						? unlocked[0]
+						: unlocked.find((u) => u.folder.teamId === chosenTeamId);
 				if (chosen !== undefined) {
 					return {
 						kind: "restored",
-						...(await restoreFrom(chosen, password, true)),
+						...(await restoreFrom(
+							chosen.folder,
+							password,
+							true,
+							chosen.opened,
+						)),
 					};
 				}
-				const teams: TeamOption[] = [];
-				for (const folder of choice.teams) {
-					const opened = await openMarker(folder, password);
-					teams.push({ teamId: folder.teamId, name: opened?.name ?? "" });
-				}
+				const teams: TeamOption[] = unlocked.map((u) => ({
+					teamId: u.folder.teamId,
+					name: u.opened.name,
+				}));
 				teams.sort((x, y) =>
 					x.name !== y.name
 						? x.name < y.name

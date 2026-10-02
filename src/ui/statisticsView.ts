@@ -10,6 +10,7 @@ import {
 	MatchFileError,
 	parseMatchFile,
 } from "../core/matchFile.js";
+import { isAcceptableNewPassword } from "../core/passwords.js";
 import {
 	decryptJson,
 	encryptJson,
@@ -26,7 +27,12 @@ import { confirmWithSecondTap } from "./confirmButton.js";
 import { byId, card, downloadJson, table } from "./domHelpers.js";
 import { loadDraft, saveDraft } from "./draftStorage.js";
 import { createDriveAuth } from "./driveAuth.js";
-import { createDriveBackup, DriveFolderError } from "./driveBackup.js";
+import {
+	createDriveBackup,
+	DriveFolderError,
+	DriveMarkerError,
+	PasswordTooShortError,
+} from "./driveBackup.js";
 import { createDriveClient } from "./driveClient.js";
 import {
 	DRIVE_APP_ID,
@@ -192,6 +198,10 @@ function setUpDriveBackup(refresh: () => void): void {
 	function driveFailure(err: unknown): string {
 		if (err instanceof SecurePackageError) return t.wrongPassword;
 		if (err instanceof DriveFolderError) return t.folderRefused[err.reason];
+		if (err instanceof PasswordTooShortError) {
+			return t.passwordTooShort(LIMITS.minPasswordLength);
+		}
+		if (err instanceof DriveMarkerError) return t.markerInvalid;
 		return t.failed;
 	}
 
@@ -286,6 +296,8 @@ function setUpDriveBackup(refresh: () => void): void {
 			status.textContent = driveFailure(err);
 		} finally {
 			backupBtn.disabled = false;
+			// Not left on screen once the call is over (#147).
+			passwordInput.value = "";
 		}
 	});
 
@@ -304,6 +316,8 @@ function setUpDriveBackup(refresh: () => void): void {
 		status.textContent = t.restoring;
 		restoreBtn.disabled = true;
 		restoreTeamBtn.disabled = true;
+		// The password has to stay for "Läs in laget" while a choice is open.
+		let choicePending = false;
 		try {
 			const outcome = await backup.restore(
 				folderId,
@@ -322,6 +336,7 @@ function setUpDriveBackup(refresh: () => void): void {
 				);
 				teamChoice.hidden = false;
 				status.textContent = t.chooseTeam;
+				choicePending = true;
 				return;
 			}
 			teamChoice.hidden = true;
@@ -332,6 +347,7 @@ function setUpDriveBackup(refresh: () => void): void {
 		} finally {
 			restoreBtn.disabled = false;
 			restoreTeamBtn.disabled = false;
+			if (!choicePending) passwordInput.value = "";
 		}
 	}
 
@@ -364,6 +380,10 @@ function setUpSecureExport(refresh: () => void): void {
 			status.textContent = t.needPassword;
 			return;
 		}
+		if (!isAcceptableNewPassword(passwordInput.value)) {
+			status.textContent = t.passwordTooShort(LIMITS.minPasswordLength);
+			return;
+		}
 		const bundle: ExportBundle = {
 			schemaVersion: EXPORT_BUNDLE_VERSION,
 			roster: loadDraft(),
@@ -376,6 +396,7 @@ function setUpSecureExport(refresh: () => void): void {
 			securePackageToJson(pkg),
 		);
 		status.textContent = t.exported;
+		passwordInput.value = "";
 	});
 
 	fileInput.addEventListener("change", () => {
@@ -417,6 +438,7 @@ function setUpSecureExport(refresh: () => void): void {
 					pendingFile = null;
 					fileInput.value = "";
 					importBtn.disabled = true;
+					passwordInput.value = "";
 				}
 			})();
 		},

@@ -1,5 +1,6 @@
 import type { SeasonHistory } from "../core/history.js";
 import { LIMITS } from "../core/limits.js";
+import { isAcceptableNewPassword } from "../core/passwords.js";
 import type { DevelopmentArea } from "../core/playerNotes.js";
 import { buildSeasonReport, type SeasonReport } from "../core/seasonReport.js";
 import { encryptJson, securePackageToJson } from "../core/securePackage.js";
@@ -94,6 +95,10 @@ function buildSeasonReportCard(
 			status.textContent = t.needPassword;
 			return;
 		}
+		if (!isAcceptableNewPassword(passwordInput.value)) {
+			status.textContent = t.passwordTooShort(LIMITS.minPasswordLength);
+			return;
+		}
 		const reviewed: SeasonReport = {
 			...report,
 			players: report.players.map((player) => ({
@@ -112,6 +117,7 @@ function buildSeasonReportCard(
 			securePackageToJson(pkg),
 		);
 		status.textContent = "";
+		passwordInput.value = "";
 	});
 	actions.append(exportButton);
 
