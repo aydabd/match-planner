@@ -152,3 +152,26 @@ describe("withTeamIdChanged - adopting the id a Drive folder belongs to (#135)",
 		expect(JSON.stringify(two)).toBe(before);
 	});
 });
+
+describe("withTeamIdChanged with a name (#142)", () => {
+	const file = withActiveTeam(
+		withTeam(EMPTY_TEAMS_FILE, { id: "t1", name: "Mitt lag" }),
+		"t1",
+	);
+
+	it("also renames the team when a name is given, trimmed and capped", () => {
+		const changed = withTeamIdChanged(file, "t1", "new-id", "  P11 Blå ");
+		expect(changed.teams).toEqual([{ id: "new-id", name: "P11 Blå" }]);
+		const long = withTeamIdChanged(file, "t1", "new-id", "x".repeat(100));
+		expect(long.teams[0]?.name).toHaveLength(40);
+	});
+
+	it("keeps the name when none is given, or only blanks", () => {
+		expect(withTeamIdChanged(file, "t1", "new-id").teams[0]?.name).toBe(
+			"Mitt lag",
+		);
+		expect(withTeamIdChanged(file, "t1", "new-id", "   ").teams[0]?.name).toBe(
+			"Mitt lag",
+		);
+	});
+});

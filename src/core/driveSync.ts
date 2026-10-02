@@ -12,8 +12,9 @@ import type { RosterFile } from "./storage.js";
  * writes only its own notes and squad files (names built from the device
  * id, see driveNames.ts) and restore folds all of them together
  * (notesMerge.ts): nobody ever overwrites a file another device writes, so
- * there is nothing to race. A folder belongs to exactly one team, shown by
- * a team marker file, and is never mixed with another team's (#135).
+ * there is nothing to race. Each team has a subfolder of its own in the
+ * coach's root folder, with a team marker file in it, and a team is never
+ * mixed with another's (#135, #142).
  *
  * This module is pure planning: it decides what to upload or download from
  * a listing already fetched. The actual Drive `files.list` call and
@@ -82,41 +83,6 @@ export function filesToRestore(
 	localNames: ReadonlySet<string>,
 ): DriveFileEntry[] {
 	return remote.filter((entry) => !localNames.has(entry.name));
-}
-
-export type FolderDecision =
-	| { action: "claim" }
-	| { action: "use" }
-	| { action: "adopt"; teamId: string }
-	| {
-			action: "refuse";
-			reason: "severalTeams" | "otherTeam" | "belongsToOtherLocalTeam";
-	  };
-
-/**
- * Whose folder this is, from its team marker files. A folder with no marker
- * can be claimed by this team; one marked with this team's id is used; one
- * marked with another team's id is adopted (the device takes that team's
- * id) only when this device's team is still empty and no other team on the
- * device already has that id. Everything else is refused, so two teams
- * never share a folder.
- */
-export function decideFolder(input: {
-	localTeamId: string;
-	localIsEmpty: boolean;
-	otherLocalTeamIds: readonly string[];
-	markers: readonly FolderMarker[];
-}): FolderDecision {
-	const ids = [...new Set(input.markers.map((m) => m.teamId))];
-	if (ids.length === 0) return { action: "claim" };
-	if (ids.length > 1) return { action: "refuse", reason: "severalTeams" };
-	const [folderTeam] = ids as [string];
-	if (folderTeam === input.localTeamId) return { action: "use" };
-	if (input.otherLocalTeamIds.includes(folderTeam)) {
-		return { action: "refuse", reason: "belongsToOtherLocalTeam" };
-	}
-	if (!input.localIsEmpty) return { action: "refuse", reason: "otherTeam" };
-	return { action: "adopt", teamId: folderTeam };
 }
 
 /**

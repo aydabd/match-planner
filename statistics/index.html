@@ -45,7 +45,7 @@
       </section>
       <section class="card" aria-labelledby="historyBackupTitle" id="historyBackupCard" hidden>
         <h2 id="historyBackupTitle">Säkerhetskopiera till Google Drive</h2>
-        <p class="hint">Kopplas till ditt eget Google-konto. Appen sparar bara sina egna filer i Drive - aldrig resten av din Drive. Filerna krypteras med ett lösenord du väljer, så en mapp du delar med andra ledare är säker även om Drive-behörigheten inte är det.</p>
+        <p class="hint">Kopplas till ditt eget Google-konto. Appen sparar bara sina egna filer i Drive - aldrig resten av din Drive. Filerna krypteras med ett lösenord du väljer, så en mapp du delar med andra ledare är säker även om Drive-behörigheten inte är det. Välj en mapp en gång - varje lag får en egen undermapp i den.</p>
         <div class="row-buttons">
           <button type="button" id="driveConnectBtn" class="btn btn-secondary">Koppla Google Drive</button>
           <button type="button" id="driveChooseFolderBtn" class="btn btn-secondary" hidden>Välj mapp</button>
@@ -58,6 +58,13 @@
         <div class="row-buttons">
           <button type="button" id="driveBackupBtn" class="btn btn-secondary" hidden>Säkerhetskopiera</button>
           <button type="button" id="driveRestoreBtn" class="btn btn-secondary" hidden>Återställ</button>
+        </div>
+        <div class="field" id="driveTeamChoice" hidden>
+          <label class="field-label" for="driveTeamSelect">Lag att läsa in</label>
+          <select id="driveTeamSelect"></select>
+          <div class="row-buttons">
+            <button type="button" id="driveRestoreTeamBtn" class="btn btn-secondary">Läs in laget</button>
+          </div>
         </div>
         <p class="hint" id="driveStatus" role="status"></p>
       </section>

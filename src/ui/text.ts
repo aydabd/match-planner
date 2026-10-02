@@ -385,11 +385,11 @@ export const TEXT = {
 					...skipped,
 				].join(" ");
 			},
+			chooseTeam: "Mappen innehåller flera lag. Välj vilket som ska läsas in.",
+			unnamedTeam: (number: number) => `Lag ${number}`,
 			folderRefused: {
-				severalTeams:
-					"Mappen innehåller filer från flera lag. Välj en mapp för just det här laget.",
 				otherTeam:
-					"Mappen tillhör ett annat lag. Välj en egen mapp för det här laget, eller läs in från den här mappen i ett tomt lag.",
+					"Mappen har inget lag som hör till det här laget. Läs in den i ett tomt lag, eller säkerhetskopiera det här laget dit i stället.",
 				belongsToOtherLocalTeam:
 					"Mappen tillhör ett annat lag på den här enheten. Byt till det laget först.",
 			},

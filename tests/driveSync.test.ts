@@ -4,7 +4,6 @@ import {
 	chooseTeamFolder,
 	classifyFolder,
 	type DriveFileEntry,
-	decideFolder,
 	filesToRestore,
 	matchesToBackUp,
 	pickSquad,
@@ -58,76 +57,6 @@ describe("filesToRestore", () => {
 			{ name: "match-b", fileId: "2" },
 		]);
 		expect(filesToRestore([], new Set())).toEqual([]);
-	});
-});
-
-describe("decideFolder - whose folder is this", () => {
-	const base = {
-		localTeamId: TEAM_A,
-		localIsEmpty: false,
-		otherLocalTeamIds: [] as string[],
-	};
-
-	it("claims a folder with no team marker", () => {
-		expect(decideFolder({ ...base, markers: [] })).toEqual({ action: "claim" });
-	});
-
-	it("uses a folder already marked with this team's own id", () => {
-		expect(
-			decideFolder({ ...base, markers: [{ teamId: TEAM_A, fileId: "x" }] }),
-		).toEqual({
-			action: "use",
-		});
-	});
-
-	it("tolerates the same marker listed twice", () => {
-		expect(
-			decideFolder({
-				...base,
-				markers: [
-					{ teamId: TEAM_A, fileId: "x" },
-					{ teamId: TEAM_A, fileId: "y" },
-				],
-			}),
-		).toEqual({ action: "use" });
-	});
-
-	it("adopts another team's id only on a device whose team is still empty", () => {
-		const markers = [{ teamId: TEAM_B, fileId: "x" }];
-		expect(decideFolder({ ...base, localIsEmpty: true, markers })).toEqual({
-			action: "adopt",
-			teamId: TEAM_B,
-		});
-	});
-
-	it("refuses to mix a team that already has data with another team's folder", () => {
-		expect(
-			decideFolder({ ...base, markers: [{ teamId: TEAM_B, fileId: "x" }] }),
-		).toEqual({ action: "refuse", reason: "otherTeam" });
-	});
-
-	it("refuses to adopt an id that another team on this device already has", () => {
-		expect(
-			decideFolder({
-				...base,
-				localIsEmpty: true,
-				otherLocalTeamIds: [TEAM_B],
-				markers: [{ teamId: TEAM_B, fileId: "x" }],
-			}),
-		).toEqual({ action: "refuse", reason: "belongsToOtherLocalTeam" });
-	});
-
-	it("refuses a folder that holds more than one team", () => {
-		expect(
-			decideFolder({
-				...base,
-				localIsEmpty: true,
-				markers: [
-					{ teamId: TEAM_A, fileId: "x" },
-					{ teamId: TEAM_B, fileId: "y" },
-				],
-			}),
-		).toEqual({ action: "refuse", reason: "severalTeams" });
 	});
 });
 

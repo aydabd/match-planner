@@ -1,5 +1,9 @@
 import type { BrowserContext } from "@playwright/test";
-import { driveFileName, teamMarkerName } from "../../src/core/driveNames.js";
+import {
+	driveFileName,
+	teamFolderName,
+	teamMarkerName,
+} from "../../src/core/driveNames.js";
 import { matchFileToJson } from "../../src/core/matchFile.js";
 import {
 	encryptJson,
@@ -9,6 +13,7 @@ import { makeMatchFile, NAMES } from "../../tests/support/matchFiles.js";
 import { expect, test } from "../fixtures.js";
 import { HistoryPage } from "../pages/HistoryPage.js";
 import { SetupPage } from "../pages/SetupPage.js";
+import { TeamSwitcher } from "../pages/TeamSwitcher.js";
 
 /**
  * A minimal in-memory stand-in for Google Identity Services and the Drive
@@ -77,6 +82,21 @@ const GIS_SCRIPT = `window.google = {
 
 const GAPI_SCRIPT = `window.gapi = { load(api, cb) { cb(); } };`;
 
+const FOLDER_MIME = "application/vnd.google-apps.folder";
+
+/** The names of the subfolders of `parentId` in the fake Drive. */
+function subfolderNames(
+	drive: ReturnType<typeof createFakeDrive>,
+	parentId: string,
+): string[] {
+	return [...drive.files.values()]
+		.filter(
+			(f) => f.mimeType === FOLDER_MIME && (f.parents ?? []).includes(parentId),
+		)
+		.map((f) => f.name)
+		.sort();
+}
+
 const BOUNDARY = "matchplanner-drive-boundary";
 const CORS_HEADERS = { "Access-Control-Allow-Origin": "*" };
 
@@ -125,10 +145,13 @@ async function mockGoogle(
 			const q = url.searchParams.get("q") ?? "";
 			const name = /name='([^']*)'/.exec(q)?.[1];
 			const mimeType = /mimeType='([^']*)'/.exec(q)?.[1];
+			const notMimeType = /mimeType!='([^']*)'/.exec(q)?.[1];
 			const parent = /'([^']*)' in parents/.exec(q)?.[1];
 			const matches = [...drive.files.entries()].filter(([, f]) => {
 				if (name !== undefined && f.name !== name) return false;
 				if (mimeType !== undefined && f.mimeType !== mimeType) return false;
+				if (notMimeType !== undefined && f.mimeType === notMimeType)
+					return false;
 				if (parent !== undefined && !(f.parents ?? []).includes(parent))
 					return false;
 				return true;
@@ -154,11 +177,13 @@ async function mockGoogle(
 			const body = request.postDataJSON() as {
 				name: string;
 				mimeType?: string;
+				parents?: string[];
 			};
 			const id = drive.nextId();
 			drive.files.set(id, {
 				name: body.name,
 				...(body.mimeType !== undefined && { mimeType: body.mimeType }),
+				...(body.parents !== undefined && { parents: body.parents }),
 				content: "",
 			});
 			await json({ id });
@@ -310,23 +335,42 @@ test.describe("Google Drive backup and restore", () => {
 			securePackageToJson(await encryptJson(password, payload));
 		drive.files.set("legacy-manifest", {
 			name: "manifest.json",
-			parents: [folderId],
+			parents: ["team-folder"],
 			content: JSON.stringify({ schemaVersion: 1, files: {} }),
 		});
 		drive.files.set("bare", {
 			name: "seed-old.json",
-			parents: [folderId],
+			parents: ["team-folder"],
 			content: "{}",
+		});
+		// The picked folder is the root; the team's files live in its own
+		// subfolder (#142), next to a folder that is not a team's.
+		drive.files.set("team-folder", {
+			name: teamFolderName(teamId),
+			mimeType: FOLDER_MIME,
+			parents: [folderId],
+			content: "",
+		});
+		drive.files.set("other-folder", {
+			name: "Semesterbilder",
+			mimeType: FOLDER_MIME,
+			parents: [folderId],
+			content: "",
 		});
 		drive.files.set("marker", {
 			name: teamMarkerName(teamId),
-			parents: [folderId],
-			content: await seal({ schemaVersion: 1, kind: "team", teamId }),
+			parents: ["team-folder"],
+			content: await seal({
+				schemaVersion: 1,
+				kind: "team",
+				teamId,
+				teamName: "P11 Blå",
+			}),
 		});
 		for (const suffix of ["a", "b", "c"]) {
 			drive.files.set(`seed-${suffix}`, {
 				name: await driveFileName("match", teamId, `seed-${suffix}`),
-				parents: [folderId],
+				parents: ["team-folder"],
 				content: await seal({
 					schemaVersion: 1,
 					kind: "match",
@@ -427,7 +471,7 @@ test.describe("Google Drive backup and restore", () => {
 		await otherContext.close();
 	});
 
-	test("a second team on the same phone cannot back up into the first team's folder (#118, #135)", async ({
+	test("a second team on the same phone gets a subfolder of its own in the root (#118, #142)", async ({
 		history,
 		setup,
 		teamSwitcher,
@@ -451,18 +495,18 @@ test.describe("Google Drive backup and restore", () => {
 		await expect(history.driveStatus).toHaveText(
 			"1 match säkerhetskopierades.",
 		);
+		expect(subfolderNames(drive, "folder-1")).toHaveLength(1);
 
-		// A second team, on the same device, pointed at the same shared Drive
-		// folder (this test's fake picker always "picks" the same folder id):
-		// the folder belongs to the first team, so the second is told so and
-		// nothing is written - two teams never share a folder.
+		// A second team, on the same device, pointed at the same root (this
+		// test's fake picker always "picks" the same folder id). It has
+		// nothing yet, so backing up writes nothing; restoring is refused,
+		// since the only team in the root is the first one, on this phone.
 		await setup.open();
 		await teamSwitcher.createTeam("P11 7v7");
 		await history.open();
 		await expect(history.count).toHaveText(
 			"Inga matcher än. Spela en match eller läs in matchfiler.",
 		);
-
 		await history.driveConnectButton.click();
 		await expect(history.driveStatus).toHaveText("Kopplad till Google Drive.");
 		await history.driveChooseFolderButton.click();
@@ -471,18 +515,39 @@ test.describe("Google Drive backup and restore", () => {
 		const filesBefore = drive.files.size;
 		await history.driveBackupButton.click();
 		await expect(history.driveStatus).toHaveText(
-			"Mappen tillhör ett annat lag på den här enheten. Byt till det laget först.",
+			"Allt var redan säkerhetskopierat.",
 		);
 		expect(drive.files.size).toBe(filesBefore);
-		await expect(history.count).toHaveText(
-			"Inga matcher än. Spela en match eller läs in matchfiler.",
+		await history.driveRestoreButton.click();
+		await expect(history.driveStatus).toHaveText(
+			"Mappen tillhör ett annat lag på den här enheten. Byt till det laget först.",
 		);
+
+		// Once it has a match of its own it is backed up into its own subfolder.
+		await history.importFiles([
+			{
+				name: "second.json",
+				contents: matchFileToJson(
+					makeMatchFile({
+						matchId: "second-1",
+						seed: 3,
+						names: NAMES.slice(0, 9),
+					}),
+				),
+			},
+		]);
+		await history.driveBackupButton.click();
+		await expect(history.driveStatus).toHaveText(
+			"1 match säkerhetskopierades.",
+		);
+		expect(subfolderNames(drive, "folder-1")).toHaveLength(2);
 	});
 
-	test("player notes reach a second phone, and a coach with their own data is kept out", async ({
+	test("two coaches share one root: each team keeps its subfolder, and an empty phone chooses between them", async ({
 		browser,
 		history,
 		setup,
+		teamSwitcher,
 		page,
 	}) => {
 		const drive = createFakeDrive();
@@ -497,8 +562,9 @@ test.describe("Google Drive backup and restore", () => {
 			await h.drivePasswordInput.fill(password);
 		};
 
-		// Phone one: a match, and a development note on the notes page.
+		// Coach one: team "P11 Blå", a match, and a development note.
 		await setup.open();
+		await teamSwitcher.createTeam("P11 Blå");
 		await history.open();
 		await history.importFiles([
 			{
@@ -521,7 +587,40 @@ test.describe("Google Drive backup and restore", () => {
 			"1 match säkerhetskopierades. Trupp och anteckningar sparades.",
 		);
 
-		// Phone two, empty: restoring brings the match and the note.
+		// Coach two: another team with a match of its own, same root. It is
+		// backed up into a subfolder of its own and does not get coach one's
+		// notes back.
+		const coachContext = await browser.newContext({
+			reducedMotion: "reduce",
+			serviceWorkers: "block",
+		});
+		await mockGoogle(coachContext, drive);
+		const coachPage = await coachContext.newPage();
+		const coachHistory = new HistoryPage(coachPage);
+		await new SetupPage(coachPage).open();
+		await new TeamSwitcher(coachPage).createTeam("F12 Röd");
+		await coachHistory.open();
+		await coachHistory.importFiles([
+			{
+				name: "mine.json",
+				contents: matchFileToJson(
+					makeMatchFile({ matchId: "mine-1", seed: 7, names: squad }),
+				),
+			},
+		]);
+		await connectAndPickFolder(coachHistory);
+		await coachHistory.driveBackupButton.click();
+		await expect(coachHistory.driveStatus).toHaveText(
+			"1 match säkerhetskopierades.",
+		);
+		expect(subfolderNames(drive, "folder-1")).toHaveLength(2);
+		await coachHistory.driveRestoreButton.click();
+		await expect(coachHistory.driveStatus).toHaveText(
+			"Inget nytt att läsa in.",
+		);
+		await coachContext.close();
+
+		// A third phone, empty: the root holds two teams, so it asks which.
 		const otherContext = await browser.newContext({
 			reducedMotion: "reduce",
 			serviceWorkers: "block",
@@ -534,41 +633,27 @@ test.describe("Google Drive backup and restore", () => {
 		await connectAndPickFolder(otherHistory);
 		await otherHistory.driveRestoreButton.click();
 		await expect(otherHistory.driveStatus).toHaveText(
+			"Mappen innehåller flera lag. Välj vilket som ska läsas in.",
+		);
+		await expect(otherHistory.driveTeamSelect.locator("option")).toHaveText([
+			"F12 Röd",
+			"P11 Blå",
+		]);
+		await expect(otherHistory.count).toHaveText(
+			"Inga matcher än. Spela en match eller läs in matchfiler.",
+		);
+
+		await otherHistory.driveTeamSelect.selectOption({ label: "P11 Blå" });
+		await otherHistory.driveRestoreTeamButton.click();
+		await expect(otherHistory.driveStatus).toHaveText(
 			"1 match lästes in. Anteckningarna uppdaterades.",
 		);
+		await expect(otherHistory.count).toHaveText("1 match över 1 månad.");
 		await otherHistory.gotoNotes();
 		await otherHistory.choosePlayerForNotes("Alva");
 		await expect(otherHistory.developmentNotes()).toContainText([
 			"Snabbare i vändningar",
 		]);
 		await otherContext.close();
-
-		// Another coach, who already has a match of their own, picks the same
-		// folder: refused, and nothing in the folder changes.
-		const coachContext = await browser.newContext({
-			reducedMotion: "reduce",
-			serviceWorkers: "block",
-		});
-		await mockGoogle(coachContext, drive);
-		const coachPage = await coachContext.newPage();
-		const coachHistory = new HistoryPage(coachPage);
-		await new SetupPage(coachPage).open();
-		await coachHistory.open();
-		await coachHistory.importFiles([
-			{
-				name: "mine.json",
-				contents: matchFileToJson(
-					makeMatchFile({ matchId: "mine-1", seed: 7, names: squad }),
-				),
-			},
-		]);
-		await connectAndPickFolder(coachHistory);
-		const filesBefore = drive.files.size;
-		await coachHistory.driveBackupButton.click();
-		await expect(coachHistory.driveStatus).toHaveText(
-			"Mappen tillhör ett annat lag. Välj en egen mapp för det här laget, eller läs in från den här mappen i ett tomt lag.",
-		);
-		expect(drive.files.size).toBe(filesBefore);
-		await coachContext.close();
 	});
 });

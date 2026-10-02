@@ -14,6 +14,8 @@ export class HistoryPage {
 	readonly driveBackupButton: Locator;
 	readonly driveRestoreButton: Locator;
 	readonly driveStatus: Locator;
+	readonly driveTeamSelect: Locator;
+	readonly driveRestoreTeamButton: Locator;
 	readonly playerNotesCard: Locator;
 	readonly playerNotesFeedback: Locator;
 	readonly seasonReportCard: Locator;
@@ -44,6 +46,10 @@ export class HistoryPage {
 			name: "Återställ",
 		});
 		this.driveStatus = this.root.locator("#driveStatus");
+		this.driveTeamSelect = this.root.locator("#driveTeamSelect");
+		this.driveRestoreTeamButton = this.root.getByRole("button", {
+			name: "Läs in laget",
+		});
 		this.playerNotesCard = this.root.locator("section.card").filter({
 			has: page.getByRole("heading", { name: "Anteckningar per spelare" }),
 		});
