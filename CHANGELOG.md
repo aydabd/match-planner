@@ -3,6 +3,17 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.23.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.22.0...matchplanner-v0.23.0) (2026-10-02)
+
+
+### Features
+
+* **core:** classify, unlock and place imported files ([#155](https://github.com/aydabd/match-planner/issues/155)) ([25c3b9f](https://github.com/aydabd/match-planner/commit/25c3b9f659d3d07833faf4b5c30007376eb63ed9))
+* **ui:** add a Data page and move import, export and Drive onto it ([#156](https://github.com/aydabd/match-planner/issues/156)) ([4f0c527](https://github.com/aydabd/match-planner/commit/4f0c5277b213821885d33b18613a236e09f04fa7))
+* **ui:** fetch the start page squad through the shared importer ([c7ed8c2](https://github.com/aydabd/match-planner/commit/c7ed8c23047c290eca39a41a155081b0efb77032))
+* **ui:** import any file or folder on the Data page ([#158](https://github.com/aydabd/match-planner/issues/158)) ([700a563](https://github.com/aydabd/match-planner/commit/700a563a94f1e9430bcc828226be4082617953a6))
+* **ui:** use the shared importer for the start page squad ([#159](https://github.com/aydabd/match-planner/issues/159)) ([c7ed8c2](https://github.com/aydabd/match-planner/commit/c7ed8c23047c290eca39a41a155081b0efb77032))
+
 ## [0.22.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.21.0...matchplanner-v0.22.0) (2026-10-02)
 
 
