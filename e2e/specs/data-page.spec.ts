@@ -38,4 +38,29 @@ test.describe("Data page", () => {
 		await page.locator("#historyDataLink").click();
 		await expect(data.title).toHaveText("Data");
 	});
+
+	test("holds the import, export and Drive cards that Statistik no longer has", async ({
+		data,
+		history,
+		page,
+	}) => {
+		await data.goto();
+		for (const heading of ["Läs in matchfiler", "Säker export och import"]) {
+			await expect(
+				data.root.getByRole("heading", { name: heading }),
+			).toBeVisible();
+		}
+		await page.goto("statistics/");
+		await expect(history.root).toBeVisible();
+		for (const heading of [
+			"Läs in matchfiler",
+			"Säker export och import",
+			"Säkerhetskopiera till Google Drive",
+		]) {
+			await expect(
+				history.root.getByRole("heading", { name: heading }),
+			).toHaveCount(0);
+		}
+		await expect(page.locator("#historyDataLink")).toBeVisible();
+	});
 });

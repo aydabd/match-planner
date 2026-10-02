@@ -46,13 +46,14 @@ test.describe("Teams", () => {
 
 	test("keeps two teams' match history apart", async ({
 		setup,
+		data,
 		history,
 		teamSwitcher,
 	}) => {
 		await setup.open();
-		await history.open();
-		await history.importFiles([{ name: "match.json", contents: MATCH }]);
-		await expect(history.count).toHaveText("1 match över 1 månad.");
+		await data.open();
+		await data.importFiles([{ name: "match.json", contents: MATCH }]);
+		await expect(data.count).toHaveText("1 match över 1 månad.");
 
 		await setup.open();
 		await teamSwitcher.createTeam("P11 7v7");

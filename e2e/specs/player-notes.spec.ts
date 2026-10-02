@@ -17,10 +17,10 @@ const FILES = Array.from({ length: 8 }, (_, i) => {
 });
 
 test.describe("Player notes: availability and development", () => {
-	test.beforeEach(async ({ setup, history }) => {
+	test.beforeEach(async ({ setup, data, history }) => {
 		await setup.open();
-		await history.open();
-		await history.importFiles(FILES);
+		await data.open();
+		await data.importFiles(FILES);
 		await history.gotoNotes();
 	});
 

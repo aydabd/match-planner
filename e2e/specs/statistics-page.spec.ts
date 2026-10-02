@@ -27,17 +27,18 @@ test.describe("Statistics page", () => {
 		).toHaveAttribute("aria-current", "page");
 	});
 
-	test("a match file can be imported directly, with no detour through setup", async ({
+	test("a match file can be imported directly on the Data page, with no detour through setup", async ({
+		data,
 		history,
-		page,
 	}) => {
-		await page.goto("statistics/");
-		await history.importFiles([
+		await data.goto();
+		await data.importFiles([
 			{
 				name: "match.json",
 				contents: matchFileToJson(makeMatchFile({ seed: 1 })),
 			},
 		]);
+		await history.goto();
 		await expect(history.count).toHaveText("1 match över 1 månad.");
 	});
 });
