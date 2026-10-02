@@ -17,6 +17,7 @@ import {
 	matchesToBackUp,
 	type TeamFolder,
 } from "../core/driveSync.js";
+import type { MergeCounts, PlacementChoice } from "../core/importTeam.js";
 import type { MatchFile } from "../core/matchFile.js";
 import { isAcceptableNewPassword } from "../core/passwords.js";
 import type { PlayerNotesFile } from "../core/playerNotes.js";
@@ -39,6 +40,7 @@ import {
 	activeTeamId,
 	activeTeamName,
 	adoptTeamId,
+	createTeamWithId,
 	otherTeamIds,
 } from "./teamStorage.js";
 
@@ -89,7 +91,14 @@ export interface TeamOption {
 
 export type RestoreOutcome =
 	| ({ kind: "restored" } & RestoreResult)
-	| { kind: "choose"; teams: TeamOption[] };
+	| { kind: "choose"; teams: TeamOption[] }
+	/** The folder belongs to another team than this one, which has data: nothing is changed until `placement` is given. */
+	| {
+			kind: "different-team";
+			teamId: string;
+			name: string;
+			counts: MergeCounts;
+	  };
 
 export interface DriveBackup {
 	/** Upload what is not yet in this team's folder under `rootId`. */
@@ -103,11 +112,12 @@ export interface DriveBackup {
 		rootId: string,
 		password: string,
 		teamId?: string,
+		placement?: PlacementChoice,
 	): Promise<RestoreOutcome>;
 }
 
 /** Why a restore was refused; src/ui/text.ts turns it into a sentence. */
-export type FolderProblem = "otherTeam" | "belongsToOtherLocalTeam";
+export type FolderProblem = "belongsToOtherLocalTeam";
 
 export class DriveFolderError extends Error {
 	constructor(readonly reason: FolderProblem) {
@@ -384,6 +394,7 @@ export function createDriveBackup(client: DriveClient): DriveBackup {
 		rootId: string,
 		password: string,
 		chosenTeamId?: string,
+		placement?: PlacementChoice,
 	): Promise<RestoreOutcome> {
 		const choice = chooseTeamFolder({
 			localTeamId: activeTeamId(),
@@ -411,22 +422,7 @@ export function createDriveBackup(client: DriveClient): DriveBackup {
 					...(await restoreFrom(choice, password, true)),
 				};
 			case "choose": {
-				// Teams may have different passwords: only the ones this password
-				// opens are candidates. The others are neither offered nor read.
-				const unlocked: { folder: TeamFolder; opened: OpenedMarker }[] = [];
-				for (const folder of choice.teams) {
-					try {
-						const opened = await openMarker(folder, password);
-						if (opened !== null) unlocked.push({ folder, opened });
-					} catch (err) {
-						if (!isLocked(err)) throw err;
-					}
-				}
-				if (unlocked.length === 0) {
-					throw new SecurePackageError("No team opens with this password", {
-						code: "wrongPasswordOrTampered",
-					});
-				}
+				const unlocked = await unlockedTeams(choice.teams, password);
 				const chosen =
 					unlocked.length === 1
 						? unlocked[0]
@@ -442,22 +438,110 @@ export function createDriveBackup(client: DriveClient): DriveBackup {
 						)),
 					};
 				}
-				const teams: TeamOption[] = unlocked.map((u) => ({
-					teamId: u.folder.teamId,
-					name: u.opened.name,
-				}));
-				teams.sort((x, y) =>
-					x.name !== y.name
-						? x.name < y.name
-							? -1
-							: 1
-						: x.teamId < y.teamId
-							? -1
-							: 1,
-				);
-				return { kind: "choose", teams };
+				return { kind: "choose", teams: teamOptions(unlocked) };
+			}
+			case "different": {
+				// This team has data and the folders are other teams': the coach
+				// chooses, deliberately, what happens (#154). Only the teams the
+				// password opens are candidates.
+				const unlocked = await unlockedTeams(choice.teams, password);
+				const chosen =
+					unlocked.length === 1
+						? unlocked[0]
+						: unlocked.find((u) => u.folder.teamId === chosenTeamId);
+				if (chosen === undefined) {
+					return { kind: "choose", teams: teamOptions(unlocked) };
+				}
+				const { folder, opened } = chosen;
+				if (placement === undefined) {
+					return {
+						kind: "different-team",
+						teamId: folder.teamId,
+						name: opened.name,
+						counts: await matchCounts(folder.teamId, opened),
+					};
+				}
+				if (placement === "new") createTeamWithId(folder.teamId, opened.name);
+				else if (!adoptTeamId(folder.teamId)) {
+					throw new DriveFolderError("belongsToOtherLocalTeam");
+				}
+				return {
+					kind: "restored",
+					...(await restoreFrom(folder, password, false, opened)),
+				};
 			}
 		}
+	}
+
+	/**
+	 * The teams in `folders` this password opens; the others are neither
+	 * offered nor read. A password that opens none is the wrong password.
+	 */
+	async function unlockedTeams(
+		folders: readonly TeamFolder[],
+		password: string,
+	): Promise<{ folder: TeamFolder; opened: OpenedMarker }[]> {
+		const unlocked: { folder: TeamFolder; opened: OpenedMarker }[] = [];
+		for (const folder of folders) {
+			try {
+				const opened = await openMarker(folder, password);
+				if (opened !== null) unlocked.push({ folder, opened });
+			} catch (err) {
+				if (!isLocked(err)) throw err;
+			}
+		}
+		if (unlocked.length === 0) {
+			throw new SecurePackageError("No team opens with this password", {
+				code: "wrongPasswordOrTampered",
+			});
+		}
+		return unlocked;
+	}
+
+	/** The teams to choose from, by name and then id. */
+	function teamOptions(
+		unlocked: readonly { folder: TeamFolder; opened: OpenedMarker }[],
+	): TeamOption[] {
+		const teams: TeamOption[] = unlocked.map((u) => ({
+			teamId: u.folder.teamId,
+			name: u.opened.name,
+		}));
+		return teams.sort((x, y) =>
+			x.name !== y.name
+				? x.name < y.name
+					? -1
+					: 1
+				: x.teamId < y.teamId
+					? -1
+					: 1,
+		);
+	}
+
+	/**
+	 * Matches before and after merging this team with the folder's, from the
+	 * file names alone: a match's name is built from the team id and the
+	 * match id, so the local matches are named as the folder's team would.
+	 */
+	async function matchCounts(
+		teamId: string,
+		opened: OpenedMarker,
+	): Promise<MergeCounts> {
+		const incoming = new Set(opened.entries.matches.map((m) => m.name));
+		const local = loadMatchFiles();
+		let shared = 0;
+		for (const match of local) {
+			if (
+				incoming.has(await driveFileName("match", teamId, match.audit.matchId))
+			) {
+				shared++;
+			}
+		}
+		const localCount = new Set(local.map((m) => m.audit.matchId)).size;
+		return {
+			local: localCount,
+			incoming: incoming.size,
+			merged: localCount + incoming.size - shared,
+		};
 	}
 
 	return { backup, restore };

@@ -1,3 +1,4 @@
+import { LIMITS } from "../core/limits.js";
 import {
 	EMPTY_TEAMS_FILE,
 	parseTeamsFile,
@@ -17,6 +18,8 @@ import {
 } from "./appStorage.js";
 
 const DEFAULT_TEAM_NAME = "Mitt lag";
+/** A team read in from files or Drive that has no name of its own (#154). */
+const IMPORTED_TEAM_NAME = "Importerat lag";
 
 /** A new id for a team; unique across devices so teams never clash. */
 function newTeamId(): string {
@@ -84,7 +87,10 @@ export function createTeamWithId(id: string, name: string): Team {
 	if (file.teams.some((t) => t.id === id)) {
 		throw new Error("A team with this id already exists");
 	}
-	const team: Team = { id, name };
+	const team: Team = {
+		id,
+		name: name.trim().slice(0, LIMITS.teamNameLength) || IMPORTED_TEAM_NAME,
+	};
 	saveTeamsFile(withActiveTeam(withTeam(file, team), id));
 	return team;
 }

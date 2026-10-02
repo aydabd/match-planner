@@ -115,16 +115,19 @@ export type TeamFolderChoice =
 	| { action: "use"; folderId: string }
 	| { action: "adopt"; teamId: string; folderId: string }
 	| { action: "choose"; teams: TeamFolder[] }
-	| { action: "refuse"; reason: "otherTeam" | "belongsToOtherLocalTeam" };
+	/** A team with data, and only other teams' folders: it may read one in as a new team or merge it (#154). */
+	| { action: "different"; teams: TeamFolder[] }
+	| { action: "refuse"; reason: "belongsToOtherLocalTeam" };
 
 /**
  * Which team subfolder of the root to restore from (#142). This team's own
  * folder wins whatever else is in the root. Without one, a team that has
- * data is refused (restoring another team's files would mix two teams);
- * an empty team may take on a team from the root - straight away when
- * there is one, by the coach's choice when there are several. A team that
- * another team on this device already has is never offered, since adopting
- * it would merge two teams. Two folders for the same team (made at the same
+ * data is offered the other teams' folders ("different"): the coach then
+ * picks, deliberately, between reading one in as a new team and merging it
+ * into this one (#154). An empty team may take on a team from the root -
+ * straight away when there is one, by the coach's choice when there are
+ * several. A team that another team on this device already has is never
+ * offered, since adopting it would merge two teams. Two folders for the same team (made at the same
  * moment) count as one, the same one every time.
  */
 export function chooseTeamFolder(input: {
@@ -142,7 +145,6 @@ export function chooseTeamFolder(input: {
 	const own = byTeam.get(input.localTeamId);
 	if (own) return { action: "use", folderId: own.folderId };
 	if (byTeam.size === 0) return { action: "none" };
-	if (!input.localIsEmpty) return { action: "refuse", reason: "otherTeam" };
 	const candidates = [...byTeam.values()]
 		.filter((folder) => !input.otherLocalTeamIds.includes(folder.teamId))
 		.sort((x, y) => (x.teamId < y.teamId ? -1 : x.teamId > y.teamId ? 1 : 0));
@@ -150,6 +152,7 @@ export function chooseTeamFolder(input: {
 	if (only === undefined) {
 		return { action: "refuse", reason: "belongsToOtherLocalTeam" };
 	}
+	if (!input.localIsEmpty) return { action: "different", teams: candidates };
 	if (candidates.length === 1) {
 		return { action: "adopt", teamId: only.teamId, folderId: only.folderId };
 	}

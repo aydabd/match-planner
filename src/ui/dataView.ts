@@ -2,6 +2,7 @@ import {
 	EXPORT_BUNDLE_VERSION,
 	type ExportBundle,
 } from "../core/exportBundle.js";
+import type { PlacementChoice } from "../core/importTeam.js";
 import { LIMITS } from "../core/limits.js";
 import { isAcceptableNewPassword } from "../core/passwords.js";
 import {
@@ -30,6 +31,8 @@ import { pickFolder } from "./drivePicker.js";
 import { loadSeasonData } from "./historyData.js";
 import { setUpImport } from "./importView.js";
 import { loadMatchFiles } from "./matchFileStorage.js";
+import { renderTeamSwitcher } from "./page.js";
+import { createPlacementPanel } from "./placementChoice.js";
 import { loadPlayerNotes } from "./playerNotesStorage.js";
 import { activeTeamId } from "./teamStorage.js";
 import { TEXT } from "./text.js";
@@ -42,9 +45,12 @@ import { TEXT } from "./text.js";
  * encrypted with a password the coach types in for each call (#81); it is
  * never saved anywhere.
  */
-function setUpDriveBackup(refresh: () => void): void {
+function setUpDriveBackup(callbacks: {
+	refresh: () => void;
+	teamChanged: () => void;
+}): { syncTeam: () => void } {
 	const card = byId("historyBackupCard");
-	if (DRIVE_CLIENT_ID === "") return;
+	if (DRIVE_CLIENT_ID === "") return { syncTeam: () => {} };
 	card.hidden = false;
 
 	const connectBtn = byId("driveConnectBtn") as HTMLButtonElement;
@@ -72,6 +78,7 @@ function setUpDriveBackup(refresh: () => void): void {
 		return t.failed;
 	}
 
+	const placement = createPlacementPanel(byId("drivePlacement"));
 	const auth = createDriveAuth(DRIVE_CLIENT_ID, DRIVE_SCOPE);
 	const backup = createDriveBackup(createDriveClient(() => auth.accessToken()));
 
@@ -87,14 +94,23 @@ function setUpDriveBackup(refresh: () => void): void {
 		restoreBtn.hidden = false;
 	}
 
-	const storedFolderId = readItem(
-		teamScoped(STORAGE_KEYS.driveFolderId, activeTeamId()),
-	);
-	const storedFolderName = readItem(
-		teamScoped(STORAGE_KEYS.driveFolderName, activeTeamId()),
-	);
-	if (storedFolderId !== null && storedFolderName !== null) {
-		showFolder(storedFolderId, storedFolderName);
+	/** Show the folder the active team has chosen, or none: teams have a folder each. */
+	function syncTeam(): void {
+		const id = readItem(teamScoped(STORAGE_KEYS.driveFolderId, activeTeamId()));
+		const name = readItem(
+			teamScoped(STORAGE_KEYS.driveFolderName, activeTeamId()),
+		);
+		if (id !== null && name !== null) {
+			showFolder(id, name);
+			return;
+		}
+		folderStatus.hidden = true;
+		chooseFolderBtn.textContent = t.chooseFolder;
+		passwordField.hidden = true;
+		backupBtn.hidden = true;
+		restoreBtn.hidden = true;
+		teamChoice.hidden = true;
+		placement.hide();
 	}
 
 	connectBtn.addEventListener("click", async () => {
@@ -173,7 +189,10 @@ function setUpDriveBackup(refresh: () => void): void {
 	 * and this one is empty the coach is asked which (#142): the choice is
 	 * shown, and "Läs in laget" restores that team.
 	 */
-	async function runRestore(teamId?: string): Promise<void> {
+	async function runRestore(
+		teamId?: string,
+		choice?: PlacementChoice,
+	): Promise<void> {
 		const folderId = currentFolderId();
 		if (folderId === null) return;
 		if (passwordInput.value === "") {
@@ -185,12 +204,27 @@ function setUpDriveBackup(refresh: () => void): void {
 		restoreTeamBtn.disabled = true;
 		// The password has to stay for "Läs in laget" while a choice is open.
 		let choicePending = false;
+		const before = activeTeamId();
 		try {
 			const outcome = await backup.restore(
 				folderId,
 				passwordInput.value,
 				teamId,
+				choice,
 			);
+			if (outcome.kind === "different-team") {
+				// This team has data and the folder is another team's (#154): the
+				// coach picks, with the numbers in front of them. Nothing has
+				// changed yet, and the password stays for the pick.
+				teamChoice.hidden = true;
+				status.textContent = "";
+				placement.ask(
+					{ source: "drive", name: outcome.name, counts: outcome.counts },
+					(picked) => void runRestore(outcome.teamId, picked),
+				);
+				choicePending = true;
+				return;
+			}
 			if (outcome.kind === "choose") {
 				teamSelect.replaceChildren(
 					...outcome.teams.map((team, index) => {
@@ -207,8 +241,10 @@ function setUpDriveBackup(refresh: () => void): void {
 				return;
 			}
 			teamChoice.hidden = true;
+			placement.hide();
 			status.textContent = t.restored(outcome);
-			refresh();
+			if (activeTeamId() !== before) callbacks.teamChanged();
+			callbacks.refresh();
 		} catch (err) {
 			status.textContent = driveFailure(err);
 		} finally {
@@ -218,11 +254,17 @@ function setUpDriveBackup(refresh: () => void): void {
 		}
 	}
 
-	restoreBtn.addEventListener("click", () => void runRestore());
+	restoreBtn.addEventListener("click", () => {
+		placement.hide();
+		void runRestore();
+	});
 	restoreTeamBtn.addEventListener(
 		"click",
 		() => void runRestore(teamSelect.value),
 	);
+
+	syncTeam();
+	return { syncTeam };
 }
 
 /**
@@ -268,6 +310,12 @@ function setUpSecureExport(): void {
  * in Google Drive. The statistics page keeps only statistics.
  */
 export function createDataView(): { refresh: () => void } {
+	/** The team switcher and the Drive card show the active team; redraw them. */
+	function teamChanged(): void {
+		renderTeamSwitcher();
+		drive.syncTeam();
+	}
+
 	// Only the newest call may draw, as on the statistics page.
 	let latestRender = 0;
 	async function refresh(): Promise<void> {
@@ -280,8 +328,8 @@ export function createDataView(): { refresh: () => void } {
 				: TEXT.history.matchesCount(history.matches, history.months.length);
 	}
 
-	setUpImport(refresh);
-	setUpDriveBackup(refresh);
+	const drive = setUpDriveBackup({ refresh, teamChanged });
+	setUpImport({ refresh, teamChanged });
 	setUpSecureExport();
 	void refresh();
 	return { refresh };

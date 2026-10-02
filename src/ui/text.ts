@@ -50,6 +50,28 @@ export const TEXT = {
 	data: {
 		open: "Hämta in, spara och synka data",
 	},
+	/** The choice a team with data gets for another team's files or Drive folder (#154). */
+	placement: {
+		intro: (source: "files" | "drive", name: string) =>
+			`${source === "files" ? "Filerna" : "Drive-mappen"} hör till ett annat lag${name === "" ? "" : ` ("${name}")`}, och det här laget har redan data. Inget har ändrats än.`,
+		numbers: (
+			source: "files" | "drive",
+			c: { local: number; incoming: number; merged: number },
+		) => {
+			const matches = (n: number) => `${n} ${n === 1 ? "match" : "matcher"}`;
+			return `Du har ${matches(c.local)}, ${source === "files" ? "filerna" : "Drive"} har ${c.incoming}, efter hopslagning ${c.merged}.`;
+		},
+		newTeam: "Läs in som nytt lag",
+		newTeamHint:
+			"Ett nytt lag skapas på den här enheten och datan hamnar där. Det här laget lämnas som det är.",
+		merge: "Slå ihop med det här laget",
+		mergeHint:
+			"Datan slås ihop med det här laget, som får samma lagid så att senare säkerhetskopior hamnar i samma Drive-mapp.",
+		confirmNote:
+			"Den gamla lagmappen i Drive, om det fanns en, lämnas där den är.",
+		confirm: "Slå ihop",
+		cancel: "Avbryt",
+	},
 	/** The "Hämta in" card on the Data page (#154). */
 	dataImport: {
 		hint: "Välj filer eller en hel mapp. Appen ser på innehållet vad varje fil är, inte på namnet. Inget lämnar den här enheten.",
@@ -129,12 +151,8 @@ export const TEXT = {
 			];
 			return parts.length === 0 ? "Inget nytt att läsa in." : parts.join(" ");
 		},
-		refused: {
-			otherTeam:
-				"Filerna hör till ett annat lag och det här laget har redan data, så inget lästes in.",
-			belongsToOtherLocalTeam:
-				"Filerna tillhör ett annat lag på den här enheten. Byt till det laget först.",
-		},
+		refusedBelongsToOtherLocalTeam:
+			"Filerna tillhör ett annat lag på den här enheten. Byt till det laget först.",
 		driveHint:
 			"Det här finns nu på enheten. Koppla Google Drive nedan och tryck Säkerhetskopiera för att spara det i Drive.",
 	},
@@ -482,8 +500,6 @@ export const TEXT = {
 			chooseTeam: "Mappen innehåller flera lag. Välj vilket som ska läsas in.",
 			unnamedTeam: (number: number) => `Lag ${number}`,
 			folderRefused: {
-				otherTeam:
-					"Mappen har inget lag som hör till det här laget. Läs in den i ett tomt lag, eller säkerhetskopiera det här laget dit i stället.",
 				belongsToOtherLocalTeam:
 					"Mappen tillhör ett annat lag på den här enheten. Byt till det laget först.",
 			},

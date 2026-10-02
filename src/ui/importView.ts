@@ -10,6 +10,7 @@ import {
 	type Skipped,
 	screenBySize,
 } from "../core/importPlan.js";
+import type { PlacementChoice } from "../core/importTeam.js";
 import {
 	type Opened,
 	openPackages,
@@ -21,7 +22,7 @@ import { readItem, STORAGE_KEYS, teamScoped } from "./appStorage.js";
 import { byId } from "./domHelpers.js";
 import { DRIVE_CLIENT_ID } from "./driveConfig.js";
 import { importTeam } from "./importApply.js";
-import { renderTeamSwitcher } from "./page.js";
+import { createPlacementPanel } from "./placementChoice.js";
 import { activeTeamId } from "./teamStorage.js";
 import { TEXT } from "./text.js";
 
@@ -89,7 +90,11 @@ async function readSelection(files: readonly File[]): Promise<Selection> {
  * apply with one button. Everything is read and decided on this device; the
  * password is only used to unlock and is cleared as soon as that is done.
  */
-export function setUpImport(refresh: () => void): void {
+export function setUpImport(callbacks: {
+	refresh: () => void;
+	/** The active team changed id or was replaced (a new team, an adopted id). */
+	teamChanged: () => void;
+}): void {
 	const t = TEXT.dataImport;
 	const filesInput = byId("importFilesInput") as HTMLInputElement;
 	const folderInput = byId("importFolderInput") as HTMLInputElement;
@@ -110,6 +115,7 @@ export function setUpImport(refresh: () => void): void {
 	driveHint.textContent = t.driveHint;
 
 	let selection: Selection | null = null;
+	const placement = createPlacementPanel(byId("importPlacement"));
 
 	function teams(): CollectedTeam[] {
 		return selection
@@ -202,6 +208,7 @@ export function setUpImport(refresh: () => void): void {
 		const files = [...(input.files ?? [])];
 		input.value = "";
 		messages.replaceChildren();
+		placement.hide();
 		driveHint.hidden = true;
 		progress.textContent = "";
 		passwordInput.value = "";
@@ -252,7 +259,8 @@ export function setUpImport(refresh: () => void): void {
 		render();
 	});
 
-	applyBtn.addEventListener("click", () => {
+	/** Apply what is chosen; `choice` is the coach's pick when the files are another team's. */
+	function apply(choice?: PlacementChoice): void {
 		const chosen = selection;
 		if (chosen === null) return;
 		const groups = collectTeams(chosen.plain, chosen.opened);
@@ -263,10 +271,17 @@ export function setUpImport(refresh: () => void): void {
 				? (named[0] ?? null)
 				: (named.find((g) => g.teamId === teamSelect.value) ?? null);
 		const before = activeTeamId();
-		const outcome = importTeam(loose, team);
+		const outcome = importTeam(loose, team, choice);
 		messages.replaceChildren();
+		if (outcome.kind === "ask") {
+			placement.ask(
+				{ source: "files", name: outcome.name, counts: outcome.counts },
+				apply,
+			);
+			return;
+		}
 		if (outcome.kind === "refused") {
-			addItem(messages, t.refused[outcome.reason], true);
+			addItem(messages, t.refusedBelongsToOtherLocalTeam, true);
 			return;
 		}
 		addItem(
@@ -278,13 +293,15 @@ export function setUpImport(refresh: () => void): void {
 				squadTaken: outcome.applied.squadTaken,
 			}),
 		);
-		if (activeTeamId() !== before) renderTeamSwitcher();
+		if (activeTeamId() !== before) callbacks.teamChanged();
 		const driveConnected =
 			readItem(teamScoped(STORAGE_KEYS.driveFolderId, activeTeamId())) !== null;
 		driveHint.hidden = DRIVE_CLIENT_ID === "" || driveConnected;
 		selection = null;
 		passwordInput.value = "";
 		render();
-		refresh();
-	});
+		callbacks.refresh();
+	}
+
+	applyBtn.addEventListener("click", () => apply());
 }

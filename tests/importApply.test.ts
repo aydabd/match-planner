@@ -88,13 +88,47 @@ describe("importTeam", () => {
 		expect(loadDraft().players).toHaveLength(1);
 	});
 
-	it("refuses another team's files for a team that has data, changing nothing", () => {
+	it("asks, with the numbers, when a team with data gets another team's files, and changes nothing", () => {
 		importTeam(group(null, ["mine"]), null);
 		const id = activeTeamId();
-		const outcome = importTeam(null, group(INCOMING, ["theirs"]));
-		expect(outcome).toEqual({ kind: "refused", reason: "otherTeam" });
+		const outcome = importTeam(null, group(INCOMING, ["a", "b"], "Lag A"));
+		expect(outcome).toEqual({
+			kind: "ask",
+			teamId: INCOMING,
+			name: "Lag A",
+			counts: { local: 1, incoming: 2, merged: 3 },
+		});
 		expect(activeTeamId()).toBe(id);
 		expect(loadMatchFiles().map((m) => m.audit.matchId)).toEqual(["mine"]);
+	});
+
+	it('"new" makes a new team and leaves the existing one exactly as it was', () => {
+		importTeam(group(null, ["mine"]), null);
+		const mine = activeTeamId();
+		const outcome = importTeam(null, group(INCOMING, ["a"], "Lag A"), "new");
+		expect(outcome).toMatchObject({ kind: "applied", applied: { added: 1 } });
+		expect(activeTeamId()).toBe(INCOMING);
+		expect(listTeams().map((t) => t.id)).toEqual([mine, INCOMING]);
+		expect(loadMatchFiles().map((m) => m.audit.matchId)).toEqual(["a"]);
+		switchTeam(mine);
+		expect(loadMatchFiles().map((m) => m.audit.matchId)).toEqual(["mine"]);
+	});
+
+	it('"merge" leaves nothing out and makes the team take on the files\' id', () => {
+		importTeam(group(null, ["mine"]), null);
+		const name = listTeams()[0]?.name;
+		const outcome = importTeam(
+			null,
+			group(INCOMING, ["a", "b"], "Lag A"),
+			"merge",
+		);
+		expect(outcome).toMatchObject({ kind: "applied", applied: { added: 2 } });
+		expect(listTeams()).toEqual([{ id: INCOMING, name }]);
+		expect(
+			loadMatchFiles()
+				.map((m) => m.audit.matchId)
+				.sort(),
+		).toEqual(["a", "b", "mine"]);
 	});
 
 	it("refuses an id another team on this device already has", () => {

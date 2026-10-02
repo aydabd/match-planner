@@ -136,4 +136,10 @@ describe("teamStorage", () => {
 		expect(() => createTeamWithId(existing, "Dubblett")).toThrow();
 		expect(listTeams()).toEqual(before);
 	});
+
+	it("gives a team created without a name a name, so the teams file stays valid", () => {
+		const id = "44444444-4444-4444-8444-444444444444";
+		expect(createTeamWithId(id, "  ").name).not.toBe("");
+		expect(listTeams().find((t) => t.id === id)?.name).not.toBe("");
+	});
 });

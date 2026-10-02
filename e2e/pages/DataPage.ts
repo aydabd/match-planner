@@ -17,6 +17,8 @@ export class DataPage {
 	readonly importTeamSelect: Locator;
 	readonly importApplyButton: Locator;
 	readonly importDriveHint: Locator;
+	readonly importPlacement: Locator;
+	readonly drivePlacement: Locator;
 	readonly driveConnectButton: Locator;
 	readonly driveChooseFolderButton: Locator;
 	readonly drivePasswordInput: Locator;
@@ -50,6 +52,8 @@ export class DataPage {
 			exact: true,
 		});
 		this.importDriveHint = this.root.locator("#importDriveHint");
+		this.importPlacement = this.root.locator("#importPlacement");
+		this.drivePlacement = this.root.locator("#drivePlacement");
 		const drive = this.root.locator("#historyBackupCard");
 		this.driveConnectButton = drive.getByRole("button", {
 			name: "Koppla Google Drive",
@@ -76,6 +80,18 @@ export class DataPage {
 			name: "Exportera allt (krypterat)",
 		});
 		this.secureExportStatus = this.root.locator("#secureExportStatus");
+	}
+
+	/** The button in a placement panel (files or Drive) by its label. */
+	placementButton(
+		panel: Locator,
+		name:
+			| "Läs in som nytt lag"
+			| "Slå ihop med det här laget"
+			| "Slå ihop"
+			| "Avbryt",
+	): Locator {
+		return panel.getByRole("button", { name, exact: true });
 	}
 
 	/** A real navigation to /data/, by URL. */

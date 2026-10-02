@@ -1,9 +1,20 @@
 import type { CollectedTeam } from "../core/importCollect.js";
-import { placeTeam } from "../core/importTeam.js";
+import {
+	type MergeCounts,
+	type PlacementChoice,
+	placeTeam,
+	previewMerge,
+} from "../core/importTeam.js";
 import type { TeamData } from "../core/teamData.js";
 import { type Applied, applyTeamData } from "./applyTeamData.js";
+import { loadMatchFiles } from "./matchFileStorage.js";
 import { activeTeamIsEmpty } from "./teamEmpty.js";
-import { activeTeamId, adoptTeamId, otherTeamIds } from "./teamStorage.js";
+import {
+	activeTeamId,
+	adoptTeamId,
+	createTeamWithId,
+	otherTeamIds,
+} from "./teamStorage.js";
 
 export type ImportOutcome =
 	| {
@@ -12,7 +23,14 @@ export type ImportOutcome =
 			/** Distinct matches the files offered, new or known. */
 			offered: number;
 	  }
-	| { kind: "refused"; reason: "otherTeam" | "belongsToOtherLocalTeam" };
+	/** The files are another team's and this team has data: nothing changed, the coach picks a placement. */
+	| {
+			kind: "ask";
+			teamId: string;
+			name: string;
+			counts: MergeCounts;
+	  }
+	| { kind: "refused"; reason: "belongsToOtherLocalTeam" };
 
 function combined(...parts: (CollectedTeam | null)[]): TeamData {
 	const data: TeamData = { matches: [], notes: [], squads: [] };
@@ -29,11 +47,14 @@ function combined(...parts: (CollectedTeam | null)[]): TeamData {
  * Apply what the files hold (#154): `loose` is the team-less group, merged
  * into the active team; `team` is one team's Drive-format files, placed with
  * the same rules as a Drive restore. Only merges: nothing on the device is
- * removed, and an import of the same files again changes nothing.
+ * removed, and an import of the same files again changes nothing. When a
+ * team with data is given another team's files the outcome is "ask"; call
+ * again with `placement` to read them in as a new team or merge them.
  */
 export function importTeam(
 	loose: CollectedTeam | null,
 	team: CollectedTeam | null,
+	choice?: PlacementChoice,
 ): ImportOutcome {
 	if (team?.teamId) {
 		const placement = placeTeam({
@@ -46,7 +67,23 @@ export function importTeam(
 			return { kind: "refused", reason: placement.reason };
 		}
 		if (placement.action === "ask") {
-			return { kind: "refused", reason: "otherTeam" };
+			if (choice === undefined) {
+				const local: TeamData = {
+					matches: loadMatchFiles(),
+					notes: [],
+					squads: [],
+				};
+				return {
+					kind: "ask",
+					teamId: placement.teamId,
+					name: team.name,
+					counts: previewMerge(local, combined(loose, team)),
+				};
+			}
+			if (choice === "new") createTeamWithId(placement.teamId, team.name);
+			else if (!adoptTeamId(placement.teamId)) {
+				return { kind: "refused", reason: "belongsToOtherLocalTeam" };
+			}
 		}
 		if (
 			placement.action === "adopt" &&

@@ -5,7 +5,11 @@ import { makeMatchFile, NAMES } from "../../tests/support/matchFiles.js";
 import { expect, test } from "../fixtures.js";
 import { DataPage } from "../pages/DataPage.js";
 import { driveTeamFolder, writeTree } from "../support/dataFolder.js";
-import { createFakeDrive, mockGoogle } from "../support/fakeGoogle.js";
+import {
+	createFakeDrive,
+	mockGoogle,
+	subfolderNames,
+} from "../support/fakeGoogle.js";
 
 // The service worker proxies every GET, including the mocked Google ones;
 // blocking it keeps these tests about the importer.
@@ -204,6 +208,39 @@ test.describe("Data page: import by contents (#154)", () => {
 		await expect(data.messages).toHaveText(["1 ny match lästes in."]);
 	});
 
+	test("a hostile team name is only ever text", async ({
+		data,
+		page,
+	}, testInfo) => {
+		page.on("dialog", () => {
+			throw new Error("a hostile team name ran script");
+		});
+		const hostile = "<img src=x onerror=alert(1)>";
+		const dir = await writeTree(
+			testInfo.outputPath("fientlig"),
+			await driveTeamFolder({
+				root: "fientlig",
+				teamId: TEAM_A,
+				name: hostile,
+				password: PASSWORD,
+				matches: 1,
+			}),
+		);
+		await data.goto();
+		await data.chooseFolder(dir);
+		await data.unlock(PASSWORD);
+		await expect(data.importSummary).toHaveText([
+			`Lag "${hostile}" (aaaaaaaa): 1 match, 1 truppfil, anteckningar för 1 spelare`,
+		]);
+		await expect(page.locator("#importSummary img")).toHaveCount(0);
+		await data.importApplyButton.click();
+		await expect(data.messages.first()).toBeVisible();
+		await expect(page.locator("#teamSwitcherSelect img")).toHaveCount(0);
+		await expect(page.locator("#teamSwitcherSelect option")).toHaveText([
+			hostile,
+		]);
+	});
+
 	test("a season report or a file that is none of ours is listed with a reason", async ({
 		data,
 	}) => {
@@ -322,5 +359,320 @@ test.describe("Data page: import by contents (#154)", () => {
 			"3 matcher lästes in. Anteckningarna uppdaterades. Truppen lästes in.",
 		);
 		await context.close();
+	});
+});
+
+test.describe("Data page: files for a different team than the one with data (#154)", () => {
+	const OPTIONS = "#teamSwitcherSelect option";
+
+	/** A device that already has one match, facing team A's folder. */
+	async function laptopWithData(
+		data: import("../pages/DataPage.js").DataPage,
+		outputPath: (name: string) => string,
+		matches = 3,
+	): Promise<string> {
+		const dir = await writeTree(
+			outputPath("lag-a"),
+			await driveTeamFolder({
+				root: "lag-a",
+				teamId: TEAM_A,
+				name: "Röda",
+				password: PASSWORD,
+				matches,
+			}),
+		);
+		await data.goto();
+		await data.importFiles([match("laptop", 7)]);
+		await data.chooseFolder(dir);
+		await data.unlock(PASSWORD);
+		await data.importApplyButton.click();
+		return dir;
+	}
+
+	test("shows both choices with the numbers and changes nothing until one is picked", async ({
+		data,
+		page,
+	}, testInfo) => {
+		await laptopWithData(data, (n) => testInfo.outputPath(n));
+		await expect(data.importPlacement).toBeVisible();
+		await expect(data.importPlacement).toContainText(
+			'Filerna hör till ett annat lag ("Röda"), och det här laget har redan data. Inget har ändrats än.',
+		);
+		await expect(data.importPlacement).toContainText(
+			"Du har 1 match, filerna har 3, efter hopslagning 4.",
+		);
+		await expect(data.count).toHaveText("1 match över 1 månad.");
+		await expect(page.locator(OPTIONS)).toHaveText(["Mitt lag"]);
+	});
+
+	test('"Läs in som nytt lag" leaves the existing team exactly as it was', async ({
+		data,
+		page,
+		teamSwitcher,
+	}, testInfo) => {
+		await laptopWithData(data, (n) => testInfo.outputPath(n));
+		await data
+			.placementButton(data.importPlacement, "Läs in som nytt lag")
+			.click();
+		await expect(data.messages).toHaveText([
+			"3 nya matcher lästes in. Anteckningarna uppdaterades. Truppen lästes in.",
+		]);
+		await expect(data.importPlacement).toBeHidden();
+		await expect(data.count).toHaveText("3 matcher över 1 månad.");
+		await expect(page.locator(OPTIONS)).toHaveText(["Mitt lag", "Röda"]);
+
+		await teamSwitcher.switchTo("Mitt lag");
+		await data.goto();
+		await expect(data.count).toHaveText("1 match över 1 månad.");
+	});
+
+	test('"Slå ihop" asks once more with the numbers, leaves nothing out and keeps the current team\'s name', async ({
+		data,
+		page,
+	}, testInfo) => {
+		await laptopWithData(data, (n) => testInfo.outputPath(n));
+		await data
+			.placementButton(data.importPlacement, "Slå ihop med det här laget")
+			.click();
+		await expect(data.importPlacement).toContainText(
+			"Du har 1 match, filerna har 3, efter hopslagning 4. Den gamla lagmappen i Drive, om det fanns en, lämnas där den är.",
+		);
+		// Nothing is mixed until it is confirmed, and it can be called off.
+		await expect(data.count).toHaveText("1 match över 1 månad.");
+		await data.placementButton(data.importPlacement, "Avbryt").click();
+		await expect(data.count).toHaveText("1 match över 1 månad.");
+
+		await data
+			.placementButton(data.importPlacement, "Slå ihop med det här laget")
+			.click();
+		await data.placementButton(data.importPlacement, "Slå ihop").click();
+		await expect(data.messages).toHaveText([
+			"3 nya matcher lästes in. Anteckningarna uppdaterades. Truppen lästes in.",
+		]);
+		await expect(data.count).toHaveText("4 matcher över 1 månad.");
+		await expect(page.locator(OPTIONS)).toHaveText(["Mitt lag"]);
+	});
+
+	test("a team id another team on this device has is refused, and nothing changes", async ({
+		data,
+		page,
+		teamSwitcher,
+		setup,
+	}, testInfo) => {
+		const dir = await laptopWithData(data, (n) => testInfo.outputPath(n));
+		await data
+			.placementButton(data.importPlacement, "Slå ihop med det här laget")
+			.click();
+		await data.placementButton(data.importPlacement, "Slå ihop").click();
+		await expect(data.count).toHaveText("4 matcher över 1 månad.");
+
+		// A second team on the device; the files now belong to the first.
+		await setup.open();
+		await teamSwitcher.createTeam("Annat");
+		await data.open();
+		await data.chooseFolder(dir);
+		await data.unlock(PASSWORD);
+		await data.importApplyButton.click();
+		await expect(data.messages).toHaveText([
+			"Filerna tillhör ett annat lag på den här enheten. Byt till det laget först.",
+		]);
+		await expect(data.importPlacement).toBeHidden();
+		await expect(page.locator(OPTIONS)).toHaveText(["Mitt lag", "Annat"]);
+		await expect(data.count).toHaveText(
+			"Inga matcher än. Spela en match eller läs in matchfiler.",
+		);
+	});
+
+	test("two teams in one folder: the second password then reads the second team into a new team", async ({
+		data,
+		page,
+	}, testInfo) => {
+		const dir = await writeTree(testInfo.outputPath("tva-lag"), [
+			...(await driveTeamFolder({
+				root: "rot",
+				teamId: TEAM_A,
+				name: "Röda",
+				password: "losenord-roda",
+				matches: 2,
+			})),
+			...(await driveTeamFolder({
+				root: "rot",
+				teamId: TEAM_B,
+				name: "Blå",
+				password: "losenord-bla",
+				matches: 3,
+				firstSeed: 4,
+			})),
+		]);
+		await data.goto();
+		await data.chooseFolder(dir);
+		await data.unlock("losenord-roda");
+		await data.importApplyButton.click();
+		await expect(data.count).toHaveText("2 matcher över 1 månad.");
+
+		await data.chooseFolder(dir);
+		await data.unlock("losenord-bla");
+		await expect(data.importSummary).toContainText([
+			'Lag "Blå" (bbbbbbbb): 3 matcher, 1 truppfil, anteckningar för 1 spelare',
+		]);
+		await data.importApplyButton.click();
+		await expect(data.importPlacement).toContainText(
+			"Du har 2 matcher, filerna har 3, efter hopslagning 5.",
+		);
+		await data
+			.placementButton(data.importPlacement, "Läs in som nytt lag")
+			.click();
+		await expect(data.count).toHaveText("3 matcher över 1 månad.");
+		await expect(page.locator(OPTIONS)).toHaveText(["Röda", "Blå"]);
+	});
+});
+
+test.describe("Data page: a Drive folder for a different team than the one with data (#154)", () => {
+	async function phoneBackedUp(
+		browser: import("@playwright/test").Browser,
+		drive: ReturnType<typeof createFakeDrive>,
+		dir: string,
+	) {
+		const context = await browser.newContext({
+			reducedMotion: "reduce",
+			serviceWorkers: "block",
+		});
+		await mockGoogle(context, drive);
+		const page = await context.newPage();
+		const phone = new DataPage(page);
+		await phone.goto();
+		await phone.chooseFolder(dir);
+		await phone.unlock(PASSWORD);
+		await phone.importApplyButton.click();
+		await phone.driveConnectButton.click();
+		await expect(phone.driveStatus).toHaveText("Kopplad till Google Drive.");
+		await phone.driveChooseFolderButton.click();
+		await expect(phone.driveStatus).toHaveText("Mapp: MatchPlanner-mapp");
+		await phone.drivePasswordInput.fill("drive-losenord-1");
+		await phone.driveBackupButton.click();
+		await expect(phone.driveStatus).toHaveText(
+			"2 matcher säkerhetskopierades. Trupp och anteckningar sparades.",
+		);
+		await context.close();
+	}
+
+	test("shows both choices, and a merge makes the next backup land in the other device's folder", async ({
+		data,
+		browser,
+	}, testInfo) => {
+		const drive = createFakeDrive();
+		await mockGoogle(data.page.context(), drive);
+		const dir = await writeTree(
+			testInfo.outputPath("telefon"),
+			await driveTeamFolder({
+				root: "telefon",
+				teamId: TEAM_A,
+				name: "Röda",
+				password: PASSWORD,
+				matches: 2,
+			}),
+		);
+		await phoneBackedUp(browser, drive, dir);
+
+		// A laptop with data of its own, never connected to that team.
+		await data.goto();
+		await data.importFiles([match("laptop", 7)]);
+		await data.driveConnectButton.click();
+		await expect(data.driveStatus).toHaveText("Kopplad till Google Drive.");
+		await data.driveChooseFolderButton.click();
+		await expect(data.driveStatus).toHaveText("Mapp: MatchPlanner-mapp");
+		await data.drivePasswordInput.fill("drive-losenord-1");
+		await data.driveRestoreButton.click();
+		await expect(data.drivePlacement).toContainText(
+			"Du har 1 match, Drive har 2, efter hopslagning 3.",
+		);
+		await expect(data.count).toHaveText("1 match över 1 månad.");
+
+		await data
+			.placementButton(data.drivePlacement, "Slå ihop med det här laget")
+			.click();
+		await data.placementButton(data.drivePlacement, "Slå ihop").click();
+		await expect(data.driveStatus).toHaveText(
+			"2 matcher lästes in. Anteckningarna uppdaterades. Truppen lästes in.",
+		);
+		await expect(data.count).toHaveText("3 matcher över 1 månad.");
+		await expect(data.drivePasswordInput).toHaveValue("");
+
+		await data.drivePasswordInput.fill("drive-losenord-1");
+		await data.driveBackupButton.click();
+		await expect(data.driveStatus).toHaveText(
+			"1 match säkerhetskopierades. Trupp och anteckningar sparades.",
+		);
+		expect(subfolderNames(drive, "folder-1")).toHaveLength(1);
+	});
+
+	test('"Läs in som nytt lag" keeps the existing team, which has no Drive folder of its own', async ({
+		data,
+		browser,
+		page,
+	}, testInfo) => {
+		const drive = createFakeDrive();
+		await mockGoogle(data.page.context(), drive);
+		const dir = await writeTree(
+			testInfo.outputPath("telefon"),
+			await driveTeamFolder({
+				root: "telefon",
+				teamId: TEAM_A,
+				name: "Röda",
+				password: PASSWORD,
+				matches: 2,
+			}),
+		);
+		await phoneBackedUp(browser, drive, dir);
+
+		await data.goto();
+		await data.importFiles([match("laptop", 7)]);
+		await data.driveConnectButton.click();
+		await expect(data.driveStatus).toHaveText("Kopplad till Google Drive.");
+		await data.driveChooseFolderButton.click();
+		await data.drivePasswordInput.fill("drive-losenord-1");
+		await data.driveRestoreButton.click();
+		await data
+			.placementButton(data.drivePlacement, "Läs in som nytt lag")
+			.click();
+		await expect(data.driveStatus).toHaveText(
+			"2 matcher lästes in. Anteckningarna uppdaterades. Truppen lästes in.",
+		);
+		await expect(data.count).toHaveText("2 matcher över 1 månad.");
+		await expect(page.locator("#teamSwitcherSelect option")).toHaveText([
+			"Mitt lag",
+			"Röda",
+		]);
+	});
+
+	test("a wrong password gets the wrong-password message and no choice", async ({
+		data,
+		browser,
+	}, testInfo) => {
+		const drive = createFakeDrive();
+		await mockGoogle(data.page.context(), drive);
+		const dir = await writeTree(
+			testInfo.outputPath("telefon"),
+			await driveTeamFolder({
+				root: "telefon",
+				teamId: TEAM_A,
+				name: "Röda",
+				password: PASSWORD,
+				matches: 2,
+			}),
+		);
+		await phoneBackedUp(browser, drive, dir);
+		await data.goto();
+		await data.importFiles([match("laptop", 7)]);
+		await data.driveConnectButton.click();
+		await expect(data.driveStatus).toHaveText("Kopplad till Google Drive.");
+		await data.driveChooseFolderButton.click();
+		await data.drivePasswordInput.fill("fel-losenord-12");
+		await data.driveRestoreButton.click();
+		await expect(data.driveStatus).toHaveText(
+			"Fel lösenord, eller filen har ändrats. Kontrollera lösenordet och försök igen.",
+		);
+		await expect(data.drivePlacement).toBeHidden();
+		await expect(data.count).toHaveText("1 match över 1 månad.");
 	});
 });
