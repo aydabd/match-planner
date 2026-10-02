@@ -3,6 +3,14 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.24.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.23.0...matchplanner-v0.24.0) (2026-10-02)
+
+
+### Features
+
+* **ui:** add Data to the menu and drop the start header link ([#162](https://github.com/aydabd/match-planner/issues/162)) ([7442f2e](https://github.com/aydabd/match-planner/commit/7442f2e8a202e3a131ad79f3693543aec20eb144))
+* **ui:** replace the emoji brand with a drawn mark ([#163](https://github.com/aydabd/match-planner/issues/163)) ([61357b3](https://github.com/aydabd/match-planner/commit/61357b3ee22d5f081bfba41371e80c6b2a3fb281))
+
 ## [0.23.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.22.0...matchplanner-v0.23.0) (2026-10-02)
 
 
