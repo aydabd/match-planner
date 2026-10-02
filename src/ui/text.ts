@@ -44,9 +44,10 @@ export const TEXT = {
 		match: "Match",
 		report: "Matchrapport",
 		statistics: "Statistik",
+		data: "Data",
 		about: "Om",
 	},
-	/** The Data page (#154), reached from Start and Statistik. */
+	/** The Data page (#154), reached from Start and Statistik and the main menu. */
 	data: {
 		open: "Hämta in, spara och synka data",
 	},
