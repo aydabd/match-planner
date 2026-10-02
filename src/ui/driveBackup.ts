@@ -15,12 +15,11 @@ import {
 	type DriveFileEntry,
 	filesToRestore,
 	matchesToBackUp,
-	pickSquad,
 	type TeamFolder,
 } from "../core/driveSync.js";
 import type { MatchFile } from "../core/matchFile.js";
-import { mergePlayerNotes } from "../core/notesMerge.js";
 import { isAcceptableNewPassword } from "../core/passwords.js";
+import type { PlayerNotesFile } from "../core/playerNotes.js";
 import {
 	decryptJson,
 	encryptJson,
@@ -29,11 +28,12 @@ import {
 	securePackageToJson,
 } from "../core/securePackage.js";
 import type { RosterFile } from "../core/storage.js";
+import { applyTeamData } from "./applyTeamData.js";
 import { deviceId } from "./deviceStorage.js";
-import { loadDraft, saveDraft } from "./draftStorage.js";
+import { loadDraft } from "./draftStorage.js";
 import type { DriveClient } from "./driveClient.js";
-import { keepMatchFiles, loadMatchFiles } from "./matchFileStorage.js";
-import { loadPlayerNotes, savePlayerNotes } from "./playerNotesStorage.js";
+import { loadMatchFiles } from "./matchFileStorage.js";
+import { loadPlayerNotes } from "./playerNotesStorage.js";
 import { activeTeamIsEmpty } from "./teamEmpty.js";
 import {
 	activeTeamId,
@@ -357,16 +357,12 @@ export function createDriveBackup(client: DriveClient): DriveBackup {
 			else ignored++;
 		}
 
-		let notes = loadPlayerNotes();
-		const before = JSON.stringify(notes);
+		const notes: PlayerNotesFile[] = [];
 		for (const entry of listing.notes) {
 			const payload = await ownPayload(password, entry, teamId);
-			if (payload?.kind === "notes") {
-				notes = mergePlayerNotes(notes, payload.playerNotes);
-			} else ignored++;
+			if (payload?.kind === "notes") notes.push(payload.playerNotes);
+			else ignored++;
 		}
-		const notesChanged = JSON.stringify(notes) !== before;
-		if (notesChanged) savePlayerNotes(notes);
 
 		const squads: RosterFile[] = [];
 		for (const entry of listing.squads) {
@@ -374,12 +370,14 @@ export function createDriveBackup(client: DriveClient): DriveBackup {
 			if (payload?.kind === "squad") squads.push(payload.roster);
 			else ignored++;
 		}
-		const squad = pickSquad(squads);
-		const squadRestored = squad !== null && loadDraft().players.length === 0;
-		if (squadRestored && squad) saveDraft(squad);
 
-		const { newMatches } = keepMatchFiles(matches);
-		return { downloaded: newMatches, notesChanged, squadRestored, ignored };
+		const applied = applyTeamData({ matches, notes, squads });
+		return {
+			downloaded: applied.added,
+			notesChanged: applied.notesChanged,
+			squadRestored: applied.squadTaken,
+			ignored,
+		};
 	}
 
 	async function restore(
