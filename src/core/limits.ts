@@ -44,6 +44,12 @@ export const LIMITS = {
 	driveFileBytes: 5 * 1024 * 1024,
 	/** Shortest password accepted when one is first set, in characters (#147). */
 	minPasswordLength: 10,
+	/** Largest single file the Data page reads, in bytes (#154). */
+	importFileBytes: 5 * 1024 * 1024,
+	/** Most files the Data page reads at once (#154). */
+	importFiles: 500,
+	/** Most bytes the Data page reads at once, over all files (#154). */
+	importTotalBytes: 50 * 1024 * 1024,
 } as const;
 
 /**

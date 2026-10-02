@@ -74,6 +74,21 @@ export function createTeam(name: string): Team {
 	return team;
 }
 
+/**
+ * Create a team with a given id (the id of files being imported, #154) and
+ * make it the active one. Throws, changing nothing, if a team already has
+ * that id, so two teams can never share one.
+ */
+export function createTeamWithId(id: string, name: string): Team {
+	const file = ensureDefaultTeam();
+	if (file.teams.some((t) => t.id === id)) {
+		throw new Error("A team with this id already exists");
+	}
+	const team: Team = { id, name };
+	saveTeamsFile(withActiveTeam(withTeam(file, team), id));
+	return team;
+}
+
 /** Make `teamId` the active team. A no-op if no team has that id. */
 export function switchTeam(teamId: string): void {
 	const file = ensureDefaultTeam();
