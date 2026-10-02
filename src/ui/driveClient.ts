@@ -1,4 +1,6 @@
+import { isDriveId } from "../core/driveIds.js";
 import type { DriveFileEntry } from "../core/driveSync.js";
+import { LIMITS } from "../core/limits.js";
 
 /**
  * The Drive REST calls backup (#56, #70, #135) needs, kept to exactly the
@@ -38,6 +40,42 @@ export interface DriveClient {
 	downloadJson(fileId: string): Promise<unknown>;
 }
 
+/** `id` if it is a plausible Drive id; anything else never reaches a request. */
+function checkedId(id: unknown, what: string): string {
+	if (!isDriveId(id)) throw new Error(`Ogiltigt Drive-id (${what})`);
+	return id;
+}
+
+/** The body of `response` as text, refusing one larger than LIMITS.driveFileBytes. */
+async function readLimitedText(response: Response): Promise<string> {
+	const tooLarge = () => new Error("Filen i Drive är för stor");
+	const declared = Number(response.headers.get("Content-Length"));
+	if (Number.isFinite(declared) && declared > LIMITS.driveFileBytes) {
+		throw tooLarge();
+	}
+	const reader = response.body?.getReader();
+	if (!reader) return response.text();
+	const chunks: Uint8Array[] = [];
+	let total = 0;
+	for (;;) {
+		const { done, value } = await reader.read();
+		if (done) break;
+		total += value.byteLength;
+		if (total > LIMITS.driveFileBytes) {
+			await reader.cancel();
+			throw tooLarge();
+		}
+		chunks.push(value);
+	}
+	const bytes = new Uint8Array(total);
+	let offset = 0;
+	for (const chunk of chunks) {
+		bytes.set(chunk, offset);
+		offset += chunk.byteLength;
+	}
+	return new TextDecoder().decode(bytes);
+}
+
 async function driveFetch(
 	token: string,
 	url: string,
@@ -59,7 +97,7 @@ export function createDriveClient(
 		folderId: string,
 		extra: string,
 	): Promise<{ id: string; name: string }[]> {
-		const query = `'${folderId}' in parents and trashed=false${extra}`;
+		const query = `'${checkedId(folderId, "mapp")}' in parents and trashed=false${extra}`;
 		const entries: { id: string; name: string }[] = [];
 		let pageToken: string | undefined;
 		do {
@@ -76,7 +114,8 @@ export function createDriveClient(
 				files?: { id: string; name: string }[];
 				nextPageToken?: string;
 			};
-			entries.push(...(body.files ?? []));
+			// An entry with an id that could change a later request is left out.
+			entries.push(...(body.files ?? []).filter((file) => isDriveId(file.id)));
 			pageToken = body.nextPageToken;
 		} while (pageToken !== undefined);
 		return entries;
@@ -102,6 +141,7 @@ export function createDriveClient(
 	}
 
 	async function createFolder(parentId: string, name: string): Promise<string> {
+		const parent = checkedId(parentId, "mapp");
 		const token = await accessToken();
 		const response = await driveFetch(token, `${FILES_URL}?fields=id`, {
 			method: "POST",
@@ -109,19 +149,20 @@ export function createDriveClient(
 			body: JSON.stringify({
 				name,
 				mimeType: FOLDER_MIME,
-				parents: [parentId],
+				parents: [parent],
 			}),
 		});
-		return ((await response.json()) as { id: string }).id;
+		return checkedId(((await response.json()) as { id: string }).id, "mapp");
 	}
 
 	async function downloadJson(fileId: string): Promise<unknown> {
+		const id = checkedId(fileId, "fil");
 		const token = await accessToken();
 		const response = await driveFetch(
 			token,
-			`${FILES_URL}/${fileId}?alt=media`,
+			`${FILES_URL}/${encodeURIComponent(id)}?alt=media`,
 		);
-		return response.json();
+		return JSON.parse(await readLimitedText(response));
 	}
 
 	async function createFile(
@@ -129,8 +170,9 @@ export function createDriveClient(
 		name: string,
 		contents: string,
 	): Promise<void> {
+		const parent = checkedId(folderId, "mapp");
 		const token = await accessToken();
-		const metadata = { name, parents: [folderId] };
+		const metadata = { name, parents: [parent] };
 		const boundary = "matchplanner-drive-boundary";
 		const body = [
 			`--${boundary}`,
@@ -151,10 +193,11 @@ export function createDriveClient(
 	}
 
 	async function updateFile(fileId: string, contents: string): Promise<void> {
+		const id = checkedId(fileId, "fil");
 		const token = await accessToken();
 		await driveFetch(
 			token,
-			`${UPLOAD_URL}/${fileId}?uploadType=media&fields=id`,
+			`${UPLOAD_URL}/${encodeURIComponent(id)}?uploadType=media&fields=id`,
 			{
 				method: "PATCH",
 				headers: { "Content-Type": "application/json" },

@@ -40,6 +40,10 @@ export const LIMITS = {
 	developmentNotesPerPlayer: 200,
 	/** Longest team/squad name, in characters (#118). */
 	teamNameLength: 40,
+	/** Largest file read from Google Drive, in bytes (#147); a bigger one is ignored. */
+	driveFileBytes: 5 * 1024 * 1024,
+	/** Shortest password accepted when one is first set, in characters (#147). */
+	minPasswordLength: 10,
 } as const;
 
 /**
