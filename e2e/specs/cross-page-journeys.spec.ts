@@ -2,7 +2,7 @@ import { expect, test } from "../fixtures.js";
 import { SQUAD } from "../support/squads.js";
 
 /**
- * Full journeys across the five real pages (issue #93), clicked through as
+ * Full journeys across the six real pages (issue #93), clicked through as
  * a coach would rather than reached by direct navigation - each of those
  * is covered by the page's own spec (report-page, match-page, ...). This
  * file is about the transitions between them: real URLs change, browser

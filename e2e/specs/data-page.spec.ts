@@ -1,7 +1,7 @@
 import { expect, test } from "../fixtures.js";
 
-/** The Data page (#154): its own real URL, linked from Start and Statistik,
- * and not a sixth entry in the main menu. */
+/** The Data page (#154): its own real URL, linked from Start and Statistik
+ * and an entry in the main menu. */
 test.describe("Data page", () => {
 	test("loads directly and after a reload", async ({ data, page }) => {
 		await data.goto();
@@ -10,20 +10,22 @@ test.describe("Data page", () => {
 		await expect(data.title).toHaveText("Data");
 	});
 
-	test("is not in the main menu, which keeps five entries", async ({
+	test("is in the main menu, marked as the current page", async ({
 		data,
 		page,
 	}) => {
 		await data.goto();
-		const links = page.locator("#pageNav a");
-		await expect(links).toHaveText([
+		await expect(page.locator("#pageNav a")).toHaveText([
 			"Start",
 			"Match",
 			"Matchrapport",
 			"Statistik",
+			"Data",
 			"Om",
 		]);
-		await expect(page.locator("#pageNav [aria-current]")).toHaveCount(0);
+		await expect(page.locator("#pageNav [aria-current='page']")).toHaveText(
+			"Data",
+		);
 	});
 
 	test("is linked from Start", async ({ setup, data, page }) => {

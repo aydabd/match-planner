@@ -13,7 +13,8 @@ test.describe("Why does it work like this?", () => {
 	}) => {
 		await setup.open();
 		await page
-			.getByRole("link", { name: "Varför fungerar det så här?" })
+			.locator("#pageNav")
+			.getByRole("link", { name: "Om", exact: true })
 			.click();
 
 		const policy = page.locator("#policyView");
@@ -55,7 +56,8 @@ test.describe("Why does it work like this?", () => {
 	}) => {
 		await setup.open();
 		await page
-			.getByRole("link", { name: "Varför fungerar det så här?" })
+			.locator("#pageNav")
+			.getByRole("link", { name: "Om", exact: true })
 			.click();
 		const nav = page.locator("#pageNav");
 		await expect(

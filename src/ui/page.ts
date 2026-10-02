@@ -8,8 +8,7 @@ import {
 import { TEXT } from "./text.js";
 
 /**
- * One entry per real URL the app serves. Order in PAGES is nav order; "data"
- * (#154) is reached from Start and Statistik and is not in the main menu.
+ * One entry per real URL the app serves. Order in PAGES is nav order.
  */
 export type PageId =
 	| "start"
@@ -48,6 +47,7 @@ const PAGES: readonly PageDef[] = [
 	{ id: "match", path: "match/", label: TEXT.nav.match },
 	{ id: "report", path: "report/", label: TEXT.nav.report },
 	{ id: "statistics", path: "statistics/", label: TEXT.nav.statistics },
+	{ id: "data", path: "data/", label: TEXT.nav.data },
 	{ id: "about", path: "about/", label: TEXT.nav.about },
 ];
 
