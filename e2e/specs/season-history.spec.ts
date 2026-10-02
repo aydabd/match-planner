@@ -16,12 +16,12 @@ const FILES = Array.from({ length: 6 }, (_, i) => {
 });
 
 test.describe("Season history", () => {
-	test.beforeEach(async ({ setup, history }) => {
+	test.beforeEach(async ({ setup }) => {
 		await setup.open();
-		await history.open();
 	});
 
 	test("starts empty and says so", async ({ history }) => {
+		await history.open();
 		await expect(history.root).toBeVisible();
 		await expect(history.count).toHaveText(
 			"Inga matcher än. Spela en match eller läs in matchfiler.",
@@ -29,13 +29,15 @@ test.describe("Season history", () => {
 	});
 
 	test("reads several matches: starts, minutes, positions and months", async ({
+		data,
 		history,
 	}) => {
-		await history.importFiles(FILES);
+		await data.open();
+		await data.importFiles(FILES);
 
-		await expect(history.messages.first()).toHaveText(
-			"6 nya matcher lästes in.",
-		);
+		await expect(data.messages.first()).toHaveText("6 nya matcher lästes in.");
+		await expect(data.count).toHaveText("6 matcher över 6 månader.");
+		await history.goto();
 		await expect(history.count).toHaveText("6 matcher över 6 månader.");
 
 		// Alva keeps goal for two 10-minute periods, six matches: 120 minutes.
@@ -59,43 +61,52 @@ test.describe("Season history", () => {
 	});
 
 	test("counts a match once however often its file is read", async ({
+		data,
 		history,
 	}) => {
-		await history.importFiles(FILES.slice(0, 3));
-		await history.importFiles(FILES);
+		await data.open();
+		await data.importFiles(FILES.slice(0, 3));
+		await data.importFiles(FILES);
 
-		await expect(history.messages.first()).toHaveText(
+		await expect(data.messages.first()).toHaveText(
 			"3 nya matcher lästes in, 3 fanns redan.",
 		);
-		await expect(history.count).toHaveText("6 matcher över 6 månader.");
+		await expect(data.count).toHaveText("6 matcher över 6 månader.");
+		await history.goto();
 		await expect(
 			history.row("Startat och speltid", "Alva").getByRole("cell").nth(0),
 		).toHaveText("6");
 	});
 
 	test("refuses a broken file and says why, without changing the statistics", async ({
+		data,
 		history,
 	}) => {
 		const broken = JSON.parse(FILES[0]?.contents ?? "{}");
 		broken.timeline[1].zones.back[0] = "nobody";
-		await history.importFiles([
+		await data.open();
+		await data.importFiles([
 			FILES[1] ?? { name: "", contents: "" },
 			{ name: "trasig.json", contents: JSON.stringify(broken) },
 			{ name: "inte-json.json", contents: "det här är text" },
 		]);
 
-		await expect(history.messages).toHaveText([
+		await expect(data.messages).toHaveText([
 			"1 ny match lästes in.",
 			"trasig.json: Händelse 2 i tidslinjen är ogiltig: spelaren finns inte i truppen.",
 			"inte-json.json: Filen kunde inte läsas. Välj en matchfil från MatchPlanner.",
 		]);
+		await expect(data.count).toHaveText("1 match över 1 månad.");
+		await history.goto();
 		await expect(history.count).toHaveText("1 match över 1 månad.");
 	});
 
-	test("keeps the matches after a reload", async ({ history, page }) => {
-		await history.importFiles(FILES);
+	test("keeps the matches after a reload", async ({ data, history, page }) => {
+		await data.open();
+		await data.importFiles(FILES);
 		// Reading files is asynchronous: reload only once they are kept.
-		await expect(history.count).toHaveText("6 matcher över 6 månader.");
+		await expect(data.count).toHaveText("6 matcher över 6 månader.");
+		await history.goto();
 		// /statistics/ is a real page (#93): a reload stays there, no need to
 		// reopen it from setup.
 		await page.reload();

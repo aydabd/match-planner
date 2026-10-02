@@ -7,8 +7,17 @@ import {
 } from "./teamStorage.js";
 import { TEXT } from "./text.js";
 
-/** One entry per real URL the app serves. Order here is nav order. */
-export type PageId = "start" | "match" | "report" | "statistics" | "about";
+/**
+ * One entry per real URL the app serves. Order in PAGES is nav order; "data"
+ * (#154) is reached from Start and Statistik and is not in the main menu.
+ */
+export type PageId =
+	| "start"
+	| "match"
+	| "report"
+	| "statistics"
+	| "about"
+	| "data";
 
 /** The three pages that share the "Statistik" entry in the main nav (#119). */
 export type StatisticsPageId = "overview" | "seasonReport" | "notes";

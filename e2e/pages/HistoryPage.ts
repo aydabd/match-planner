@@ -1,55 +1,20 @@
-import { expect, type Locator, type Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 
-/** The statistics pages (#119): import match files and read the tables on
+/** The statistics pages (#119): read the tables on
  * /statistics/, the season report on /statistics/sasongsrapport/, and the
  * player notes on /statistics/anteckningar/. All three share `#historyView`. */
 export class HistoryPage {
 	readonly root: Locator;
 	readonly count: Locator;
-	readonly messages: Locator;
 	readonly backButton: Locator;
-	readonly driveConnectButton: Locator;
-	readonly driveChooseFolderButton: Locator;
-	readonly drivePasswordInput: Locator;
-	readonly driveBackupButton: Locator;
-	readonly driveRestoreButton: Locator;
-	readonly driveStatus: Locator;
-	readonly driveTeamSelect: Locator;
-	readonly driveRestoreTeamButton: Locator;
 	readonly playerNotesCard: Locator;
 	readonly playerNotesFeedback: Locator;
 	readonly seasonReportCard: Locator;
-	readonly secureExportPasswordInput: Locator;
-	readonly secureExportButton: Locator;
-	readonly secureImportFileInput: Locator;
-	readonly secureImportButton: Locator;
-	readonly secureExportStatus: Locator;
 
 	constructor(private readonly page: Page) {
 		this.root = page.locator("#historyView");
 		this.count = this.root.locator("#historyCount");
-		this.messages = this.root.locator("#historyMessages li");
 		this.backButton = this.root.getByRole("link", { name: "Tillbaka" });
-		this.driveConnectButton = this.root.getByRole("button", {
-			name: "Koppla Google Drive",
-		});
-		this.driveChooseFolderButton = this.root.getByRole("button", {
-			name: /Välj mapp|Byt mapp/,
-		});
-		this.drivePasswordInput = this.root.getByLabel(
-			"Lösenord för säkerhetskopian",
-		);
-		this.driveBackupButton = this.root.getByRole("button", {
-			name: "Säkerhetskopiera",
-		});
-		this.driveRestoreButton = this.root.getByRole("button", {
-			name: "Återställ",
-		});
-		this.driveStatus = this.root.locator("#driveStatus");
-		this.driveTeamSelect = this.root.locator("#driveTeamSelect");
-		this.driveRestoreTeamButton = this.root.getByRole("button", {
-			name: "Läs in laget",
-		});
 		this.playerNotesCard = this.root.locator("section.card").filter({
 			has: page.getByRole("heading", { name: "Anteckningar per spelare" }),
 		});
@@ -59,22 +24,16 @@ export class HistoryPage {
 		this.seasonReportCard = this.root.locator("section.card").filter({
 			has: page.getByRole("heading", { name: "Säsongsrapport" }),
 		});
-		this.secureExportPasswordInput = this.root.locator(
-			"#secureExportPasswordInput",
-		);
-		this.secureExportButton = this.root.getByRole("button", {
-			name: "Exportera allt (krypterat)",
-		});
-		this.secureImportFileInput = this.root.locator("#secureImportFileInput");
-		this.secureImportButton = this.root.getByRole("button", {
-			name: /^(Importera|Ersätt trupp och anteckningar\?)$/,
-		});
-		this.secureExportStatus = this.root.locator("#secureExportStatus");
 	}
 
 	/** Open it from the setup screen: a real navigation to /statistics/. */
 	async open(): Promise<void> {
 		await this.page.getByRole("link", { name: "Visa spelarhistorik" }).click();
+	}
+
+	/** A real navigation to /statistics/, by URL. */
+	async goto(): Promise<void> {
+		await this.page.goto("statistics/");
 	}
 
 	/** A real navigation to the season report page, by URL. */
@@ -85,25 +44,6 @@ export class HistoryPage {
 	/** A real navigation to the player notes page, by URL. */
 	async gotoNotes(): Promise<void> {
 		await this.page.goto("statistics/anteckningar/");
-	}
-
-	async importFiles(
-		files: readonly { name: string; contents: string }[],
-	): Promise<void> {
-		// The first render fills the match count, and it runs after the
-		// page's script has attached the input's change handler; setting files
-		// earlier would fire a change event nobody is listening to yet.
-		await expect(this.count).not.toBeEmpty();
-		await this.root.locator("#historyImportInput").setInputFiles(
-			files.map((file) => ({
-				name: file.name,
-				mimeType: "application/json",
-				buffer: Buffer.from(file.contents),
-			})),
-		);
-		// The import reads and stores the files asynchronously and then says
-		// so; leaving the page before that would abandon it half done.
-		await expect(this.messages.first()).toBeVisible();
 	}
 
 	/** The row of a player in one of the tables ("Startat och speltid", ...). */

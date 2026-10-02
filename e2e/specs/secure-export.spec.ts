@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { matchFileToJson } from "../../src/core/matchFile.js";
 import { makeMatchFile, NAMES } from "../../tests/support/matchFiles.js";
 import { expect, test } from "../fixtures.js";
-import { HistoryPage } from "../pages/HistoryPage.js";
+import { DataPage } from "../pages/DataPage.js";
 import { SetupPage } from "../pages/SetupPage.js";
 
 const MATCH = matchFileToJson(
@@ -12,22 +12,22 @@ const MATCH = matchFileToJson(
 test.describe("Secure export and import (#81)", () => {
 	test("exports everything to one encrypted file and imports it on another device", async ({
 		browser,
-		history,
+		data,
 		setup,
 		page,
 	}) => {
 		const password = "hemligt-lösenord";
 
 		await setup.open();
-		await history.open();
-		await history.importFiles([{ name: "match.json", contents: MATCH }]);
-		await expect(history.count).toHaveText("1 match över 1 månad.");
+		await data.open();
+		await data.importFiles([{ name: "match.json", contents: MATCH }]);
+		await expect(data.count).toHaveText("1 match över 1 månad.");
 
-		await history.secureExportPasswordInput.fill(password);
+		await data.secureExportPasswordInput.fill(password);
 		const download = page.waitForEvent("download");
-		await history.secureExportButton.click();
+		await data.secureExportButton.click();
 		const file = await download;
-		await expect(history.secureExportStatus).toHaveText(
+		await expect(data.secureExportStatus).toHaveText(
 			"Allt exporterades till en krypterad fil.",
 		);
 		const contents = await readFile(await file.path(), "utf8");
@@ -39,7 +39,7 @@ test.describe("Secure export and import (#81)", () => {
 		});
 		const otherPage = await otherContext.newPage();
 		const otherSetup = new SetupPage(otherPage);
-		const otherHistory = new HistoryPage(otherPage);
+		const otherHistory = new DataPage(otherPage);
 		await otherSetup.open();
 		await otherHistory.open();
 		await expect(otherHistory.count).toHaveText(
@@ -79,14 +79,15 @@ test.describe("Secure export and import (#81)", () => {
 	});
 
 	test("the season report download is encrypted with the entered password", async ({
+		data,
 		history,
 		setup,
 		page,
 	}) => {
 		await setup.open();
-		await history.open();
-		await history.importFiles([{ name: "match.json", contents: MATCH }]);
-		await expect(history.count).toHaveText("1 match över 1 månad.");
+		await data.open();
+		await data.importFiles([{ name: "match.json", contents: MATCH }]);
+		await expect(data.count).toHaveText("1 match över 1 månad.");
 
 		await history.gotoSeasonReport();
 		const reportCard = history.seasonReportCard;
@@ -112,14 +113,15 @@ test.describe("Secure export and import (#81)", () => {
 	});
 
 	test("a file that decrypts fine but isn't an export bundle is refused as unreadable, not a wrong password", async ({
+		data,
 		history,
 		setup,
 		page,
 	}) => {
 		const password = "samma-lösenord";
 		await setup.open();
-		await history.open();
-		await history.importFiles([{ name: "match.json", contents: MATCH }]);
+		await data.open();
+		await data.importFiles([{ name: "match.json", contents: MATCH }]);
 
 		// Export the season report (a different SecurePackage payload shape)
 		// with the same password the import will use.
@@ -133,17 +135,17 @@ test.describe("Secure export and import (#81)", () => {
 		const file = await download;
 		const contents = await readFile(await file.path(), "utf8");
 
-		// Importing a bundle is a data-management action: back on /statistics/.
-		await page.goto("statistics/");
-		await history.secureImportFileInput.setInputFiles({
+		// Importing a bundle is a data-management action: back on /data/.
+		await data.goto();
+		await data.secureImportFileInput.setInputFiles({
 			name: "sasongsrapport.json",
 			mimeType: "application/json",
 			buffer: Buffer.from(contents),
 		});
-		await history.secureExportPasswordInput.fill(password);
-		await history.secureImportButton.click();
-		await history.secureImportButton.click();
-		await expect(history.secureExportStatus).toHaveText(
+		await data.secureExportPasswordInput.fill(password);
+		await data.secureImportButton.click();
+		await data.secureImportButton.click();
+		await expect(data.secureExportStatus).toHaveText(
 			"Filen kunde inte läsas som en exporterad fil.",
 		);
 	});

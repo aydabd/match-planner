@@ -56,17 +56,19 @@ for (const colorScheme of ["light", "dark"] as const) {
 
 		test("the season history has no WCAG A/AA violations", async ({
 			setup,
+			data,
 			history,
 			page,
 		}) => {
 			await setup.open();
-			await history.open();
-			await history.importFiles([
+			await data.open();
+			await data.importFiles([
 				{
 					name: "match.json",
 					contents: matchFileToJson(makeMatchFile({ seed: 3 })),
 				},
 			]);
+			await history.goto();
 			await expect(history.count).toHaveText("1 match över 1 månad.");
 			expect(await accessibilityViolations(page)).toEqual([]);
 		});

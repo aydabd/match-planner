@@ -11,6 +11,7 @@ import {
 } from "../../src/core/securePackage.js";
 import { makeMatchFile, NAMES } from "../../tests/support/matchFiles.js";
 import { expect, test } from "../fixtures.js";
+import { DataPage } from "../pages/DataPage.js";
 import { HistoryPage } from "../pages/HistoryPage.js";
 import { SetupPage } from "../pages/SetupPage.js";
 import { TeamSwitcher } from "../pages/TeamSwitcher.js";
@@ -49,7 +50,7 @@ async function newPhone(
 	return {
 		context,
 		page,
-		history: new HistoryPage(page),
+		data: new DataPage(page),
 		close: async () => {
 			expect(violations).toEqual([]);
 			await context.close();
@@ -57,11 +58,11 @@ async function newPhone(
 	};
 }
 
-async function connectAndPickFolder(history: HistoryPage): Promise<void> {
-	await history.driveConnectButton.click();
-	await expect(history.driveStatus).toHaveText("Kopplad till Google Drive.");
-	await history.driveChooseFolderButton.click();
-	await expect(history.driveStatus).toHaveText("Mapp: MatchPlanner-mapp");
+async function connectAndPickFolder(data: DataPage): Promise<void> {
+	await data.driveConnectButton.click();
+	await expect(data.driveStatus).toHaveText("Kopplad till Google Drive.");
+	await data.driveChooseFolderButton.click();
+	await expect(data.driveStatus).toHaveText("Mapp: MatchPlanner-mapp");
 }
 
 /** A phone with a named team and one match, backed up with `password`. */
@@ -73,17 +74,17 @@ async function backedUpTeam(
 	seed: number,
 	password: string,
 ): Promise<BrowserContext> {
-	const { context, page, history } = await newPhone(browser, drive);
+	const { context, page, data } = await newPhone(browser, drive);
 	await new SetupPage(page).open();
 	await new TeamSwitcher(page).createTeam(teamName);
-	await history.open();
-	await history.importFiles([
+	await data.open();
+	await data.importFiles([
 		{ name: "m.json", contents: matchJson(matchId, seed) },
 	]);
-	await connectAndPickFolder(history);
-	await history.drivePasswordInput.fill(password);
-	await history.driveBackupButton.click();
-	await expect(history.driveStatus).toHaveText("1 match säkerhetskopierades.");
+	await connectAndPickFolder(data);
+	await data.drivePasswordInput.fill(password);
+	await data.driveBackupButton.click();
+	await expect(data.driveStatus).toHaveText("1 match säkerhetskopierades.");
 	return context;
 }
 
@@ -114,42 +115,43 @@ test.describe("Drive: teams with different passwords share one root (#147)", () 
 		// A coach with P11's password: P11 is restored, no question asked.
 		const blue = await newPhone(browser, drive);
 		await new SetupPage(blue.page).open();
-		await blue.history.open();
-		await connectAndPickFolder(blue.history);
-		await blue.history.drivePasswordInput.fill("blå-lösenord-1");
-		await blue.history.driveRestoreButton.click();
-		await expect(blue.history.driveStatus).toHaveText("1 match lästes in.");
-		await expect(blue.history.count).toHaveText("1 match över 1 månad.");
-		await expect(blue.history.driveTeamSelect).toBeHidden();
+		await blue.data.open();
+		await connectAndPickFolder(blue.data);
+		await blue.data.drivePasswordInput.fill("blå-lösenord-1");
+		await blue.data.driveRestoreButton.click();
+		await expect(blue.data.driveStatus).toHaveText("1 match lästes in.");
+		await expect(blue.data.count).toHaveText("1 match över 1 månad.");
+		await expect(blue.data.driveTeamSelect).toBeHidden();
 		await blue.close();
 
 		// A coach with P13's password gets P13, a different match.
 		const p13 = await newPhone(browser, drive);
 		await new SetupPage(p13.page).open();
-		await p13.history.open();
-		await connectAndPickFolder(p13.history);
-		await p13.history.drivePasswordInput.fill("p13-lösenord-2");
-		await p13.history.driveRestoreButton.click();
-		await expect(p13.history.driveStatus).toHaveText("1 match lästes in.");
+		await p13.data.open();
+		await connectAndPickFolder(p13.data);
+		await p13.data.drivePasswordInput.fill("p13-lösenord-2");
+		await p13.data.driveRestoreButton.click();
+		await expect(p13.data.driveStatus).toHaveText("1 match lästes in.");
+		await p13.page.goto("statistics/");
 		await expect(
-			p13.history.row("Startat och speltid", SQUAD[0] ?? ""),
+			new HistoryPage(p13.page).row("Startat och speltid", SQUAD[0] ?? ""),
 		).toBeVisible();
 		await p13.close();
 
 		// Someone guessing gets the wrong-password message and no data.
 		const guess = await newPhone(browser, drive);
 		await new SetupPage(guess.page).open();
-		await guess.history.open();
-		await connectAndPickFolder(guess.history);
-		await guess.history.drivePasswordInput.fill("gissning-12345");
-		await guess.history.driveRestoreButton.click();
-		await expect(guess.history.driveStatus).toHaveText(
+		await guess.data.open();
+		await connectAndPickFolder(guess.data);
+		await guess.data.drivePasswordInput.fill("gissning-12345");
+		await guess.data.driveRestoreButton.click();
+		await expect(guess.data.driveStatus).toHaveText(
 			"Fel lösenord, eller filen har ändrats. Kontrollera lösenordet och försök igen.",
 		);
-		await expect(guess.history.count).toHaveText(
+		await expect(guess.data.count).toHaveText(
 			"Inga matcher än. Spela en match eller läs in matchfiler.",
 		);
-		await expect(guess.history.driveTeamSelect).toBeHidden();
+		await expect(guess.data.driveTeamSelect).toBeHidden();
 		await guess.close();
 	});
 });
@@ -176,25 +178,25 @@ test.describe("Drive: what the app sends and keeps (#147)", () => {
 		const writer = await newPhone(browser, drive);
 		watch(writer.context);
 		await new SetupPage(writer.page).open();
-		await writer.history.open();
-		await writer.history.importFiles([
+		await writer.data.open();
+		await writer.data.importFiles([
 			{ name: "m.json", contents: matchJson("leak-1", 3) },
 		]);
-		await connectAndPickFolder(writer.history);
-		await writer.history.drivePasswordInput.fill(password);
-		await writer.history.driveBackupButton.click();
-		await expect(writer.history.driveStatus).toHaveText(
+		await connectAndPickFolder(writer.data);
+		await writer.data.drivePasswordInput.fill(password);
+		await writer.data.driveBackupButton.click();
+		await expect(writer.data.driveStatus).toHaveText(
 			"1 match säkerhetskopierades.",
 		);
 
 		const reader = await newPhone(browser, drive);
 		watch(reader.context);
 		await new SetupPage(reader.page).open();
-		await reader.history.open();
-		await connectAndPickFolder(reader.history);
-		await reader.history.drivePasswordInput.fill(password);
-		await reader.history.driveRestoreButton.click();
-		await expect(reader.history.driveStatus).toHaveText("1 match lästes in.");
+		await reader.data.open();
+		await connectAndPickFolder(reader.data);
+		await reader.data.drivePasswordInput.fill(password);
+		await reader.data.driveRestoreButton.click();
+		await expect(reader.data.driveStatus).toHaveText("1 match lästes in.");
 
 		// The calls were really made (so this is not an empty check)...
 		expect(seen.some((r) => r.includes("/upload/drive/v3/files"))).toBe(true);
@@ -247,55 +249,55 @@ test.describe("Drive: what the app sends and keeps (#147)", () => {
 
 		const phone = await newPhone(browser, drive);
 		await new SetupPage(phone.page).open();
-		await phone.history.open();
-		await connectAndPickFolder(phone.history);
-		await phone.history.drivePasswordInput.fill(password);
-		await phone.history.driveRestoreButton.click();
-		await expect(phone.history.driveStatus).toHaveText(
+		await phone.data.open();
+		await connectAndPickFolder(phone.data);
+		await phone.data.drivePasswordInput.fill(password);
+		await phone.data.driveRestoreButton.click();
+		await expect(phone.data.driveStatus).toHaveText(
 			"Mappen innehåller flera lag. Välj vilket som ska läsas in.",
 		);
-		await expect(phone.history.drivePasswordInput).toHaveValue(password);
+		await expect(phone.data.drivePasswordInput).toHaveValue(password);
 
-		await phone.history.driveTeamSelect.selectOption({ label: "P11 Blå" });
-		await phone.history.driveRestoreTeamButton.click();
-		await expect(phone.history.driveStatus).toHaveText("1 match lästes in.");
-		await expect(phone.history.drivePasswordInput).toHaveValue("");
+		await phone.data.driveTeamSelect.selectOption({ label: "P11 Blå" });
+		await phone.data.driveRestoreTeamButton.click();
+		await expect(phone.data.driveStatus).toHaveText("1 match lästes in.");
+		await expect(phone.data.drivePasswordInput).toHaveValue("");
 
-		await phone.history.drivePasswordInput.fill(password);
-		await phone.history.driveBackupButton.click();
-		await expect(phone.history.driveStatus).toHaveText(
+		await phone.data.drivePasswordInput.fill(password);
+		await phone.data.driveBackupButton.click();
+		await expect(phone.data.driveStatus).toHaveText(
 			"Allt var redan säkerhetskopierat.",
 		);
-		await expect(phone.history.drivePasswordInput).toHaveValue("");
+		await expect(phone.data.drivePasswordInput).toHaveValue("");
 		for (const context of [first, second]) await context.close();
 		await phone.close();
 	});
 
 	test("a short password is refused for a new backup and a new export, and nothing is written", async ({
 		browser,
-		history,
+		data,
 		setup,
 		page,
 	}) => {
 		const drive = createFakeDrive();
 		await mockGoogle(page.context(), drive);
 		await setup.open();
-		await history.open();
-		await history.importFiles([
+		await data.open();
+		await data.importFiles([
 			{ name: "m.json", contents: matchJson("short-1", 2) },
 		]);
-		await connectAndPickFolder(history);
+		await connectAndPickFolder(data);
 
-		await history.drivePasswordInput.fill("kort");
-		await history.driveBackupButton.click();
-		await expect(history.driveStatus).toHaveText(
+		await data.drivePasswordInput.fill("kort");
+		await data.driveBackupButton.click();
+		await expect(data.driveStatus).toHaveText(
 			"Lösenordet för en ny säkerhetskopia måste vara minst 10 tecken.",
 		);
 		expect(drive.files.size).toBe(0);
 
-		await history.secureExportPasswordInput.fill("kort");
-		await history.secureExportButton.click();
-		await expect(history.secureExportStatus).toHaveText(
+		await data.secureExportPasswordInput.fill("kort");
+		await data.secureExportButton.click();
+		await expect(data.secureExportStatus).toHaveText(
 			"Lösenordet måste vara minst 10 tecken.",
 		);
 		void browser;
@@ -351,19 +353,19 @@ test.describe("Drive: data from Drive and storage is never run or trusted (#147)
 		}
 		const phone = await newPhone(browser, drive);
 		await new SetupPage(phone.page).open();
-		await phone.history.open();
-		await connectAndPickFolder(phone.history);
-		await phone.history.drivePasswordInput.fill(password);
-		await phone.history.driveRestoreButton.click();
+		await phone.data.open();
+		await connectAndPickFolder(phone.data);
+		await phone.data.drivePasswordInput.fill(password);
+		await phone.data.driveRestoreButton.click();
 
-		const options = phone.history.driveTeamSelect.locator("option");
+		const options = phone.data.driveTeamSelect.locator("option");
 		await expect(options).toHaveText(["Vanligt lag", hostile].sort());
 		await expect(phone.page.locator("#driveTeamSelect img")).toHaveCount(0);
 
 		// Take the hostile-named team on: its name now shows in the header too.
-		await phone.history.driveTeamSelect.selectOption({ label: hostile });
-		await phone.history.driveRestoreTeamButton.click();
-		await expect(phone.history.driveStatus).toHaveText("1 match lästes in.");
+		await phone.data.driveTeamSelect.selectOption({ label: hostile });
+		await phone.data.driveRestoreTeamButton.click();
+		await expect(phone.data.driveStatus).toHaveText("1 match lästes in.");
 		await phone.page.reload();
 		await expect(phone.page.locator("#teamSwitcherSelect option")).toHaveText([
 			hostile,
@@ -388,17 +390,17 @@ test.describe("Drive: data from Drive and storage is never run or trusted (#147)
 			if (url.hostname === "www.googleapis.com") drivePaths.push(request.url());
 		});
 		await new SetupPage(phone.page).open();
-		await phone.history.open();
-		await phone.history.importFiles([
+		await phone.data.open();
+		await phone.data.importFiles([
 			{ name: "m.json", contents: matchJson("id-1", 4) },
 		]);
 
 		// Something (an extension, a script, a damaged profile) wrote a hostile id.
 		await writeFolderToStorage(phone.page, "x' or 'a'='a", "Elak mapp");
 		await phone.page.reload();
-		await phone.history.drivePasswordInput.fill("någotlångtlösen1");
-		await phone.history.driveBackupButton.click();
-		await expect(phone.history.driveStatus).toHaveText(
+		await phone.data.drivePasswordInput.fill("någotlångtlösen1");
+		await phone.data.driveBackupButton.click();
+		await expect(phone.data.driveStatus).toHaveText(
 			"Det gick inte att nå Google Drive just nu. Försök igen senare.",
 		);
 		expect(drivePaths).toEqual([]);

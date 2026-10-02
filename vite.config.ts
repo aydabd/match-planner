@@ -35,6 +35,7 @@ const PAGE_DIRS = [
 	"statistics/sasongsrapport/",
 	"statistics/anteckningar/",
 	"about/",
+	"data/",
 ];
 
 /** Precached so every page works fully offline after its first visit. */

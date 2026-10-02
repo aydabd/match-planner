@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#f3f6f1" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#0c1a12" media="(prefers-color-scheme: dark)" />
+  <title>MatchPlanner – Data</title>
+  <link rel="manifest" href="../manifest.webmanifest" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9A%BD%3C/text%3E%3C/svg%3E" />
+  <link rel="apple-touch-icon" href="../icon-192.svg" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="MatchPlan" />
+  <link rel="stylesheet" href="../src/ui/style.css" />
+</head>
+<body>
+  <div class="app" id="app">
+    <header class="topbar">
+      <span class="brand"><span class="brand-ball" aria-hidden="true">⚽</span>MatchPlanner</span>
+      <nav class="page-nav" id="pageNav" aria-label="Sidor"></nav>
+      <div class="team-switcher" id="teamSwitcher"></div>
+    </header>
+
+    <!-- ============ DATA VIEW ============ -->
+    <section id="dataView" class="view view-history" aria-labelledby="dataTitle">
+      <div class="row-buttons">
+        <a id="dataBackBtn" href="../" class="btn btn-ghost">Tillbaka</a>
+      </div>
+      <div class="intro">
+        <h1 id="dataTitle" tabindex="-1">Data</h1>
+        <p class="lede">Hämta in matcher, trupp och anteckningar, skicka ut allt i en krypterad fil och håll laget säkerhetskopierat i Google Drive. Allt på ett ställe.</p>
+      </div>
+      <section class="card" aria-labelledby="historyImportTitle">
+        <h2 id="historyImportTitle">Läs in matchfiler</h2>
+        <div class="row-buttons">
+          <label class="btn btn-secondary file-btn">
+            Välj matchfiler
+            <input id="historyImportInput" class="visually-hidden" type="file" accept="application/json" multiple />
+          </label>
+        </div>
+        <div class="hint" role="status"><ul class="history-messages" id="historyMessages"></ul></div>
+        <p class="hint" id="historyCount"></p>
+      </section>
+      <section class="card" aria-labelledby="historyBackupTitle" id="historyBackupCard" hidden>
+        <h2 id="historyBackupTitle">Säkerhetskopiera till Google Drive</h2>
+        <p class="hint">Kopplas till ditt eget Google-konto. Appen sparar bara sina egna filer i Drive - aldrig resten av din Drive. Filerna krypteras med ett lösenord du väljer, så en mapp du delar med andra ledare är säker även om Drive-behörigheten inte är det. Välj en mapp en gång - varje lag får en egen undermapp i den.</p>
+        <div class="row-buttons">
+          <button type="button" id="driveConnectBtn" class="btn btn-secondary">Koppla Google Drive</button>
+          <button type="button" id="driveChooseFolderBtn" class="btn btn-secondary" hidden>Välj mapp</button>
+        </div>
+        <p class="hint" id="driveFolderStatus" hidden>Mapp: <a id="driveFolderLink" href="https://drive.google.com/drive/my-drive" target="_blank" rel="noopener">Google Drive</a></p>
+        <div class="field" id="drivePasswordField" hidden>
+          <label class="field-label" for="drivePasswordInput">Lösenord för säkerhetskopian</label>
+          <input type="password" id="drivePasswordInput" autocomplete="off">
+        </div>
+        <div class="row-buttons">
+          <button type="button" id="driveBackupBtn" class="btn btn-secondary" hidden>Säkerhetskopiera</button>
+          <button type="button" id="driveRestoreBtn" class="btn btn-secondary" hidden>Återställ</button>
+        </div>
+        <div class="field" id="driveTeamChoice" hidden>
+          <label class="field-label" for="driveTeamSelect">Lag att läsa in</label>
+          <select id="driveTeamSelect"></select>
+          <div class="row-buttons">
+            <button type="button" id="driveRestoreTeamBtn" class="btn btn-secondary">Läs in laget</button>
+          </div>
+        </div>
+        <p class="hint" id="driveStatus" role="status"></p>
+      </section>
+      <section class="card" aria-labelledby="secureExportTitle" id="secureExportCard">
+        <h2 id="secureExportTitle">Säker export och import</h2>
+        <p class="hint">Sparar truppen, alla matcher och spelaranteckningar i en enda krypterad fil, skyddad med ett lösenord du väljer. Bra för att flytta allt till en annan enhet utan Google Drive.</p>
+        <div class="field">
+          <label class="field-label" for="secureExportPasswordInput">Lösenord</label>
+          <input type="password" id="secureExportPasswordInput" autocomplete="off">
+        </div>
+        <div class="row-buttons">
+          <button type="button" id="secureExportBtn" class="btn btn-secondary">Exportera allt (krypterat)</button>
+          <label class="btn btn-secondary file-btn">
+            Välj krypterad fil
+            <input id="secureImportFileInput" class="visually-hidden" type="file" accept="application/json" />
+          </label>
+          <button type="button" id="secureImportBtn" class="btn btn-secondary" disabled>Importera</button>
+        </div>
+        <p class="hint" id="secureExportStatus" role="status"></p>
+      </section>
+    </section>
+
+    <footer class="footer app-footer" id="appFooter">
+      <span>MatchPlanner v<span data-app-version></span></span>
+      <span data-copyright></span>
+      <span>MIT-licens</span>
+    </footer>
+  </div>
+
+  <script type="module" src="/src/ui/pages/data.ts"></script>
+</body>
+</html>

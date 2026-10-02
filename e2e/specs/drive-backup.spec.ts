@@ -10,6 +10,7 @@ import {
 } from "../../src/core/securePackage.js";
 import { makeMatchFile, NAMES } from "../../tests/support/matchFiles.js";
 import { expect, test } from "../fixtures.js";
+import { DataPage } from "../pages/DataPage.js";
 import { HistoryPage } from "../pages/HistoryPage.js";
 import { SetupPage } from "../pages/SetupPage.js";
 import { TeamSwitcher } from "../pages/TeamSwitcher.js";
@@ -34,7 +35,7 @@ test.use({ serviceWorkers: "block" });
 test.describe("Google Drive backup and restore", () => {
 	test("retries loading Google sign-in after a failed attempt", async ({
 		setup,
-		history,
+		data,
 		page,
 	}) => {
 		let scriptRequests = 0;
@@ -54,22 +55,22 @@ test.describe("Google Drive backup and restore", () => {
 			});
 
 		await setup.open();
-		await history.open();
+		await data.open();
 
-		await history.driveConnectButton.click();
-		await expect(history.driveStatus).toHaveText(
+		await data.driveConnectButton.click();
+		await expect(data.driveStatus).toHaveText(
 			"Inloggningen misslyckades eller avbröts.",
 		);
 
 		// A second tap must load the script again, not replay the same
 		// cached failure for the rest of the page's life.
-		await history.driveConnectButton.click();
-		await expect(history.driveStatus).toHaveText("Kopplad till Google Drive.");
+		await data.driveConnectButton.click();
+		await expect(data.driveStatus).toHaveText("Kopplad till Google Drive.");
 		expect(scriptRequests).toBe(2);
 	});
 
 	test("anchors the folder picker to the viewport, not the page (#115)", async ({
-		history,
+		data,
 		setup,
 		page,
 	}) => {
@@ -77,12 +78,12 @@ test.describe("Google Drive backup and restore", () => {
 		await mockGoogle(page.context(), drive);
 
 		await setup.open();
-		await history.open();
-		await history.driveConnectButton.click();
-		await expect(history.driveStatus).toHaveText("Kopplad till Google Drive.");
+		await data.open();
+		await data.driveConnectButton.click();
+		await expect(data.driveStatus).toHaveText("Kopplad till Google Drive.");
 
-		await history.driveChooseFolderButton.click();
-		await expect(history.driveStatus).toHaveText("Mapp: MatchPlanner-mapp");
+		await data.driveChooseFolderButton.click();
+		await expect(data.driveStatus).toHaveText("Mapp: MatchPlanner-mapp");
 
 		// <style> elements carry no visible text, so read their raw content
 		// directly rather than through Playwright's toContainText, which
@@ -94,12 +95,12 @@ test.describe("Google Drive backup and restore", () => {
 		);
 
 		// Choosing again (e.g. "Byt mapp") must not pile up duplicate tags.
-		await history.driveChooseFolderButton.click();
+		await data.driveChooseFolderButton.click();
 		await expect(fixStyle).toHaveCount(1);
 	});
 
 	test("restores a team's files, skipping anything else in the folder, across several pages", async ({
-		history,
+		data,
 		setup,
 		page,
 	}) => {
@@ -167,20 +168,20 @@ test.describe("Google Drive backup and restore", () => {
 		await mockGoogle(page.context(), drive);
 
 		await setup.open();
-		await history.open();
-		await history.driveConnectButton.click();
-		await expect(history.driveStatus).toHaveText("Kopplad till Google Drive.");
-		await history.driveChooseFolderButton.click();
-		await expect(history.driveStatus).toHaveText("Mapp: MatchPlanner-mapp");
-		await history.drivePasswordInput.fill(password);
-		await history.driveRestoreButton.click();
-		await expect(history.driveStatus).toHaveText("3 matcher lästes in.");
-		await expect(history.count).toHaveText("3 matcher över 1 månad.");
+		await data.open();
+		await data.driveConnectButton.click();
+		await expect(data.driveStatus).toHaveText("Kopplad till Google Drive.");
+		await data.driveChooseFolderButton.click();
+		await expect(data.driveStatus).toHaveText("Mapp: MatchPlanner-mapp");
+		await data.drivePasswordInput.fill(password);
+		await data.driveRestoreButton.click();
+		await expect(data.driveStatus).toHaveText("3 matcher lästes in.");
+		await expect(data.count).toHaveText("3 matcher över 1 månad.");
 	});
 
 	test("backs up on one phone and restores on another", async ({
 		browser,
-		history,
+		data,
 		setup,
 		page,
 	}) => {
@@ -188,29 +189,27 @@ test.describe("Google Drive backup and restore", () => {
 		await mockGoogle(page.context(), drive);
 
 		await setup.open();
-		await history.open();
-		await history.importFiles([{ name: "match.json", contents: MATCH }]);
-		await expect(history.count).toHaveText("1 match över 1 månad.");
+		await data.open();
+		await data.importFiles([{ name: "match.json", contents: MATCH }]);
+		await expect(data.count).toHaveText("1 match över 1 månad.");
 
 		const password = "hemligt-lösenord";
 
-		await history.driveConnectButton.click();
-		await expect(history.driveStatus).toHaveText("Kopplad till Google Drive.");
-		await history.driveChooseFolderButton.click();
-		await expect(history.driveStatus).toHaveText("Mapp: MatchPlanner-mapp");
-		await history.drivePasswordInput.fill(password);
-		await expect(history.driveBackupButton).toBeVisible();
+		await data.driveConnectButton.click();
+		await expect(data.driveStatus).toHaveText("Kopplad till Google Drive.");
+		await data.driveChooseFolderButton.click();
+		await expect(data.driveStatus).toHaveText("Mapp: MatchPlanner-mapp");
+		await data.drivePasswordInput.fill(password);
+		await expect(data.driveBackupButton).toBeVisible();
 
-		await history.drivePasswordInput.fill(password);
-		await history.driveBackupButton.click();
-		await expect(history.driveStatus).toHaveText(
-			"1 match säkerhetskopierades.",
-		);
+		await data.drivePasswordInput.fill(password);
+		await data.driveBackupButton.click();
+		await expect(data.driveStatus).toHaveText("1 match säkerhetskopierades.");
 
 		// Backing up again finds nothing new to upload.
-		await history.drivePasswordInput.fill(password);
-		await history.driveBackupButton.click();
-		await expect(history.driveStatus).toHaveText(
+		await data.drivePasswordInput.fill(password);
+		await data.driveBackupButton.click();
+		await expect(data.driveStatus).toHaveText(
 			"Allt var redan säkerhetskopierat.",
 		);
 
@@ -224,7 +223,7 @@ test.describe("Google Drive backup and restore", () => {
 		await mockGoogle(otherContext, drive);
 		const otherPage = await otherContext.newPage();
 		const otherSetup = new SetupPage(otherPage);
-		const otherHistory = new HistoryPage(otherPage);
+		const otherHistory = new DataPage(otherPage);
 		await otherSetup.open();
 		await otherHistory.open();
 		await expect(otherHistory.count).toHaveText(
@@ -256,7 +255,7 @@ test.describe("Google Drive backup and restore", () => {
 	});
 
 	test("a second team on the same phone gets a subfolder of its own in the root (#118, #142)", async ({
-		history,
+		data,
 		setup,
 		teamSwitcher,
 		page,
@@ -265,20 +264,18 @@ test.describe("Google Drive backup and restore", () => {
 		await mockGoogle(page.context(), drive);
 
 		await setup.open();
-		await history.open();
-		await history.importFiles([{ name: "match.json", contents: MATCH }]);
-		await expect(history.count).toHaveText("1 match över 1 månad.");
+		await data.open();
+		await data.importFiles([{ name: "match.json", contents: MATCH }]);
+		await expect(data.count).toHaveText("1 match över 1 månad.");
 
 		const password = "hemligt-lösenord";
-		await history.driveConnectButton.click();
-		await expect(history.driveStatus).toHaveText("Kopplad till Google Drive.");
-		await history.driveChooseFolderButton.click();
-		await expect(history.driveStatus).toHaveText("Mapp: MatchPlanner-mapp");
-		await history.drivePasswordInput.fill(password);
-		await history.driveBackupButton.click();
-		await expect(history.driveStatus).toHaveText(
-			"1 match säkerhetskopierades.",
-		);
+		await data.driveConnectButton.click();
+		await expect(data.driveStatus).toHaveText("Kopplad till Google Drive.");
+		await data.driveChooseFolderButton.click();
+		await expect(data.driveStatus).toHaveText("Mapp: MatchPlanner-mapp");
+		await data.drivePasswordInput.fill(password);
+		await data.driveBackupButton.click();
+		await expect(data.driveStatus).toHaveText("1 match säkerhetskopierades.");
 		expect(subfolderNames(drive, "folder-1")).toHaveLength(1);
 
 		// A second team, on the same device, pointed at the same root (this
@@ -287,30 +284,30 @@ test.describe("Google Drive backup and restore", () => {
 		// since the only team in the root is the first one, on this phone.
 		await setup.open();
 		await teamSwitcher.createTeam("P11 7v7");
-		await history.open();
-		await expect(history.count).toHaveText(
+		await data.open();
+		await expect(data.count).toHaveText(
 			"Inga matcher än. Spela en match eller läs in matchfiler.",
 		);
-		await history.driveConnectButton.click();
-		await expect(history.driveStatus).toHaveText("Kopplad till Google Drive.");
-		await history.driveChooseFolderButton.click();
-		await expect(history.driveStatus).toHaveText("Mapp: MatchPlanner-mapp");
-		await history.drivePasswordInput.fill(password);
+		await data.driveConnectButton.click();
+		await expect(data.driveStatus).toHaveText("Kopplad till Google Drive.");
+		await data.driveChooseFolderButton.click();
+		await expect(data.driveStatus).toHaveText("Mapp: MatchPlanner-mapp");
+		await data.drivePasswordInput.fill(password);
 		const filesBefore = drive.files.size;
-		await history.drivePasswordInput.fill(password);
-		await history.driveBackupButton.click();
-		await expect(history.driveStatus).toHaveText(
+		await data.drivePasswordInput.fill(password);
+		await data.driveBackupButton.click();
+		await expect(data.driveStatus).toHaveText(
 			"Allt var redan säkerhetskopierat.",
 		);
 		expect(drive.files.size).toBe(filesBefore);
-		await history.drivePasswordInput.fill(password);
-		await history.driveRestoreButton.click();
-		await expect(history.driveStatus).toHaveText(
+		await data.drivePasswordInput.fill(password);
+		await data.driveRestoreButton.click();
+		await expect(data.driveStatus).toHaveText(
 			"Mappen tillhör ett annat lag på den här enheten. Byt till det laget först.",
 		);
 
 		// Once it has a match of its own it is backed up into its own subfolder.
-		await history.importFiles([
+		await data.importFiles([
 			{
 				name: "second.json",
 				contents: matchFileToJson(
@@ -322,16 +319,15 @@ test.describe("Google Drive backup and restore", () => {
 				),
 			},
 		]);
-		await history.drivePasswordInput.fill(password);
-		await history.driveBackupButton.click();
-		await expect(history.driveStatus).toHaveText(
-			"1 match säkerhetskopierades.",
-		);
+		await data.drivePasswordInput.fill(password);
+		await data.driveBackupButton.click();
+		await expect(data.driveStatus).toHaveText("1 match säkerhetskopierades.");
 		expect(subfolderNames(drive, "folder-1")).toHaveLength(2);
 	});
 
 	test("two coaches share one root: each team keeps its subfolder, and an empty phone chooses between them", async ({
 		browser,
+		data,
 		history,
 		setup,
 		teamSwitcher,
@@ -341,7 +337,7 @@ test.describe("Google Drive backup and restore", () => {
 		await mockGoogle(page.context(), drive);
 		const password = "hemligt-lösenord";
 		const squad = NAMES.slice(0, 9);
-		const connectAndPickFolder = async (h: HistoryPage) => {
+		const connectAndPickFolder = async (h: DataPage) => {
 			await h.driveConnectButton.click();
 			await expect(h.driveStatus).toHaveText("Kopplad till Google Drive.");
 			await h.driveChooseFolderButton.click();
@@ -352,8 +348,8 @@ test.describe("Google Drive backup and restore", () => {
 		// Coach one: team "P11 Blå", a match, and a development note.
 		await setup.open();
 		await teamSwitcher.createTeam("P11 Blå");
-		await history.open();
-		await history.importFiles([
+		await data.open();
+		await data.importFiles([
 			{
 				name: "match.json",
 				contents: matchFileToJson(
@@ -367,11 +363,11 @@ test.describe("Google Drive backup and restore", () => {
 			area: "Fysiskt",
 			note: "Snabbare i vändningar",
 		});
-		await page.goto("statistics/");
-		await connectAndPickFolder(history);
-		await history.drivePasswordInput.fill(password);
-		await history.driveBackupButton.click();
-		await expect(history.driveStatus).toHaveText(
+		await data.goto();
+		await connectAndPickFolder(data);
+		await data.drivePasswordInput.fill(password);
+		await data.driveBackupButton.click();
+		await expect(data.driveStatus).toHaveText(
 			"1 match säkerhetskopierades. Trupp och anteckningar sparades.",
 		);
 
@@ -384,7 +380,7 @@ test.describe("Google Drive backup and restore", () => {
 		});
 		await mockGoogle(coachContext, drive);
 		const coachPage = await coachContext.newPage();
-		const coachHistory = new HistoryPage(coachPage);
+		const coachHistory = new DataPage(coachPage);
 		await new SetupPage(coachPage).open();
 		await new TeamSwitcher(coachPage).createTeam("F12 Röd");
 		await coachHistory.open();
@@ -417,7 +413,7 @@ test.describe("Google Drive backup and restore", () => {
 		});
 		await mockGoogle(otherContext, drive);
 		const otherPage = await otherContext.newPage();
-		const otherHistory = new HistoryPage(otherPage);
+		const otherHistory = new DataPage(otherPage);
 		await new SetupPage(otherPage).open();
 		await otherHistory.open();
 		await connectAndPickFolder(otherHistory);
@@ -440,9 +436,10 @@ test.describe("Google Drive backup and restore", () => {
 			"1 match lästes in. Anteckningarna uppdaterades.",
 		);
 		await expect(otherHistory.count).toHaveText("1 match över 1 månad.");
-		await otherHistory.gotoNotes();
-		await otherHistory.choosePlayerForNotes("Alva");
-		await expect(otherHistory.developmentNotes()).toContainText([
+		const otherNotes = new HistoryPage(otherPage);
+		await otherNotes.gotoNotes();
+		await otherNotes.choosePlayerForNotes("Alva");
+		await expect(otherNotes.developmentNotes()).toContainText([
 			"Snabbare i vändningar",
 		]);
 		await otherContext.close();

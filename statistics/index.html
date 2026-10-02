@@ -30,61 +30,10 @@
       <nav class="page-subnav" id="statisticsSubNav" aria-label="Statistiksidor"></nav>
       <div class="intro">
         <h1 id="historyTitle" tabindex="-1">Spelarhistorik</h1>
-        <p class="lede">Alla matcher du spelat med appen sparas här. Läs in matchfiler från andra matcher för att se hela säsongen. Samma match räknas aldrig två gånger, och ordningen spelar ingen roll. Spelare känns igen på namn.</p>
+        <p class="lede">Alla matcher du spelat med appen sparas här. Läs in matchfiler från andra matcher på Data-sidan för att se hela säsongen. Samma match räknas aldrig två gånger, och ordningen spelar ingen roll. Spelare känns igen på namn.</p>
       </div>
-      <section class="card" aria-labelledby="historyImportTitle">
-        <h2 id="historyImportTitle">Läs in matchfiler</h2>
-        <div class="row-buttons">
-          <label class="btn btn-secondary file-btn">
-            Välj matchfiler
-            <input id="historyImportInput" class="visually-hidden" type="file" accept="application/json" multiple />
-          </label>
-        </div>
-        <div class="hint" role="status"><ul class="history-messages" id="historyMessages"></ul></div>
-        <p class="hint" id="historyCount"></p>
-      </section>
-      <section class="card" aria-labelledby="historyBackupTitle" id="historyBackupCard" hidden>
-        <h2 id="historyBackupTitle">Säkerhetskopiera till Google Drive</h2>
-        <p class="hint">Kopplas till ditt eget Google-konto. Appen sparar bara sina egna filer i Drive - aldrig resten av din Drive. Filerna krypteras med ett lösenord du väljer, så en mapp du delar med andra ledare är säker även om Drive-behörigheten inte är det. Välj en mapp en gång - varje lag får en egen undermapp i den.</p>
-        <div class="row-buttons">
-          <button type="button" id="driveConnectBtn" class="btn btn-secondary">Koppla Google Drive</button>
-          <button type="button" id="driveChooseFolderBtn" class="btn btn-secondary" hidden>Välj mapp</button>
-        </div>
-        <p class="hint" id="driveFolderStatus" hidden>Mapp: <a id="driveFolderLink" href="https://drive.google.com/drive/my-drive" target="_blank" rel="noopener">Google Drive</a></p>
-        <div class="field" id="drivePasswordField" hidden>
-          <label class="field-label" for="drivePasswordInput">Lösenord för säkerhetskopian</label>
-          <input type="password" id="drivePasswordInput" autocomplete="off">
-        </div>
-        <div class="row-buttons">
-          <button type="button" id="driveBackupBtn" class="btn btn-secondary" hidden>Säkerhetskopiera</button>
-          <button type="button" id="driveRestoreBtn" class="btn btn-secondary" hidden>Återställ</button>
-        </div>
-        <div class="field" id="driveTeamChoice" hidden>
-          <label class="field-label" for="driveTeamSelect">Lag att läsa in</label>
-          <select id="driveTeamSelect"></select>
-          <div class="row-buttons">
-            <button type="button" id="driveRestoreTeamBtn" class="btn btn-secondary">Läs in laget</button>
-          </div>
-        </div>
-        <p class="hint" id="driveStatus" role="status"></p>
-      </section>
-      <section class="card" aria-labelledby="secureExportTitle" id="secureExportCard">
-        <h2 id="secureExportTitle">Säker export och import</h2>
-        <p class="hint">Sparar truppen, alla matcher och spelaranteckningar i en enda krypterad fil, skyddad med ett lösenord du väljer. Bra för att flytta allt till en annan enhet utan Google Drive.</p>
-        <div class="field">
-          <label class="field-label" for="secureExportPasswordInput">Lösenord</label>
-          <input type="password" id="secureExportPasswordInput" autocomplete="off">
-        </div>
-        <div class="row-buttons">
-          <button type="button" id="secureExportBtn" class="btn btn-secondary">Exportera allt (krypterat)</button>
-          <label class="btn btn-secondary file-btn">
-            Välj krypterad fil
-            <input id="secureImportFileInput" class="visually-hidden" type="file" accept="application/json" />
-          </label>
-          <button type="button" id="secureImportBtn" class="btn btn-secondary" disabled>Importera</button>
-        </div>
-        <p class="hint" id="secureExportStatus" role="status"></p>
-      </section>
+      <p class="hint"><a id="historyDataLink" href="../data/">Hämta in, spara och synka data</a></p>
+      <p class="hint" id="historyCount"></p>
       <div id="historyResults" class="policy-rules"></div>
     </section>
 
