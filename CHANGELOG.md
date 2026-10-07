@@ -3,6 +3,13 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.26.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.25.0...matchplanner-v0.26.0) (2026-10-07)
+
+
+### Features
+
+* take players off by time in a row, lighter for defenders ([#170](https://github.com/aydabd/match-planner/issues/170)) ([9847583](https://github.com/aydabd/match-planner/commit/9847583f8a1542877cbaad9f2695ff4b956b4446))
+
 ## [0.25.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.24.0...matchplanner-v0.25.0) (2026-10-07)
 
 
