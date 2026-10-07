@@ -108,6 +108,21 @@ export const POLICY = {
 	lateSwapSeconds: 30,
 	/** A swap this late (seconds) is flagged as seriously late. */
 	veryLateSwapSeconds: 60,
+	/**
+	 * How tiring a second in each line is, compared with midfield and attack
+	 * (1). Defenders usually run less, so they may stay on a bit longer.
+	 * Only the back line counts lighter: a defensive midfielder runs like a
+	 * midfielder. A decision, not a rule from any document. It assumes free
+	 * swaps with re-entry, which is how barn- och ungdomsfotboll is played; a
+	 * series with limited swaps is not handled yet (issue #171).
+	 */
+	zoneLoad: { back: 0.7, dmid: 1, mid: 1, amid: 1, fwd: 1 },
+	/**
+	 * Players whose playtime is within this many seconds count as having
+	 * played the same, so a late swap or a short temporary swap does not hide
+	 * who has run the most in a row. A decision.
+	 */
+	samePlaytimeSeconds: 60,
 	/** A player this far below the team average (seconds) is pointed out. */
 	playtimeGapSeconds: 120,
 } as const;
@@ -227,6 +242,11 @@ export const RULES = [
 		id: "neighbouringLines",
 		origin: "decision",
 		sources: ["svffPlayerDevelopment"],
+	},
+	{
+		id: "loadInARow",
+		origin: "decision",
+		sources: ["rfGuidelines", "svffPlayerDevelopment"],
 	},
 	{
 		id: "restTime",

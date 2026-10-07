@@ -183,6 +183,7 @@ export function resetPlayers(state: SchedulerState): void {
 		if (!player) continue;
 		player.totalSeconds = 0;
 		player.zonesPlayed = [];
+		player.loadInARow = 0;
 		player.unavailable = false;
 	}
 }

@@ -18,6 +18,7 @@ const player = (zonesPlayed: string[]): PlayerState => ({
 	id: "p",
 	totalSeconds: 0,
 	zonesPlayed,
+	loadInARow: 0,
 	unavailable: false,
 });
 

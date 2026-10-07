@@ -150,6 +150,26 @@ function isResumable(s: Record<string, unknown>): boolean {
 	);
 }
 
+/**
+ * The players with their load in a row: a match saved before it existed has
+ * none (0), and a value that is not a number of seconds drops the match.
+ */
+function withLoadInARow(session: MatchSession | null): MatchSession | null {
+	if (!session) return null;
+	const players: SchedulerState["players"] = {};
+	for (const [id, player] of Object.entries(session.schedulerPlayers)) {
+		const load: unknown = (player as { loadInARow?: unknown }).loadInARow;
+		if (load === undefined) {
+			players[id] = { ...player, loadInARow: 0 };
+		} else if (typeof load === "number" && Number.isFinite(load) && load >= 0) {
+			players[id] = player;
+		} else {
+			return null;
+		}
+	}
+	return { ...session, schedulerPlayers: players };
+}
+
 export function loadSession(): MatchSession | null {
 	const raw = readItem(teamScoped(STORAGE_KEYS.session, activeTeamId()));
 	if (!raw) return null;
@@ -157,8 +177,11 @@ export function loadSession(): MatchSession | null {
 		const parsed = JSON.parse(raw) as unknown;
 		if (typeof parsed !== "object" || parsed === null) return null;
 		const session = parsed as Record<string, unknown>;
-		if (session.schemaVersion === 1) return fromVersion1(session);
-		return isResumable(session) ? (parsed as MatchSession) : null;
+		if (session.schemaVersion === 1)
+			return withLoadInARow(fromVersion1(session));
+		return withLoadInARow(
+			isResumable(session) ? (parsed as MatchSession) : null,
+		);
 	} catch {
 		return null;
 	}

@@ -55,6 +55,12 @@ export interface PlayerState {
 	 * it works for any roster size or last-second change.
 	 */
 	zonesPlayed: string[];
+	/**
+	 * How hard the current stretch on the pitch has been: every second adds
+	 * the load of the line the player stands in (POLICY.zoneLoad). It starts
+	 * again from zero on the bench and at a break between periods.
+	 */
+	loadInARow: number;
 	/** True once a coach has marked the player unavailable for the rest of the match. */
 	unavailable: boolean;
 }

@@ -38,6 +38,7 @@ import {
 	createSchedulerState,
 	fairnessSpread,
 	generateRotation,
+	resetLoadInARow,
 	SchedulingError,
 	addPlayer as schedulerAddPlayer,
 	setUnavailable,
@@ -1003,6 +1004,8 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 					period: event.period,
 				});
 				live.pendingSwap = null;
+				// The break rests everyone: no stretch carries over it.
+				resetLoadInARow(live.schedulerState);
 			}
 		}
 		if (live.clock.phase === "playing") prepareSwapWarning();
