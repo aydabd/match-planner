@@ -296,7 +296,7 @@ export const TEXT = {
 			},
 			restTime: {
 				title: "Hur länge en spelare vilar",
-				text: `Appen visar hur länge varje bänkspelare har vilat och markerar en vila som är kortare än ${words(POLICY.shortRestSeconds)} eller längre än ${POLICY.longRestIntervals} bytesintervall. Vilotiderna finns med i matchrapporten. Det är MatchPlanners egna gränser; inget dokument anger hur länge en spelare ska vila.`,
+				text: "Appen räknar hur länge varje spelare har vilat, från att hen går av tills hen går på igen, och visar det på bänken och i matchrapporten. Tränaren bestämmer själv när spelare byter; appen sätter ingen gräns för hur länge en vila ska vara.",
 			},
 			swapTiming: {
 				title: "Byten och tid",
@@ -347,26 +347,15 @@ export const TEXT = {
 					return item.period === null
 						? `Byten var i snitt ${words(item.averageSeconds)} sena.`
 						: `Byten var i snitt ${words(item.averageSeconds)} sena i period ${item.period}.`;
-				case "shortRest":
-					return `${nameOf(item.playerId)} vilade bara ${words(item.seconds)} innan hen kom in igen.`;
-				case "longRest":
-					return `${nameOf(item.playerId)} satt på bänken i ${words(item.seconds)} i sträck.`;
 				case "evenPlaytime":
 					return `Speltiden var jämn: skillnaden mellan mest och minst var ${words(item.spreadSeconds)}.`;
 				case "playerBelowAverage":
 					return `${nameOf(item.playerId)} spelade ${words(item.belowSeconds)} mindre än lagets snitt.`;
 			}
 		},
-		restFlag(flag: "short" | "long" | null): string {
-			if (flag === "short") return "Kort vila";
-			if (flag === "long") return "Lång vila";
-			return "";
-		},
-		/** All rests of a player: how many, shortest and longest. */
-		restSummary: (count: number, shortest: string, longest: string) =>
-			count === 1
-				? `1 vila, ${longest}`
-				: `${count} vilor, kortast ${shortest}, längst ${longest}`,
+		/** How long a player rested in all, and over how many rests. */
+		restSummary: (count: number, total: string) =>
+			count === 1 ? total : `${total} (${count} vilor)`,
 		noRest: "Ingen vila",
 		copy: "Kopiera som text",
 		copied: "Rapporten är kopierad.",
@@ -742,12 +731,6 @@ export const TEXT = {
 
 	rest: {
 		resting: (time: string) => `vilar ${time}`,
-		longNotice: (name: string, limit: number) =>
-			`${name} har suttit på bänken längre än ${words(limit)}.`,
-		shortNotice: (name: string, time: string) =>
-			`${name} vilade bara ${time} innan hen kom in igen.`,
-		limits: (short: number, long: number) =>
-			`Vila kortare än ${words(short)} eller längre än ${words(long)} markeras.`,
 		title: "Vila",
 	},
 

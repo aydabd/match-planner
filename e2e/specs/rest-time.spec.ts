@@ -1,5 +1,4 @@
 import { expect, test } from "../fixtures.js";
-import { SQUAD } from "../support/squads.js";
 
 test.describe("Rest time on the bench", () => {
 	test("shows how long each bench player has rested, as the clock runs", async ({
@@ -14,50 +13,24 @@ test.describe("Rest time on the bench", () => {
 		await expect(match.benchPlayer("Hugo")).toContainText("vilar 03:00");
 	});
 
-	test("a player who has sat out longer than two swap intervals is pointed out", async ({
-		setup,
-		match,
-		page,
-	}) => {
-		await setup.open();
-		await setup.addPlayers(SQUAD);
-		await setup.setMinutesBetweenSwaps(1);
-		await setup.startMatch();
-		await match.startClock();
-
-		// The swap is due after 1 min and never made: 2 min limit is passed at 3 min.
-		await match.play(2);
-		await expect(page.locator("#restNotices li")).toHaveCount(0);
-		await match.play(1.5);
-
-		await expect(page.locator("#restNotices")).toContainText(
-			"Greta har suttit på bänken längre än 2 minuter.",
-		);
-		await expect(match.benchPlayer("Greta")).toContainText("vilar 03:30");
-		await expect(page.locator("#restLimits")).toHaveText(
-			"Vila kortare än 2 minuter eller längre än 2 minuter markeras.",
-		);
-	});
-
-	test("a player who went back on after a very short rest is pointed out for a minute", async ({
+	test("a long or a very short rest is never warned about, only counted", async ({
 		startedMatch: match,
 		page,
 	}) => {
+		await expect(page.locator("#restNotices")).toHaveCount(0);
+		await expect(page.locator("#restLimits")).toHaveCount(0);
+
 		await match.startClock();
-		await match.play(3);
+		await match.play(15);
+		await expect(match.benchPlayer("Greta")).toContainText("vilar 15:00");
+
 		await match.swapTemporarily("Alva", "Greta", "1 min");
 		await match.play(1);
-
-		await expect(page.locator("#restNotices")).toContainText(
-			"Alva vilade bara 01:00 innan hen kom in igen.",
-		);
-
-		// The notice goes away by itself.
-		await match.play(1.5);
-		await expect(page.locator("#restNotices li")).toHaveCount(0);
+		await expect(page.locator("body")).not.toContainText("vilade bara");
+		await expect(page.locator(".bench-rest.is-long")).toHaveCount(0);
 	});
 
-	test("the report audits every rest, and how long a player had rested when they came on", async ({
+	test("the report shows how long each player rested in all, and how long a player had rested when they came on", async ({
 		startedMatch: match,
 		report,
 	}) => {
@@ -72,16 +45,9 @@ test.describe("Rest time on the bench", () => {
 		// Greta rested from kickoff until 11:00; Ebba rests from the swap to the end.
 		await expect(
 			report.playtimeRows.filter({ hasText: "Greta" }),
-		).toContainText("1 vila, 11:00");
+		).toContainText("11:00");
 		await expect(report.playtimeRows.filter({ hasText: "Ebba" })).toContainText(
-			"1 vila, 02:00",
+			"02:00",
 		);
-		// Exactly the limit (2 min) and still going on: not flagged.
-		await expect(
-			report.playtimeRows.filter({ hasText: "Ebba" }),
-		).not.toContainText("Kort vila");
-		await expect(
-			report.summary.filter({ hasText: "Ebba vilade bara" }),
-		).toHaveCount(0);
 	});
 });

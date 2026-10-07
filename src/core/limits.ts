@@ -22,8 +22,6 @@ export const LIMITS = {
 	tempSwapSeconds: [60, 120, 300],
 	/** How long before a due swap the coach sees who swaps with whom. */
 	headsUpSeconds: 30,
-	/** A short rest is pointed out for this long after the player came on. */
-	restNoticeSeconds: 60,
 	/** Match reports kept on this device; the oldest is dropped first. */
 	storedReports: 10,
 	/** Most events one match file may hold. */

@@ -32,7 +32,6 @@ import {
 	newMatchFile,
 	parseMatchFile,
 } from "../core/matchFile.js";
-import { POLICY } from "../core/policy.js";
 import { buildReport, type StoredReport } from "../core/report.js";
 import {
 	applyElapsed,
@@ -113,8 +112,6 @@ interface Els {
 	backToSetupBtn: HTMLButtonElement;
 	endMatchBtn: HTMLButtonElement;
 	clockNotice: HTMLElement;
-	restNotices: HTMLElement;
-	restLimits: HTMLElement;
 	reportBtn: HTMLButtonElement;
 }
 
@@ -159,8 +156,6 @@ function getEls(): Els {
 		backToSetupBtn: byId("backToSetupBtn"),
 		endMatchBtn: byId("endMatchBtn"),
 		clockNotice: byId("clockNotice"),
-		restNotices: byId("restNotices"),
-		restLimits: byId("restLimits"),
 		reportBtn: byId("reportBtn"),
 	};
 }
@@ -289,10 +284,6 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		return restCache.rests;
 	}
 
-	function longRestSeconds(): number {
-		return live ? POLICY.longRestIntervals * live.plan.rotationSeconds : 0;
-	}
-
 	function benchChip(
 		id: string,
 		idx: number,
@@ -324,7 +315,6 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		if (ongoing) {
 			const rest = document.createElement("span");
 			rest.className = "bench-rest";
-			if (ongoing.seconds > longRestSeconds()) rest.classList.add("is-long");
 			rest.textContent = TEXT.rest.resting(formatTime(ongoing.seconds));
 			wrap.appendChild(rest);
 		}
@@ -476,46 +466,6 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		for (const [idx, id] of live.currentAssignment.bench.entries()) {
 			els.benchList.appendChild(benchChip(id, idx, rests));
 		}
-	}
-
-	/**
-	 * Point out rests that are too long (still going on) or were too short
-	 * (the player just came on). Rebuilt only when the wording changes, so
-	 * the live region does not repeat itself every second.
-	 */
-	function renderRestNotices(): void {
-		if (!live) return;
-		const rests = currentRests();
-		const limit = longRestSeconds();
-		const notices: string[] = [];
-		for (const id of live.schedulerState.order) {
-			const own = rests[id] ?? [];
-			const ongoing = own.find((r) => r.endedAt === null);
-			if (ongoing && ongoing.seconds > limit) {
-				notices.push(TEXT.rest.longNotice(nameOf(id), limit));
-			}
-			const finished = own.filter((r) => r.endedAt !== null);
-			const latest = finished[finished.length - 1];
-			if (
-				latest?.endedAt != null &&
-				latest.seconds < POLICY.shortRestSeconds &&
-				now() - latest.endedAt <= LIMITS.restNoticeSeconds
-			) {
-				notices.push(
-					TEXT.rest.shortNotice(nameOf(id), formatTime(latest.seconds)),
-				);
-			}
-		}
-		const key = JSON.stringify(notices);
-		if (els.restNotices.dataset.key === key) return;
-		els.restNotices.dataset.key = key;
-		els.restNotices.replaceChildren(
-			...notices.map((text) => {
-				const li = document.createElement("li");
-				li.textContent = text;
-				return li;
-			}),
-		);
 	}
 
 	/** Build a paragraph from plain text and bold (player name) parts, without innerHTML. */
@@ -940,7 +890,6 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		renderPitch();
 		renderBreakKeeper();
 		renderBench();
-		renderRestNotices();
 		renderSwapPanel();
 		renderAlertBanner();
 		renderPreview();
@@ -1096,7 +1045,6 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 					name: nameOf(id),
 				})),
 				endedAt: now(),
-				rotationSeconds: live.plan.rotationSeconds,
 			}),
 		};
 	}
@@ -1553,10 +1501,6 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			Math.round(live.schedulerState.rotationSeconds / 60),
 		);
 		els.lateArrivalPanel.classList.remove("show");
-		els.restLimits.textContent = TEXT.rest.limits(
-			POLICY.shortRestSeconds,
-			longRestSeconds(),
-		);
 		refreshClock();
 		render();
 	}
