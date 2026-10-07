@@ -39,7 +39,13 @@ export function createSchedulerState(
 ): SchedulerState {
 	const players: Record<string, PlayerState> = {};
 	for (const id of playerIds) {
-		players[id] = { id, totalSeconds: 0, zonesPlayed: [], unavailable: false };
+		players[id] = {
+			id,
+			totalSeconds: 0,
+			zonesPlayed: [],
+			loadInARow: 0,
+			unavailable: false,
+		};
 	}
 	return {
 		format,
@@ -57,6 +63,7 @@ export function addPlayer(state: SchedulerState, id: string): void {
 		id,
 		totalSeconds: 0,
 		zonesPlayed: [],
+		loadInARow: 0,
 		unavailable: false,
 	};
 	state.order.push(id);
@@ -306,16 +313,33 @@ export function generateRotation(state: SchedulerState): RotationAssignment {
 		(state.players[id] as PlayerState).totalSeconds;
 	const joinOrder = (a: string, b: string) =>
 		state.order.indexOf(a) - state.order.indexOf(b);
-	const byPlaytime = [...active].sort(
-		(a, b) => playtime(a) - playtime(b) || joinOrder(a, b),
-	);
-	const chosen: string[] = [];
-	for (const id of byPlaytime) {
-		if (chosen.length === need) break;
-		if (maxSeated(state, [...chosen, id], seats) === chosen.length + 1) {
-			chosen.push(id);
+	/** Take players in `order` while everyone chosen can still be seated. */
+	const pick = (order: readonly string[]): string[] => {
+		const picked: string[] = [];
+		for (const id of order) {
+			if (picked.length === need) break;
+			if (maxSeated(state, [...picked, id], seats) === picked.length + 1) {
+				picked.push(id);
+			}
 		}
-	}
+		return picked;
+	};
+	// Total playtime keeps the match fair, counted in steps of
+	// POLICY.samePlaytimeSeconds so a position's lighter load can never build
+	// up an uneven match. Among players on the same step, those who have run
+	// the most in a row come off first; join order only breaks what is still
+	// tied.
+	const bucket = (id: string) =>
+		Math.floor(playtime(id) / POLICY.samePlaytimeSeconds);
+	const load = (id: string) => (state.players[id] as PlayerState).loadInARow;
+	const byLoad = [...active].sort(
+		(a, b) =>
+			bucket(a) - bucket(b) ||
+			load(a) - load(b) ||
+			playtime(a) - playtime(b) ||
+			joinOrder(a, b),
+	);
+	const chosen = pick(byLoad);
 	if (chosen.length < need) {
 		throw new SchedulingError(
 			"No lineup fills every seat without breaking the zone rule",
@@ -348,6 +372,16 @@ export function generateRotation(state: SchedulerState): RotationAssignment {
 	return { zones, bench: active.filter((id) => !playing.has(id)) };
 }
 
+/** How tiring a second in `zoneId` is; a line without a set value counts in full. */
+function zoneLoad(zoneId: string): number {
+	return (POLICY.zoneLoad as Record<string, number>)[zoneId] ?? 1;
+}
+
+/** A break between periods rests everyone: no stretch carries over it. */
+export function resetLoadInARow(state: SchedulerState): void {
+	for (const player of Object.values(state.players)) player.loadInARow = 0;
+}
+
 /**
  * Commit a rotation that has actually been played for `elapsedSeconds`
  * (normally the full rotation length, but can be less if the coach ends a
@@ -359,13 +393,20 @@ export function applyElapsed(
 	assignment: RotationAssignment,
 	elapsedSeconds: number,
 ): void {
+	const onPitch = new Set<string>();
 	for (const zoneId of Object.keys(assignment.zones)) {
 		for (const id of assignment.zones[zoneId] ?? []) {
 			const p = state.players[id];
 			if (!p) continue;
+			onPitch.add(id);
 			p.totalSeconds += elapsedSeconds;
+			p.loadInARow += elapsedSeconds * zoneLoad(zoneId);
 			if (!p.zonesPlayed.includes(zoneId)) p.zonesPlayed.push(zoneId);
 		}
+	}
+	// Whoever is not on the pitch has rested; the keeper is not part of the rotation.
+	for (const player of Object.values(state.players)) {
+		if (!onPitch.has(player.id)) player.loadInARow = 0;
 	}
 	// The keeper plays too; goal is not an outfield zone for the zone rule.
 	const keeper = state.keeperId ? state.players[state.keeperId] : undefined;

@@ -29,6 +29,7 @@ function session(overrides: Partial<MatchSession> = {}): MatchSession {
 				id: "p1",
 				totalSeconds: 42,
 				zonesPlayed: ["mid"],
+				loadInARow: 0,
 				unavailable: false,
 			},
 		},
@@ -93,6 +94,29 @@ describe("match session storage", () => {
 	it("restores a saved match exactly", () => {
 		saveSession(session());
 		expect(loadSession()).toEqual(session());
+	});
+
+	it("treats a match saved without a load in a row as rested", () => {
+		const old = JSON.parse(JSON.stringify(session()));
+		delete old.schedulerPlayers.p1.loadInARow;
+		storage().setItem(key(), JSON.stringify(old));
+		expect(loadSession()?.schedulerPlayers.p1?.loadInARow).toBe(0);
+	});
+
+	it.each([
+		["-5", "a negative number"],
+		['"much"', "text"],
+		["null", "null"],
+		// JSON has no Infinity, but a number too large to hold reads as one.
+		["1e999", "a number too large to hold"],
+	])("drops a match whose load in a row is %s (%s)", (bad) => {
+		const damaged = JSON.stringify(session()).replace(
+			'"loadInARow":0',
+			`"loadInARow":${bad}`,
+		);
+		expect(damaged).toContain(`"loadInARow":${bad}`);
+		storage().setItem(key(), damaged);
+		expect(loadSession()).toBeNull();
 	});
 
 	it("forgets the match after clearing", () => {

@@ -294,6 +294,10 @@ export const TEXT = {
 				title: "Bara angränsande led",
 				text: "En spelare flyttas aldrig direkt mellan försvar och anfall. Det är ett eget val för att laget ska kännas tryggt för barnen.",
 			},
+			loadInARow: {
+				title: "Vem som byts ut först",
+				text: `Små barn orkar inte springa hur länge som helst. Appen räknar hur länge varje spelare har stått på planen i sträck och byter ut dem som har sprungit mest först. Försvar räknas som lättare (${POLICY.zoneLoad.back}) än mittfält och anfall (${POLICY.zoneLoad.mid}), eftersom försvarare oftast springer mindre. Speltiden över hela matchen styr fortfarande rättvisan. Regeln förutsätter fria byten där en utbytt spelare får komma in igen, som i barn- och ungdomsfotboll (SvFF:s tävlingsbestämmelser för barn- och ungdomsfotboll, 5 §). Appen planerar i dag alltid med fria byten. Det är MatchPlanners egna värden; inget dokument anger dem, och tränaren kan alltid ändra ett byte själv.`,
+			},
 			restTime: {
 				title: "Hur länge en spelare vilar",
 				text: "Appen räknar hur länge varje spelare har vilat, från att hen går av tills hen går på igen, och visar det på bänken och i matchrapporten. Tränaren bestämmer själv när spelare byter; appen sätter ingen gräns för hur länge en vila ska vara.",

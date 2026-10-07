@@ -285,6 +285,7 @@ describe("resetPlayers", () => {
 				id,
 				totalSeconds: 0,
 				zonesPlayed: [],
+				loadInARow: 0,
 				unavailable: false,
 			});
 		}
