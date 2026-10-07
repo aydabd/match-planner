@@ -32,24 +32,11 @@ describe("report in Swedish", () => {
 		expect(TEXT.report.feedback(item, () => "Ines")).toBe(sentence);
 	});
 
-	it.each([
-		[
-			{ code: "shortRest", playerId: "i", seconds: 75 },
-			"Ines vilade bara 1 min 15 s innan hen kom in igen.",
-		],
-		[
-			{ code: "longRest", playerId: "i", seconds: 1500 },
-			"Ines satt på bänken i 25 minuter i sträck.",
-		],
-	] as const)("%o", (item, sentence) => {
-		expect(TEXT.report.feedback(item, () => "Ines")).toBe(sentence);
-	});
-
-	it("summarises rests", () => {
+	it("summarises the time rested", () => {
 		expect(restSummary([])).toBe("Ingen vila");
-		expect(restSummary([{ seconds: 400 }])).toBe("1 vila, 06:40");
+		expect(restSummary([{ seconds: 400 }])).toBe("06:40");
 		expect(restSummary([{ seconds: 400 }, { seconds: 130 }])).toBe(
-			"2 vilor, kortast 02:10, längst 06:40",
+			"08:50 (2 vilor)",
 		);
 	});
 
@@ -88,7 +75,6 @@ describe("report in Swedish", () => {
 				],
 				players: [{ id: "a", name: "Ada" }],
 				endedAt: 600,
-				rotationSeconds: 300,
 			}),
 		};
 		expect(reportAsText(stored)).toBe(

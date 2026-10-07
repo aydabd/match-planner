@@ -1471,18 +1471,6 @@ button:disabled {
 	color: var(--ink-2);
 	font-variant-numeric: tabular-nums;
 }
-.bench-rest.is-long {
-	color: var(--red-text);
-}
-.rest-notices ul {
-	margin: 0;
-	padding-left: 18px;
-	color: var(--red-text);
-	font-weight: 600;
-}
-.rest-notices ul:empty {
-	display: none;
-}
 
 .app-footer {
 	display: flex;

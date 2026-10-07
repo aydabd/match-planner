@@ -137,14 +137,7 @@ export function createReportView(): ReportView {
 					formatTime(p.periodSeconds[i] ?? 0),
 				),
 				zoneBreakdown(p.zoneSeconds),
-				[
-					restSummary(p.rests),
-					...new Set(
-						p.rests.flatMap((r) =>
-							r.flag ? [TEXT.report.restFlag(r.flag)] : [],
-						),
-					),
-				].join(" · "),
+				restSummary(p.rests),
 			]),
 		);
 

@@ -1,5 +1,5 @@
 import { formatTime } from "../core/match.js";
-import type { StoredReport } from "../core/report.js";
+import { type StoredReport, totalRestSeconds } from "../core/report.js";
 import { GOAL } from "../core/timeline.js";
 import { TEXT } from "./text.js";
 
@@ -16,14 +16,12 @@ export function zoneBreakdown(zoneSeconds: Record<string, number>): string {
 		.join(", ");
 }
 
-/** "3 vilor, kortast 02:10, längst 09:40", or that the player never rested. */
+/** "08:50 (2 vilor)": the time a player rested in all, or that they never did. */
 export function restSummary(rests: readonly { seconds: number }[]): string {
 	if (rests.length === 0) return TEXT.report.noRest;
-	const seconds = rests.map((r) => r.seconds);
 	return TEXT.report.restSummary(
 		rests.length,
-		formatTime(Math.min(...seconds)),
-		formatTime(Math.max(...seconds)),
+		formatTime(totalRestSeconds(rests)),
 	);
 }
 
