@@ -3,6 +3,13 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.25.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.24.0...matchplanner-v0.25.0) (2026-10-07)
+
+
+### Features
+
+* show total rest time and drop the short and long rest warnings ([#168](https://github.com/aydabd/match-planner/issues/168)) ([ec1893f](https://github.com/aydabd/match-planner/commit/ec1893f42206544dae55a893ee8fc0d6360419b9))
+
 ## [0.24.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.23.0...matchplanner-v0.24.0) (2026-10-02)
 
 
