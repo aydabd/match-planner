@@ -1,15 +1,24 @@
 import { getFormat, TEAM_SIZES, teamSizeOf } from "./formations.js";
 import { LIMITS } from "./limits.js";
 import { policyFor, REGIONS, type RegionId } from "./policy.js";
+import {
+	DEFAULT_FAIRNESS,
+	type FairnessPeriod,
+	FREE_RULES,
+	parseFairnessPeriod,
+	parseSubstitutionRules,
+	type SubstitutionRules,
+} from "./substitutionRules.js";
 import type { Player } from "./types.js";
 
 /**
  * The squad file: a team setup a coach saves and shares with another coach,
- * who loads it and can start a match at once. Version 2 adds the match plan
- * (periods), match details, goalkeepers and an audit record. Version 3 adds
- * the region whose policy the squad was built under (src/core/policy.ts).
- * Earlier versions still load, defaulting to region "national"; add a
- * migration branch in parseRosterFile if the shape changes again.
+ * who loads it and can start a match at once. It holds the match plan
+ * (periods), match details, goalkeepers, the region whose policy the squad
+ * was built under (src/core/policy.ts), the team's substitution rules and
+ * the period fairness is measured over (#171), and an audit record. Every
+ * field except match details and the audit is required: a file without one
+ * is refused, never filled in with a guess.
  */
 export const CURRENT_SCHEMA_VERSION = 3;
 
@@ -38,6 +47,10 @@ export interface RosterFile {
 	periodSeconds: number;
 	/** Which federation's recommended policy this squad was built under. */
 	region: RegionId;
+	/** The team's default substitution rules; each match copies them. */
+	substitutions: SubstitutionRules;
+	/** The period playtime should even out over when swaps are limited. */
+	fairness: FairnessPeriod;
 	match: MatchDetails;
 	players: Player[];
 	/** Who starts in goal: a player marked as goalkeeper, or null. */
@@ -56,6 +69,8 @@ export type SquadFileProblem =
 	| { code: "matchDetails" }
 	| { code: "audit" }
 	| { code: "region" }
+	| { code: "substitutions" }
+	| { code: "fairness" }
 	| { code: "startingKeeper" }
 	| { code: "playersNotList" }
 	| { code: "emptySquad" }
@@ -86,6 +101,8 @@ export function newRoster(fields: {
 	periods?: number;
 	periodSeconds?: number;
 	region?: RegionId;
+	substitutions?: SubstitutionRules;
+	fairness?: FairnessPeriod;
 	match?: MatchDetails;
 	startingKeeperId?: string | null;
 	players?: readonly (Omit<Player, "goalkeeper"> & { goalkeeper?: boolean })[];
@@ -98,6 +115,8 @@ export function newRoster(fields: {
 		periods: fields.periods ?? size.periods,
 		periodSeconds: fields.periodSeconds ?? size.periodMinutes * 60,
 		region: fields.region ?? "national",
+		substitutions: structuredClone(fields.substitutions ?? FREE_RULES),
+		fairness: structuredClone(fields.fairness ?? DEFAULT_FAIRNESS),
 		match: { ...(fields.match ?? NO_MATCH_DETAILS) },
 		players: (fields.players ?? []).map((p) => ({
 			id: p.id,
@@ -274,18 +293,12 @@ export function parseRosterFile(
 	}
 	const obj = data as Record<string, unknown>;
 
-	if (
-		obj.schemaVersion !== 1 &&
-		obj.schemaVersion !== 2 &&
-		obj.schemaVersion !== 3
-	) {
+	if (obj.schemaVersion !== CURRENT_SCHEMA_VERSION) {
 		throw new StorageError(
-			`Unknown or missing schemaVersion (expected 1, 2 or 3, got ${JSON.stringify(obj.schemaVersion)})`,
+			`Unknown or missing schemaVersion (expected ${CURRENT_SCHEMA_VERSION}, got ${JSON.stringify(obj.schemaVersion)})`,
 			{ code: "schemaVersion" },
 		);
 	}
-	const isV1 = obj.schemaVersion === 1;
-	const isV1OrV2 = isV1 || obj.schemaVersion === 2;
 
 	const formatId =
 		typeof obj.formatId === "string" ? canonicalFormatId(obj.formatId) : null;
@@ -294,7 +307,6 @@ export function parseRosterFile(
 			code: "unknownFormat",
 		});
 	}
-	const size = TEAM_SIZES[teamSizeOf(formatId)];
 
 	if (!isMinutesStepWithin(obj.rotationSeconds, LIMITS.rotationMinutes, 0.5)) {
 		throw new StorageError(
@@ -303,9 +315,7 @@ export function parseRosterFile(
 		);
 	}
 
-	// Version 1 files had no match plan: use the team size's defaults.
-	const periods = isV1 ? size.periods : obj.periods;
-	const periodSeconds = isV1 ? size.periodMinutes * 60 : obj.periodSeconds;
+	const { periods, periodSeconds } = obj;
 	if (
 		typeof periods !== "number" ||
 		!Number.isInteger(periods) ||
@@ -318,17 +328,28 @@ export function parseRosterFile(
 		});
 	}
 
-	const match = isV1 ? { ...NO_MATCH_DETAILS } : parseMatchDetails(obj.match);
-	const audit = isV1 ? undefined : parseAudit(obj.audit);
+	const match = parseMatchDetails(obj.match);
+	const audit = parseAudit(obj.audit);
 
-	// Versions 1 and 2 predate regions: they always meant the national policy.
-	const rawRegion = isV1OrV2 ? "national" : obj.region;
-	if (typeof rawRegion !== "string" || !(rawRegion in REGIONS)) {
-		throw new StorageError(`Unknown region "${String(rawRegion)}"`, {
+	if (typeof obj.region !== "string" || !(obj.region in REGIONS)) {
+		throw new StorageError(`Unknown region "${String(obj.region)}"`, {
 			code: "region",
 		});
 	}
-	const region = rawRegion as RegionId;
+	const region = obj.region as RegionId;
+
+	const substitutions = parseSubstitutionRules(obj.substitutions);
+	if (!substitutions) {
+		throw new StorageError("substitutions must be valid substitution rules", {
+			code: "substitutions",
+		});
+	}
+	const fairness = parseFairnessPeriod(obj.fairness);
+	if (!fairness) {
+		throw new StorageError("fairness must be a valid period", {
+			code: "fairness",
+		});
+	}
 
 	if (!Array.isArray(obj.players)) {
 		throw new StorageError("players must be a list", {
@@ -348,7 +369,7 @@ export function parseRosterFile(
 	const players = parsePlayers(obj.players);
 
 	// Absent or null means nobody is tracked in goal.
-	const rawKeeper = isV1 ? null : (obj.startingKeeperId ?? null);
+	const rawKeeper = obj.startingKeeperId ?? null;
 	const startingKeeperId = typeof rawKeeper === "string" ? rawKeeper : null;
 	if (
 		rawKeeper !== null &&
@@ -367,6 +388,8 @@ export function parseRosterFile(
 		periods,
 		periodSeconds,
 		region,
+		substitutions,
+		fairness,
 		match,
 		players,
 		startingKeeperId,

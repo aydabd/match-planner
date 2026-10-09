@@ -23,6 +23,7 @@ function session(overrides: Partial<MatchSession> = {}): MatchSession {
 			rotationElapsed: 42,
 		},
 		match: { opponent: "IFK Lund", venue: "", date: "" },
+		substitutions: { kind: "free" },
 		playerNames: { p1: "Alva" },
 		schedulerPlayers: {
 			p1: {
@@ -45,46 +46,19 @@ function session(overrides: Partial<MatchSession> = {}): MatchSession {
 	};
 }
 
-/** A match saved by the app before periods existed (session version 1). */
-const VERSION_1 = {
-	schemaVersion: 1,
-	formatId: "7v7",
-	rotationSeconds: 600,
-	playerNames: { p1: "Alva" },
-	schedulerPlayers: {
-		p1: {
-			id: "p1",
-			totalSeconds: 42,
-			zonesPlayed: ["mid"],
-			unavailable: false,
-		},
-	},
-	schedulerOrder: ["p1"],
-	rotationIndex: 2,
-	elapsedSeconds: 42,
-	currentAssignment: { zones: { mid: ["p1"] }, bench: [] },
-	tempSwaps: [],
-};
-
 describe("match session storage", () => {
 	const { storage } = useMemoryStorage();
 
-	it("resumes a match saved before periods existed, in period 1 of the team size's match", () => {
-		storage().setItem(key(), JSON.stringify(VERSION_1));
-
-		expect(loadSession()).toEqual(
-			session({
+	it("drops a match saved before periods existed instead of guessing its plan", () => {
+		storage().setItem(
+			key(),
+			JSON.stringify({
+				schemaVersion: 1,
 				formatId: "7v7",
-				plan: { periods: 3, periodSeconds: 1200, rotationSeconds: 600 },
-				clock: {
-					phase: "playing",
-					period: 1,
-					periodElapsed: 42,
-					rotationElapsed: 42,
-				},
-				match: { opponent: "", venue: "", date: "" },
+				rotationSeconds: 600,
 			}),
 		);
+		expect(loadSession()).toBeNull();
 	});
 
 	it("returns nothing when no match has been saved", () => {
@@ -155,6 +129,14 @@ describe("match session storage", () => {
 			JSON.stringify(
 				session({ clock: { ...session().clock, phase: "halftime" as never } }),
 			),
+		],
+		[
+			"a session without substitution rules",
+			JSON.stringify({ ...session(), substitutions: undefined }),
+		],
+		[
+			"a session with unknown substitution rules",
+			JSON.stringify(session({ substitutions: { kind: "flying" } as never })),
 		],
 		[
 			"a version 2 session without its players",

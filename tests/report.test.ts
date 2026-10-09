@@ -30,6 +30,7 @@ function timeline(delays: { first: number; second: number }): TimelineEvent[] {
 		},
 		{
 			type: "substitution",
+			id: "swap-1",
 			at: 300 + delays.first,
 			plannedAt: 300,
 			period: 1,
@@ -54,6 +55,7 @@ function timeline(delays: { first: number; second: number }): TimelineEvent[] {
 		},
 		{
 			type: "substitution",
+			id: "swap-2",
 			at: 900 + delays.second,
 			plannedAt: 900,
 			period: 2,
@@ -356,6 +358,7 @@ describe("rest times in the report", () => {
 		},
 		{
 			type: "substitution",
+			id: "swap-3",
 			at: 160,
 			plannedAt: 150,
 			period: 1,
@@ -372,6 +375,7 @@ describe("rest times in the report", () => {
 		},
 		{
 			type: "substitution",
+			id: "swap-4",
 			at: 400,
 			plannedAt: 400,
 			period: 1,

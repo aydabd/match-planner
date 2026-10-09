@@ -8,6 +8,10 @@ import {
 	parsePlayers,
 	StorageError,
 } from "./storage.js";
+import {
+	parseSubstitutionRules,
+	type SubstitutionRules,
+} from "./substitutionRules.js";
 import type { TimelineEvent } from "./timeline.js";
 import type { Player } from "./types.js";
 
@@ -35,6 +39,26 @@ export interface MatchSetup {
 	periods: number;
 	periodSeconds: number;
 	rotationSeconds: number;
+	/**
+	 * The substitution rules that applied in this match, copied from the
+	 * team when it was set up, so they stay as played if the team's rules
+	 * change later (#171).
+	 */
+	substitutions: SubstitutionRules;
+}
+
+/**
+ * The coach's explanation of a swap that broke the match's substitution
+ * rules (#171). Kept beside the timeline, keyed by the swap's event id, so
+ * the timeline itself stays append-only.
+ */
+export interface DeviationNote {
+	matchId: string;
+	/** The id of the substitution event the note explains. */
+	eventId: string;
+	note: string;
+	/** ISO 8601 timestamp. */
+	writtenAt: string;
 }
 
 export interface MatchFile {
@@ -51,6 +75,8 @@ export interface MatchFile {
 	timeline: TimelineEvent[];
 	/** The match clock when the file was made, in seconds since kickoff. */
 	endedAt: number;
+	/** At most one note per substitution event. */
+	deviationNotes: DeviationNote[];
 }
 
 /** Why a match file was refused; src/ui/text.ts turns it into a sentence. */
@@ -64,13 +90,21 @@ export type MatchFileProblem =
 	| { code: "startingIds" }
 	| { code: "noKickoff" }
 	| { code: "endedAt" }
+	| { code: "deviationNotes" }
 	| { code: "timelineNotList" }
 	| { code: "tooManyEvents"; max: number }
 	| {
 			code: "event";
 			/** 1-based position in the timeline. */
 			position: number;
-			reason: "unknown" | "time" | "order" | "period" | "player" | "lineup";
+			reason:
+				| "unknown"
+				| "time"
+				| "order"
+				| "period"
+				| "player"
+				| "lineup"
+				| "id";
 	  };
 
 export class MatchFileError extends Error {
@@ -91,18 +125,43 @@ export function newMatchFile(fields: {
 	players: readonly Player[];
 	timeline: readonly TimelineEvent[];
 	endedAt: number;
+	deviationNotes?: readonly DeviationNote[];
 }): MatchFile {
 	return {
 		schemaVersion: MATCH_FILE_VERSION,
 		audit: fields.audit,
 		match: fields.match,
-		setup: fields.setup,
+		setup: structuredClone(fields.setup),
 		squad: {
 			players: fields.players.map((p) => ({ ...p })),
 			startingIds: startersOf(fields.timeline),
 		},
 		timeline: structuredClone(fields.timeline) as TimelineEvent[],
 		endedAt: fields.endedAt,
+		deviationNotes: (fields.deviationNotes ?? []).map((n) => ({ ...n })),
+	};
+}
+
+/**
+ * The match file with the coach's note on the swap `eventId`, replacing an
+ * earlier note on it. A blank note removes it. The timeline is not touched.
+ */
+export function withDeviationNote(
+	file: MatchFile,
+	eventId: string,
+	note: string,
+	writtenAt: string,
+): MatchFile {
+	const others = file.deviationNotes.filter((n) => n.eventId !== eventId);
+	const text = note.trim().slice(0, LIMITS.deviationNoteLength);
+	return {
+		...file,
+		deviationNotes: text
+			? [
+					...others,
+					{ matchId: file.audit.matchId, eventId, note: text, writtenAt },
+				]
+			: others,
 	};
 }
 
@@ -132,6 +191,10 @@ export function startersOf(timeline: readonly TimelineEvent[]): string[] {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	typeof value === "object" && value !== null && !Array.isArray(value);
 
+/** A record id: a matchId or an event id. */
+const isId = (value: unknown): value is string =>
+	typeof value === "string" && value !== "" && value.length <= 100;
+
 const isSeconds = (value: unknown): value is number =>
 	typeof value === "number" && Number.isInteger(value) && value >= 0;
 
@@ -142,10 +205,9 @@ function fail(problem: MatchFileProblem, message: string): never {
 /** The audit record of a match file: the squad file audit plus the match id. */
 function parseMatchAudit(raw: unknown): MatchAudit {
 	const problem = { code: "audit" } as const;
-	if (!isRecord(raw) || typeof raw.matchId !== "string" || raw.matchId === "") {
-		return fail(problem, "audit must hold a matchId");
+	if (!isRecord(raw) || !isId(raw.matchId)) {
+		return fail(problem, "audit must hold a matchId of at most 100 characters");
 	}
-	if (raw.matchId.length > 100) return fail(problem, "matchId is too long");
 	let base: ReturnType<typeof parseAudit>;
 	try {
 		base = parseAudit(raw);
@@ -179,11 +241,16 @@ function parseSetup(raw: unknown): MatchSetup {
 	) {
 		return fail(problem, "periods and times must be in range");
 	}
+	const substitutions = parseSubstitutionRules(raw.substitutions);
+	if (!substitutions) {
+		return fail(problem, "setup must hold valid substitution rules");
+	}
 	return {
 		formatId,
 		periods: raw.periods,
 		periodSeconds: raw.periodSeconds as number,
 		rotationSeconds: raw.rotationSeconds as number,
+		substitutions,
 	};
 }
 
@@ -214,10 +281,18 @@ function parseTimeline(
 	let lastPeriod = 0;
 	let lastEnd = 0;
 	let seenLineup = false;
+	const swapIds = new Set<string>();
 
 	const events = raw.map((event, index) => {
 		const bad = (
-			reason: "unknown" | "time" | "order" | "period" | "player" | "lineup",
+			reason:
+				| "unknown"
+				| "time"
+				| "order"
+				| "period"
+				| "player"
+				| "lineup"
+				| "id",
 		) =>
 			new MatchFileError(`Event ${index + 1}: ${reason}`, {
 				code: "event",
@@ -293,6 +368,8 @@ function parseTimeline(
 			}
 			case "substitution": {
 				const moves = event.moves;
+				if (!isId(event.id) || swapIds.has(event.id)) throw bad("id");
+				swapIds.add(event.id);
 				if (
 					!isPeriod(event.period) ||
 					!isSeconds(event.plannedAt) ||
@@ -317,6 +394,7 @@ function parseTimeline(
 				});
 				return {
 					type: "substitution",
+					id: event.id,
 					at,
 					plannedAt: event.plannedAt,
 					period: event.period,
@@ -358,6 +436,47 @@ function parseTimeline(
 		}
 	});
 	return events;
+}
+
+/**
+ * The coach's notes on deviations: each names this match and one of its
+ * substitution events, at most once, with a note within the length limit.
+ */
+function parseDeviationNotes(
+	raw: unknown,
+	matchId: string,
+	timeline: readonly TimelineEvent[],
+): DeviationNote[] {
+	const problem = { code: "deviationNotes" } as const;
+	if (!Array.isArray(raw))
+		return fail(problem, "deviationNotes must be a list");
+	const swapIds = new Set(
+		timeline.flatMap((e) => (e.type === "substitution" ? [e.id] : [])),
+	);
+	const noted = new Set<string>();
+	return raw.map((note) => {
+		if (
+			!isRecord(note) ||
+			note.matchId !== matchId ||
+			typeof note.eventId !== "string" ||
+			!swapIds.has(note.eventId) ||
+			noted.has(note.eventId) ||
+			typeof note.note !== "string" ||
+			note.note.trim() === "" ||
+			note.note.trim().length > LIMITS.deviationNoteLength ||
+			typeof note.writtenAt !== "string" ||
+			Number.isNaN(Date.parse(note.writtenAt))
+		) {
+			return fail(problem, "a deviation note is invalid");
+		}
+		noted.add(note.eventId);
+		return {
+			matchId,
+			eventId: note.eventId,
+			note: note.note.trim(),
+			writtenAt: note.writtenAt,
+		};
+	});
 }
 
 /**
@@ -426,6 +545,11 @@ export function parseMatchFile(data: unknown): MatchFile {
 	) {
 		return fail({ code: "endedAt" }, "endedAt is outside the match");
 	}
+	const deviationNotes = parseDeviationNotes(
+		data.deviationNotes,
+		audit.matchId,
+		timeline,
+	);
 
 	return {
 		schemaVersion: MATCH_FILE_VERSION,
@@ -435,5 +559,6 @@ export function parseMatchFile(data: unknown): MatchFile {
 		squad: { players, startingIds: [...starters] },
 		timeline,
 		endedAt: data.endedAt,
+		deviationNotes,
 	};
 }

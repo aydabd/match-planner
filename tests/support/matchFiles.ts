@@ -116,10 +116,12 @@ export function makeMatchFile(options: Options = {}): MatchFile {
 			periods,
 			periodSeconds,
 			rotationSeconds: 300,
+			substitutions: { kind: "free" },
 		},
 		squad: { players, startingIds: startersOf(timeline) },
 		timeline,
 		endedAt: periods * periodSeconds,
+		deviationNotes: [],
 	};
 }
 

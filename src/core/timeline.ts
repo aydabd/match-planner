@@ -18,6 +18,11 @@ export type TimelineEvent =
 	  }
 	| ({
 			type: "substitution";
+			/**
+			 * Stable id (a UUID when the device has one), so a deviation and
+			 * the coach's note about it can refer to this swap (#171).
+			 */
+			id: string;
 			at: number;
 			/** When the swap was due by the swap interval. */
 			plannedAt: number;

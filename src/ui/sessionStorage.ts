@@ -1,6 +1,10 @@
 import { getFormat } from "../core/formations.js";
 import type { MatchClock, MatchPlan } from "../core/matchClock.js";
-import { type MatchDetails, newRoster } from "../core/storage.js";
+import type { MatchDetails } from "../core/storage.js";
+import {
+	parseSubstitutionRules,
+	type SubstitutionRules,
+} from "../core/substitutionRules.js";
 import type { TimelineEvent } from "../core/timeline.js";
 import type {
 	MutableAssignment,
@@ -43,6 +47,8 @@ export interface MatchSession {
 	plan: MatchPlan;
 	clock: MatchClock;
 	match: MatchDetails;
+	/** The substitution rules for this match (#171). */
+	substitutions: SubstitutionRules;
 	playerNames: Record<string, string>;
 	schedulerPlayers: SchedulerState["players"];
 	schedulerOrder: string[];
@@ -66,46 +72,6 @@ export function saveSession(session: MatchSession): void {
 	);
 }
 
-/**
- * A match saved before periods existed (version 1) resumes in period 1 of the
- * team size's default match, with its swap timer where it was.
- */
-function fromVersion1(v1: Record<string, unknown>): MatchSession | null {
-	if (typeof v1.formatId !== "string" || typeof v1.rotationSeconds !== "number")
-		return null;
-	const defaults = newRoster({ formatId: v1.formatId });
-	const elapsed = typeof v1.elapsedSeconds === "number" ? v1.elapsedSeconds : 0;
-	const {
-		schemaVersion: _v,
-		rotationSeconds,
-		elapsedSeconds: _e,
-		...rest
-	} = v1;
-	return {
-		...(rest as Omit<
-			MatchSession,
-			"schemaVersion" | "plan" | "clock" | "match"
-		>),
-		schemaVersion: 2,
-		plan: {
-			periods: defaults.periods,
-			periodSeconds: defaults.periodSeconds,
-			rotationSeconds,
-		},
-		clock: {
-			phase: "playing",
-			period: 1,
-			periodElapsed: elapsed,
-			rotationElapsed: elapsed,
-		},
-		match: { ...defaults.match },
-		keeperId: null,
-		goalkeepers: [],
-		timeline: [],
-		pendingSwap: null,
-	};
-}
-
 const PHASES: readonly string[] = [
 	"beforeKickoff",
 	"playing",
@@ -121,7 +87,8 @@ const isCount = (value: unknown): boolean =>
 
 /**
  * Whether a saved version 2 match has everything resume() reads. A damaged
- * one is dropped (the coach lands on setup) instead of crashing the app.
+ * one, or one saved before a field it needs existed, is dropped (the coach
+ * lands on setup) instead of crashing the app.
  */
 function isResumable(s: Record<string, unknown>): boolean {
 	if (s.schemaVersion !== 2 || typeof s.formatId !== "string") return false;
@@ -142,6 +109,7 @@ function isResumable(s: Record<string, unknown>): boolean {
 		isCount(clock.periodElapsed) &&
 		isCount(clock.rotationElapsed) &&
 		isRecord(s.match) &&
+		parseSubstitutionRules(s.substitutions) !== null &&
 		isRecord(s.playerNames) &&
 		isRecord(s.schedulerPlayers) &&
 		Array.isArray(s.schedulerOrder) &&
@@ -176,11 +144,10 @@ export function loadSession(): MatchSession | null {
 	try {
 		const parsed = JSON.parse(raw) as unknown;
 		if (typeof parsed !== "object" || parsed === null) return null;
-		const session = parsed as Record<string, unknown>;
-		if (session.schemaVersion === 1)
-			return withLoadInARow(fromVersion1(session));
 		return withLoadInARow(
-			isResumable(session) ? (parsed as MatchSession) : null,
+			isResumable(parsed as Record<string, unknown>)
+				? (parsed as MatchSession)
+				: null,
 		);
 	} catch {
 		return null;

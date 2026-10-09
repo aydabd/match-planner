@@ -48,6 +48,20 @@ export const LIMITS = {
 	importFiles: 500,
 	/** Most bytes the Data page reads at once, over all files (#154). */
 	importTotalBytes: 50 * 1024 * 1024,
+	/**
+	 * Players brought on in a match with limited swaps (#171). The most is
+	 * the most substitutes TB 2026 lets a district write on the player list
+	 * ("dock högst sju", rule "limitedSubstitutions").
+	 */
+	substitutesIn: { min: 1, max: 7 },
+	/** Substitution occasions during play with limited swaps (#171). */
+	occasions: { min: 1, max: 7 },
+	/** "Fair over the last N matches" may look back this many matches (#171). */
+	fairnessMatches: { min: 1, max: 200 },
+	/** The season a fairness period may name (#171). */
+	seasonYear: { min: 2000, max: 2100 },
+	/** Longest explanation a coach writes for a deviation, in characters (#171). */
+	deviationNoteLength: 500,
 	/** Skipped files listed by name on the Data page; the rest are counted (#154). */
 	importListedProblems: 10,
 } as const;

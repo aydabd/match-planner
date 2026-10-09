@@ -249,6 +249,10 @@ export const TEXT = {
 					return "Filen har ogiltiga uppgifter om vem som sparade den och när.";
 				case "region":
 					return "Filen anger ett distrikt som appen inte känner igen.";
+				case "substitutions":
+					return "Filen saknar giltiga bytesregler för laget (fria byten eller ersättare med antal byten och tillfällen).";
+				case "fairness":
+					return "Filen saknar en giltig period för rättvis speltid (senaste matcher, säsong eller datum).";
 				case "notObject":
 				case "schemaVersion":
 				case "playersNotList":
@@ -725,7 +729,7 @@ export const TEXT = {
 				case "matchDetails":
 					return "Filen har ogiltiga matchuppgifter (motståndare, plats eller datum).";
 				case "setup":
-					return "Filen har ogiltiga matchinställningar (format, perioder eller tider).";
+					return "Filen har ogiltiga matchinställningar (format, perioder, tider eller bytesregler).";
 				case "squad":
 					return "Filen har en ogiltig trupp.";
 				case "startingIds":
@@ -734,6 +738,8 @@ export const TEXT = {
 					return "Matchen i filen har ingen startuppställning.";
 				case "endedAt":
 					return "Filens sluttid ligger utanför matchen.";
+				case "deviationNotes":
+					return "Filen har en ogiltig förklaring till ett avsteg från bytesreglerna.";
 				case "timelineNotList":
 					return "Filens tidslinje är ogiltig.";
 				case "tooManyEvents":
@@ -746,6 +752,7 @@ export const TEXT = {
 						period: "perioden stämmer inte",
 						player: "spelaren finns inte i truppen",
 						lineup: "laguppställningen stämmer inte",
+						id: "bytet saknar ett eget id eller har samma id som ett annat byte",
 					} as const;
 					return `Händelse ${problem.position} i tidslinjen är ogiltig: ${reasons[problem.reason]}.`;
 				}
