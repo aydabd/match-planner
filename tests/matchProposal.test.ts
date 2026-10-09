@@ -50,6 +50,7 @@ describe("the proposal for the next match", () => {
 			date: "2026-09-01",
 			started: true,
 			seconds,
+			goalSeconds: 0,
 		});
 		const records: TeamRecords = {
 			matchSummaries: async () => [row("alva", 3000), row("Bo", 1000)],
