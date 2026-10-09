@@ -3,6 +3,13 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.27.1](https://github.com/aydabd/match-planner/compare/matchplanner-v0.27.0...matchplanner-v0.27.1) (2026-10-09)
+
+
+### Bug Fixes
+
+* leave time in goal out of the standing over a period ([#183](https://github.com/aydabd/match-planner/issues/183)) ([8df41c8](https://github.com/aydabd/match-planner/commit/8df41c8fab0e606abd96736a2747d7dfc3b66074))
+
 ## [0.27.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.26.0...matchplanner-v0.27.0) (2026-10-09)
 
 
