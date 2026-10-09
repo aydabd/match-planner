@@ -75,6 +75,7 @@ describe("report in Swedish", () => {
 				],
 				players: [{ id: "a", name: "Ada" }],
 				endedAt: 600,
+				rules: { kind: "free" },
 			}),
 		};
 		expect(reportAsText(stored)).toBe(

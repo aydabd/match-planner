@@ -1,6 +1,10 @@
 import { POLICY } from "./policy.js";
 import type { MatchDetails } from "./storage.js";
 import {
+	parseSubstitutionRules,
+	type SubstitutionRules,
+} from "./substitutionRules.js";
+import {
 	GOAL,
 	restsOf,
 	secondsPlayed,
@@ -82,6 +86,86 @@ export type Feedback =
 	| { code: "evenPlaytime"; spreadSeconds: number }
 	| { code: "playerBelowAverage"; playerId: string; belowSeconds: number };
 
+/** A limit a swap went past (#171). */
+export type DeviationRule = "substitutesIn" | "occasions" | "reEntry";
+
+/** A swap that broke the match's substitution rules; it was made anyway. */
+export interface Deviation {
+	/** The substitution event, so the coach's note can refer to it. */
+	eventId: string;
+	at: number;
+	period: number;
+	inId: string;
+	outId: string;
+	rules: DeviationRule[];
+}
+
+/** How much of the substitution limits a match has used, and where it went past them. */
+export interface SubstitutionUsage {
+	/** Players brought on for the first time (a player coming back is not counted again). */
+	substitutesIn: number;
+	/** Occasions during play; swaps in a break between periods are not one. */
+	occasions: number;
+	/** Empty with free swaps: they have no limits to break. */
+	deviations: Deviation[];
+}
+
+/**
+ * Count the substitutions in the timeline against the rules. A swap made
+ * while no period is on (a break) is not an occasion but its player counts
+ * toward the substitutes (TB 4 kap. 5 §, POLICY.breakIsOccasion). Swaps
+ * during play that were due at the same moment (`plannedAt`) are one
+ * occasion. Players in the kickoff lineup have been on; one of them, or
+ * anyone brought on earlier, coming on again is a re-entry.
+ */
+export function substitutionUsage(
+	timeline: readonly TimelineEvent[],
+	rules: SubstitutionRules,
+): SubstitutionUsage {
+	let periodOn = false;
+	const everOn = new Set<string>();
+	const occasionKeys: number[] = [];
+	let substitutesIn = 0;
+	const deviations: Deviation[] = [];
+	for (const event of timeline) {
+		if (event.type === "periodStart") periodOn = true;
+		else if (event.type === "periodEnd") periodOn = false;
+		else if (event.type === "lineup") {
+			for (const id of Object.values(event.zones).flat()) everOn.add(id);
+			if (event.keeperId !== null) everOn.add(event.keeperId);
+		} else if (event.type === "substitution") {
+			const reEntry = everOn.has(event.inId);
+			everOn.add(event.inId);
+			if (!reEntry) substitutesIn++;
+			const duringPlay = periodOn || POLICY.breakIsOccasion;
+			if (duringPlay && !occasionKeys.includes(event.plannedAt))
+				occasionKeys.push(event.plannedAt);
+			if (rules.kind === "free") continue;
+			const broken: DeviationRule[] = [];
+			if (!reEntry && substitutesIn > rules.substitutesIn)
+				broken.push("substitutesIn");
+			if (
+				duringPlay &&
+				rules.occasions !== null &&
+				occasionKeys.indexOf(event.plannedAt) + 1 > rules.occasions
+			)
+				broken.push("occasions");
+			if (reEntry && !rules.reEntry) broken.push("reEntry");
+			if (broken.length > 0) {
+				deviations.push({
+					eventId: event.id,
+					at: event.at,
+					period: event.period,
+					inId: event.inId,
+					outId: event.outId,
+					rules: broken,
+				});
+			}
+		}
+	}
+	return { substitutesIn, occasions: occasionKeys.length, deviations };
+}
+
 export interface MatchReport {
 	/** Seconds of match played, over all periods. */
 	playedSeconds: number;
@@ -100,6 +184,8 @@ export interface MatchReport {
 		spreadSeconds: number;
 	};
 	feedback: Feedback[];
+	/** The rules the match was played under and what was used of them (#171). */
+	substitutions: { rules: SubstitutionRules } & SubstitutionUsage;
 }
 
 export interface ReportInput {
@@ -108,6 +194,8 @@ export interface ReportInput {
 	players: readonly { id: string; name: string }[];
 	/** Seconds the match lasted (the clock at the end). */
 	endedAt: number;
+	/** The substitution rules the match was played under. */
+	rules: SubstitutionRules;
 }
 
 /** The delay furthest from on time, keeping its sign (so all-early swaps report the earliest). */
@@ -224,6 +312,10 @@ export function buildReport(input: ReportInput): MatchReport {
 		swapSummary,
 		playtime: { averageSeconds, spreadSeconds },
 		feedback: feedbackFor(swapSummary, compared, averageSeconds, spreadSeconds),
+		substitutions: {
+			rules: input.rules,
+			...substitutionUsage(timeline, input.rules),
+		},
 	};
 }
 
@@ -329,7 +421,8 @@ export function isStoredReport(value: unknown): value is StoredReport {
 	) {
 		return false;
 	}
-	const { players, swaps, swapSummary, playtime, feedback } = report;
+	const { players, swaps, swapSummary, playtime, feedback, substitutions } =
+		report;
 	return (
 		isNumber(report.playedSeconds) &&
 		isNumber(report.periods) &&
@@ -377,7 +470,25 @@ export function isStoredReport(value: unknown): value is StoredReport {
 		isNumber(playtime.averageSeconds) &&
 		isNumber(playtime.spreadSeconds) &&
 		Array.isArray(feedback) &&
-		feedback.every((f) => isRecord(f) && typeof f.code === "string")
+		feedback.every((f) => isRecord(f) && typeof f.code === "string") &&
+		isRecord(substitutions) &&
+		parseSubstitutionRules(substitutions.rules) !== null &&
+		isNumber(substitutions.substitutesIn) &&
+		isNumber(substitutions.occasions) &&
+		Array.isArray(substitutions.deviations) &&
+		substitutions.deviations.every(
+			(d) =>
+				isRecord(d) &&
+				typeof d.eventId === "string" &&
+				isNumber(d.at) &&
+				isNumber(d.period) &&
+				typeof d.inId === "string" &&
+				typeof d.outId === "string" &&
+				Array.isArray(d.rules) &&
+				d.rules.every((r) =>
+					["substitutesIn", "occasions", "reEntry"].includes(String(r)),
+				),
+		)
 	);
 }
 

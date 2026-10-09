@@ -1055,6 +1055,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 					name: nameOf(id),
 				})),
 				endedAt: now(),
+				rules: live.substitutions,
 			}),
 		};
 	}
