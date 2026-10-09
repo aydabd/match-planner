@@ -113,3 +113,61 @@ describe("text lives in the UI", () => {
 		expect(offenders).toEqual([]);
 	});
 });
+
+describe("substitution rules in Swedish", () => {
+	const period = { kind: "recentMatches", count: 8 } as const;
+
+	it("names the presets and sums up the rules", () => {
+		expect(TEXT.rules.preset("ersattare")).toBe(
+			"Ersättare (5 inbytta, 3 tillfällen)",
+		);
+		expect(TEXT.rules.summary({ kind: "free" })).toBe("Fria byten.");
+		expect(
+			TEXT.rules.summary({
+				kind: "limited",
+				substitutesIn: 5,
+				occasions: 1,
+				reEntry: true,
+			}),
+		).toBe(
+			"Högst 5 inbytta, högst 1 tillfälle under spel. En utbytt spelare får komma in igen.",
+		);
+	});
+
+	it("says why a player sits out over the coach's period", () => {
+		expect(TEXT.rules.reason(2040, period)).toBe(
+			"+34 min över snittet de senaste 8 matcherna",
+		);
+		expect(TEXT.rules.reason(-300, { kind: "season", year: 2026 })).toBe(
+			"-5 min under snittet säsongen 2026",
+		);
+		expect(
+			TEXT.rules.reason(10, {
+				kind: "range",
+				from: "2026-04-01",
+				to: "2026-06-30",
+			}),
+		).toBe("lika mycket som snittet 2026-04-01 till 2026-06-30");
+		expect(TEXT.rules.period({ kind: "recentMatches", count: 1 })).toBe(
+			"den senaste matchen",
+		);
+	});
+
+	it("says when an occasion is", () => {
+		expect(TEXT.rules.occasionWhen(1200, true, 1200)).toBe(
+			"I pausen efter period 1",
+		);
+		expect(TEXT.rules.occasionWhen(2280, false, 1500)).toBe(
+			"38:00 (period 2, 13:00)",
+		);
+	});
+
+	it("warns when the limits are used up", () => {
+		expect(TEXT.rules.warning({ code: "noSubstitutesLeft" })).toBe(
+			"Inga byten kvar.",
+		);
+		expect(TEXT.rules.warning({ code: "shortHanded", onPitch: 10 })).toBe(
+			"Laget spelar med 10.",
+		);
+	});
+});

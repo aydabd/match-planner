@@ -1,5 +1,6 @@
 import type { DevelopmentArea } from "../core/developmentCheckpoints.js";
 import type { FormationProblem, TeamSizeId } from "../core/formations.js";
+import type { PlanWarning, PlayerChoice } from "../core/limitedPlan.js";
 import { LIMITS } from "../core/limits.js";
 import type { MatchFileProblem } from "../core/matchFile.js";
 import {
@@ -11,6 +12,11 @@ import {
 import type { Feedback, PlayerStatus } from "../core/report.js";
 import type { SchedulingProblem } from "../core/scheduler.js";
 import type { SquadFileProblem } from "../core/storage.js";
+import type {
+	FairnessPeriod,
+	RulesPreset,
+	SubstitutionRules,
+} from "../core/substitutionRules.js";
 
 /** Zone names by zone id (see ZoneConfig.id); built once, read on every render. */
 const ZONE_NAMES: Readonly<Record<string, string>> = {
@@ -40,6 +46,13 @@ function words(seconds: number): string {
 function delay(seconds: number): string {
 	if (Math.round(seconds) === 0) return "i tid";
 	return `${words(seconds)} ${seconds > 0 ? "sen" : "tidig"}`;
+}
+
+/** "38:00", minutes and seconds from seconds. */
+function clock(seconds: number): string {
+	const m = Math.floor(seconds / 60);
+	const s = Math.floor(seconds % 60);
+	return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
 export const TEXT = {
@@ -194,6 +207,119 @@ export const TEXT = {
 		confirmClearAll: "Tryck igen för att rensa allt",
 		policyOverride:
 			"Avviker från distriktets rekommenderade policy (perioder eller minuter per period).",
+	},
+
+	/** Substitution rules and fairness over time on the setup screen (#171). */
+	rules: {
+		teamLegend: "Lagets bytesregler",
+		teamHelp:
+			"Gäller lagets matcher och sparas i truppfilen. I barn- och ungdomsfotboll är bytena fria; i förbundsserier och i distriktsserier med ersättare är de begränsade.",
+		matchToggle: "Andra bytesregler i den här matchen, till exempel en cup",
+		matchLegend: "Bytesregler i den här matchen",
+		preset(preset: RulesPreset): string {
+			switch (preset) {
+				case "free":
+					return "Fria byten (barn- och ungdomsfotboll)";
+				case "ersattare":
+					return `Ersättare (${POLICY.limitedSubstitutions.substitutesIn} inbytta, ${POLICY.limitedSubstitutions.occasions} tillfällen)`;
+				case "custom":
+					return "Egna regler";
+			}
+		},
+		presetLabel: "Regler",
+		substitutesIn: "Högst antal inbytta spelare",
+		occasions: "Högst antal bytestillfällen under spel",
+		occasionsHelp:
+			"Lämna tomt om antalet inte är begränsat. Pausen mellan perioderna räknas inte som ett tillfälle.",
+		reEntry: "En utbytt spelare får komma in igen",
+		summary(rules: SubstitutionRules): string {
+			if (rules.kind === "free") return "Fria byten.";
+			const occasions =
+				rules.occasions === null
+					? "obegränsat antal tillfällen"
+					: `högst ${rules.occasions} ${rules.occasions === 1 ? "tillfälle" : "tillfällen"} under spel`;
+			return `Högst ${rules.substitutesIn} inbytta, ${occasions}. ${rules.reEntry ? "En utbytt spelare får komma in igen." : "En utbytt spelare får inte komma in igen."}`;
+		},
+		fairnessLegend: "Rättvis speltid över",
+		fairnessHelp:
+			"Med begränsade byten kan inte alla spela lika mycket i varje match. Speltiden jämnas ut över den här perioden.",
+		fairnessKindLabel: "Period",
+		fairnessKind(kind: FairnessPeriod["kind"]): string {
+			switch (kind) {
+				case "recentMatches":
+					return "De senaste matcherna";
+				case "season":
+					return "En säsong";
+				case "range":
+					return "Mellan två datum";
+			}
+		},
+		fairnessCount: "Antal matcher",
+		fairnessYear: "År",
+		fairnessFrom: "Från",
+		fairnessTo: "Till",
+		fairnessInvalid: "Välj ett slutdatum som inte är före startdatumet.",
+		/** The period in running text: "de senaste 8 matcherna". */
+		period(period: FairnessPeriod): string {
+			switch (period.kind) {
+				case "recentMatches":
+					return period.count === 1
+						? "den senaste matchen"
+						: `de senaste ${period.count} matcherna`;
+				case "season":
+					return `säsongen ${period.year}`;
+				case "range":
+					return `${period.from} till ${period.to}`;
+			}
+		},
+		proposalTitle: "Förslag för matchen",
+		proposalHelp: (period: FairnessPeriod) =>
+			`Förslaget bygger på speltiden ${TEXT.rules.period(period)}: de som har spelat minst börjar. Ändra en spelare så räknas resten om.`,
+		proposalLoading: "Räknar fram förslaget …",
+		starting: "Startar",
+		comingOn: "Byts in",
+		sittingOut: "Sitter över idag",
+		choiceLabel: (name: string) => `Roll i matchen för ${name}`,
+		choice(choice: PlayerChoice): string {
+			switch (choice) {
+				case "start":
+					return "Startar";
+				case "bench":
+					return "Byts in";
+				case "sitOut":
+					return "Sitter över";
+			}
+		},
+		/** Why a player sits out: "+34 min över snittet de senaste 8 matcherna". */
+		reason(aheadSeconds: number, period: FairnessPeriod): string {
+			const minutes = Math.round(aheadSeconds / 60);
+			if (minutes === 0)
+				return `lika mycket som snittet ${TEXT.rules.period(period)}`;
+			return minutes > 0
+				? `+${minutes} min över snittet ${TEXT.rules.period(period)}`
+				: `${minutes} min under snittet ${TEXT.rules.period(period)}`;
+		},
+		resetProposal: "Återställ förslaget",
+		occasionsTitle: "Byten",
+		noOccasions: "Inga byten planeras.",
+		/** When an occasion is: "I pausen efter period 1" or "38:00 (period 2, 13:00)". */
+		occasionWhen(at: number, atBreak: boolean, periodSeconds: number): string {
+			const period = Math.floor(at / periodSeconds) + 1;
+			return atBreak
+				? `I pausen efter period ${period - 1}`
+				: `${clock(at)} (period ${period}, ${clock(at - (period - 1) * periodSeconds)})`;
+		},
+		swap: (inName: string, outName: string) => `${inName} in för ${outName}`,
+		warning(warning: PlanWarning): string {
+			switch (warning.code) {
+				case "noSubstitutesLeft":
+					return "Inga byten kvar.";
+				case "noOccasionsLeft":
+					return "Inga bytestillfällen kvar.";
+				case "shortHanded":
+					return `Laget spelar med ${warning.onPitch}.`;
+			}
+		},
 	},
 
 	formation: {

@@ -29,6 +29,13 @@ export class SetupPage {
 	readonly squadPasswordField: Locator;
 	readonly squadPasswordInput: Locator;
 	readonly saveSquadButton: Locator;
+	/** The team's substitution rules (#171). */
+	readonly teamRules: Locator;
+	readonly fairness: Locator;
+	readonly matchRulesToggle: Locator;
+	readonly matchRules: Locator;
+	/** With limited swaps: lineup, who sits out and the planned swaps. */
+	readonly proposal: Locator;
 
 	constructor(private readonly page: Page) {
 		this.root = page.locator("#setupView");
@@ -63,6 +70,36 @@ export class SetupPage {
 			name: "Spara trupp",
 			exact: true,
 		});
+		this.teamRules = this.root.getByRole("group", {
+			name: "Lagets bytesregler",
+		});
+		this.fairness = this.root.getByRole("group", {
+			name: "Rättvis speltid över",
+		});
+		this.matchRulesToggle = this.root.getByRole("checkbox", {
+			name: "Andra bytesregler i den här matchen, till exempel en cup",
+		});
+		this.matchRules = this.root.getByRole("group", {
+			name: "Bytesregler i den här matchen",
+		});
+		this.proposal = this.root.locator("#matchProposal");
+	}
+
+	/** Choose the team's rules by the start of the option's text. */
+	async chooseTeamRules(
+		preset: "Fria byten" | "Ersättare" | "Egna regler",
+	): Promise<void> {
+		const select = this.teamRules.getByLabel("Regler");
+		const label = await select
+			.locator("option", { hasText: preset })
+			.first()
+			.textContent();
+		await select.selectOption({ label: label ?? preset });
+	}
+
+	/** The proposal's role for a player: Startar, Byts in or Sitter över. */
+	playerRole(name: string): Locator {
+		return this.proposal.getByLabel(`Roll i matchen för ${name}`);
 	}
 
 	async open(): Promise<void> {

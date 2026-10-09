@@ -16,6 +16,7 @@ import { emptyDraft, loadDraft, saveDraft } from "./draftStorage.js";
 import { initFormationPicker } from "./formationPicker.js";
 import { clearAllSavedData } from "./resetData.js";
 import { clearSession } from "./sessionStorage.js";
+import { createSubstitutionSetup } from "./substitutionSetup.js";
 import { TEXT } from "./text.js";
 
 export interface RosterViewCallbacks {
@@ -138,8 +139,17 @@ export function createRosterView(callbacks: RosterViewCallbacks): void {
 		},
 	});
 
+	const substitutionSetup = createSubstitutionSetup(
+		byId("substitutionSetup"),
+		(change) => {
+			draft = { ...draft, ...change };
+			persist();
+		},
+	);
+
 	function render(): void {
 		formationPicker.render(draft.formatId);
+		substitutionSetup.render(draft);
 		regionSelect.value = draft.region;
 		const overridden = policyOverrides(draft).length > 0;
 		regionOverrideNote.hidden = !overridden;
