@@ -155,6 +155,8 @@ startsidan och matchmenyn. Dokumenten:
 **Svenska Fotbollförbundet (SvFF)**
 - [Barn- och ungdomsfotboll](https://aktiva.svenskfotboll.se/spelare/spela/barn-och-ungdom/)
 - [Spelformer: speltid och byten](https://aktiva.svenskfotboll.se/tranare/spelformer/)
+- [Tävlingsbestämmelser för barn- och ungdomsfotboll (PDF)](https://www.svenskfotboll.se/4aefde/globalassets/svff/dokumentdokumentblock/tavling/tavlingsforeskrifter/tb-barn--och-ungdomsfotboll.pdf)
+- [Tävlingsbestämmelser 2026 (PDF)](https://www.svenskfotboll.se/49e87f/globalassets/svff/dokumentdokumentblock/tavling/tavlingsforeskrifter/2026/tb-2026-v2-202603242.pdf)
 - [Svensk fotbolls spelarutbildningsplan](https://aktiva.svenskfotboll.se/tranare/spelarutbildning/spelarutbildningsplan/)
 - [Riktlinjer och utbildningsmaterial](https://aktiva.svenskfotboll.se/spelare/utbildningsmaterial/utbildningsmaterial/)
 
@@ -167,7 +169,14 @@ Kontrollerat mot dokumenten 2026-09-28. Matchtiderna i seriespel kommer från Sv
 spelformer (5 mot 5: 3 x 15, 7 mot 7: 3 x 20, 9 mot 9: 3 x 25, 11 mot 11: 2 x 40 för 15-åringar). Cuper
 har egna regler, till exempel 2 x 12 minuter: tränaren ändrar då perioder och minuter i appen.
 
-Kontrollera att citaten fortfarande står på sidorna (kräver nät):
+Bytena skiljer sig mellan serier (kontrollerat 2026-10-09). I barn- och ungdomsfotboll är bytena fria
+och en utbytt spelare får komma in igen (Tävlingsbestämmelser för barn- och ungdomsfotboll, 5 §). I
+förbundsserierna får högst fem spelare bytas in, vid högst tre tillfällen under pågående spel, och en
+utbytt spelare får inte komma in igen. I distriktsserier som använder ersättare får högst fem bytas in
+och en utbytt spelare får inte komma in igen; där anges inget antal tillfällen (Tävlingsbestämmelser
+2026, 4 kap. 5 §). Varje regel i appen anger vilken sorts byten den gäller.
+
+Kontrollera att citaten fortfarande står på sidorna och i PDF:erna (kräver nät):
 
 ```sh
 npm run check:policy

@@ -39,6 +39,16 @@ test.describe("Why does it work like this?", () => {
 		await expect(lengths).toContainText("3 x 20 minuter vid enskild match");
 		await expect(lengths).toContainText("Cuper har ofta egna regler");
 
+		// Each rule says which matches it applies to.
+		await expect(lengths).toContainText("Gäller alla matcher");
+		await expect(policy.locator('[data-rule="loadInARow"]')).toContainText(
+			"Gäller matcher med fria byten",
+		);
+		const limited = policy.locator('[data-rule="limitedSubstitutions"]');
+		await expect(limited).toContainText("Gäller matcher med begränsade byten");
+		await expect(limited).toContainText("halvtidsvilan således undantagen");
+		await expect(limited).toContainText("Tävlingsbestämmelser 2026 (PDF)");
+
 		const hrefs = await policy
 			.getByRole("link")
 			.evaluateAll((links) => links.map((a) => (a as HTMLAnchorElement).href));
