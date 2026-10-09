@@ -2,7 +2,12 @@ import type { DevelopmentArea } from "../core/developmentCheckpoints.js";
 import type { FormationProblem, TeamSizeId } from "../core/formations.js";
 import { LIMITS } from "../core/limits.js";
 import type { MatchFileProblem } from "../core/matchFile.js";
-import { POLICY, type RuleId } from "../core/policy.js";
+import {
+	POLICY,
+	type RuleId,
+	SUBSTITUTION_KINDS,
+	type SubstitutionKind,
+} from "../core/policy.js";
 import type { Feedback, PlayerStatus } from "../core/report.js";
 import type { SchedulingProblem } from "../core/scheduler.js";
 import type { SquadFileProblem } from "../core/storage.js";
@@ -260,6 +265,13 @@ export const TEXT = {
 			`Kontrollerat ${date} mot: ${version}.`,
 		sources: "Läs mer",
 		sourcesTitle: "Dokument och länkar",
+		appliesTo(kinds: readonly SubstitutionKind[]): string {
+			if (kinds.length === SUBSTITUTION_KINDS.length)
+				return "Gäller alla matcher";
+			return kinds.includes("free")
+				? "Gäller matcher med fria byten"
+				: "Gäller matcher med begränsade byten";
+		},
 		offline: "Sidan fungerar utan nät. Länkarna öppnas när du är uppkopplad.",
 		rules: {
 			participation: {
@@ -280,7 +292,15 @@ export const TEXT = {
 			},
 			freeSubstitutions: {
 				title: "Fria byten",
-				text: "Alla spelformer i barn- och ungdomsfotboll har fria byten. Därför kan du byta en spelare i taget, när det passar, och appen visar bara vem som ska in och ut.",
+				text: "Alla spelformer i barn- och ungdomsfotboll har fria byten, och en spelare som har bytts ut får komma in igen. Därför kan du byta en spelare i taget, när det passar, och appen visar bara vem som ska in och ut.",
+			},
+			limitedSubstitutions: {
+				title: "Begränsade byten med ersättare",
+				text: `I förbundsserierna får högst ${POLICY.limitedSubstitutions.substitutesIn} spelare bytas in, vid högst ${POLICY.limitedSubstitutions.occasions} tillfällen under pågående spel, och en spelare som har bytts ut får inte komma in igen. Byten i pausen räknas inte som ett tillfälle, men spelarna räknas mot antalet ersättare. I distriktsserier som använder ersättare får också högst ${POLICY.limitedSubstitutions.substitutesIn} bytas in och en utbytt spelare får inte komma in igen, men bestämmelserna anger inget antal tillfällen. Distriktet kan tillåta fler byten, och cuper har ofta egna regler: ändra då värdena för laget eller matchen.`,
+			},
+			fairOverTime: {
+				title: "Rättvist över tid",
+				text: "Med begränsade byten kan inte alla spela lika mycket i varje match. Därför räknar appen speltiden över en period som du väljer, till exempel de senaste matcherna eller hela säsongen. De som har spelat minst börjar, och de som har spelat mest får ibland sitta över. Det är ett eget val som bygger på tanken att alla ska få vara med, inte ett krav i något dokument.",
 			},
 			equalPlaytime: {
 				title: "Så lika speltid som möjligt",
@@ -296,7 +316,7 @@ export const TEXT = {
 			},
 			loadInARow: {
 				title: "Vem som byts ut först",
-				text: `Små barn orkar inte springa hur länge som helst. Appen räknar hur länge varje spelare har stått på planen i sträck och byter ut dem som har sprungit mest först. Försvar räknas som lättare (${POLICY.zoneLoad.back}) än mittfält och anfall (${POLICY.zoneLoad.mid}), eftersom försvarare oftast springer mindre. Speltiden över hela matchen styr fortfarande rättvisan. Regeln förutsätter fria byten där en utbytt spelare får komma in igen, som i barn- och ungdomsfotboll (SvFF:s tävlingsbestämmelser för barn- och ungdomsfotboll, 5 §). Appen planerar i dag alltid med fria byten. Det är MatchPlanners egna värden; inget dokument anger dem, och tränaren kan alltid ändra ett byte själv.`,
+				text: `Små barn orkar inte springa hur länge som helst. Appen räknar hur länge varje spelare har stått på planen i sträck och byter ut dem som har sprungit mest först. Försvar räknas som lättare (${POLICY.zoneLoad.back}) än mittfält och anfall (${POLICY.zoneLoad.mid}), eftersom försvarare oftast springer mindre. Speltiden över hela matchen styr fortfarande rättvisan. Regeln förutsätter fria byten där en utbytt spelare får komma in igen, som i barn- och ungdomsfotboll (SvFF:s tävlingsbestämmelser för barn- och ungdomsfotboll, 5 §), och används inte med begränsade byten. Det är MatchPlanners egna värden; inget dokument anger dem, och tränaren kan alltid ändra ett byte själv.`,
 			},
 			restTime: {
 				title: "Hur länge en spelare vilar",

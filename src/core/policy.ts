@@ -3,10 +3,16 @@
  * sizes and the screens read their values from POLICY; nothing else defines a
  * rule. Each rule says where it comes from:
  *
- * - "policy": a published rule or guideline. It carries the source, a verbatim
- *   quote and the date it was checked against the document.
+ * - "policy": a published rule or guideline. It carries one or more
+ *   citations: the source, verbatim quotes and the date they were checked
+ *   against the document.
  * - "decision": MatchPlanner's own choice. It is never attributed to RF, SvFF
  *   or Skånebollen; a source is listed only as background.
+ *
+ * Every rule also says which matches it applies to (`appliesTo`): those with
+ * free swaps and re-entry, as in barn- och ungdomsfotboll, those with a
+ * limited number of substitutes, or both. The code reads it instead of
+ * assuming.
  *
  * Before a rule is labelled "policy", quote the passage from the current
  * version of the document and set `checked`. src/ui/text.ts explains each
@@ -48,6 +54,16 @@ export const SOURCES = {
 		publisher: "Svenska Fotbollförbundet (SvFF)",
 		title: "Svensk fotbolls spelarutbildningsplan",
 		url: "https://aktiva.svenskfotboll.se/tranare/spelarutbildning/spelarutbildningsplan/",
+	},
+	svffYouthCompetitionRules: {
+		publisher: "Svenska Fotbollförbundet (SvFF)",
+		title: "Tävlingsbestämmelser för barn- och ungdomsfotboll (PDF)",
+		url: "https://www.svenskfotboll.se/4aefde/globalassets/svff/dokumentdokumentblock/tavling/tavlingsforeskrifter/tb-barn--och-ungdomsfotboll.pdf",
+	},
+	svffCompetitionRules: {
+		publisher: "Svenska Fotbollförbundet (SvFF)",
+		title: "Tävlingsbestämmelser 2026 (PDF)",
+		url: "https://www.svenskfotboll.se/49e87f/globalassets/svff/dokumentdokumentblock/tavling/tavlingsforeskrifter/2026/tb-2026-v2-202603242.pdf",
 	},
 	svffMaterial: {
 		publisher: "Svenska Fotbollförbundet (SvFF)",
@@ -109,12 +125,26 @@ export const POLICY = {
 	/** A swap this late (seconds) is flagged as seriously late. */
 	veryLateSwapSeconds: 60,
 	/**
+	 * Substitutes ("ersättare") in a förbundsserie (TB 2026, 4 kap. 5 §; rule
+	 * "limitedSubstitutions"): at most this many players brought on, at most
+	 * this many occasions during play, and a replaced player may not return.
+	 * A district series with ersättare has the same cap on players and no
+	 * re-entry, but TB sets no limit on its occasions.
+	 */
+	limitedSubstitutions: { substitutesIn: 5, occasions: 3, reEntry: false },
+	/**
+	 * A break between periods is never a substitution occasion, but the
+	 * players brought on in it count toward the substitutes limit
+	 * ("halvtidsvilan således undantagen", TB 2026, 4 kap. 5 §).
+	 */
+	breakIsOccasion: false,
+	/**
 	 * How tiring a second in each line is, compared with midfield and attack
 	 * (1). Defenders usually run less, so they may stay on a bit longer.
 	 * Only the back line counts lighter: a defensive midfielder runs like a
 	 * midfielder. A decision, not a rule from any document. It assumes free
-	 * swaps with re-entry, which is how barn- och ungdomsfotboll is played; a
-	 * series with limited swaps is not handled yet (issue #171).
+	 * swaps with re-entry, which is how barn- och ungdomsfotboll is played
+	 * (rule "loadInARow" applies to free swaps only).
 	 */
 	zoneLoad: { back: 0.7, dmid: 1, mid: 1, amid: 1, fwd: 1 },
 	/**
@@ -150,112 +180,194 @@ export function policyFor(region: RegionId): typeof POLICY {
 	return overlay ? { ...POLICY, ...overlay } : POLICY;
 }
 
+/**
+ * How substitutions work in a match: "free" swaps where a replaced player may
+ * come back (barn- och ungdomsfotboll), or "limited" substitutes with a cap
+ * and usually no re-entry (förbundsserier, district series with ersättare,
+ * some cups).
+ */
+export const SUBSTITUTION_KINDS = ["free", "limited"] as const;
+export type SubstitutionKind = (typeof SUBSTITUTION_KINDS)[number];
+
+/** Verbatim passages from one document, and when they were checked. */
+interface Citation {
+	/** The source whose page or PDF holds the quotes. */
+	readonly source: SourceId;
+	/**
+	 * Verbatim passages. Each must appear in the document as written;
+	 * `npm run check:policy` re-checks them.
+	 */
+	readonly quotes: readonly string[];
+	/** When the passages were checked against the document, "YYYY-MM-DD". */
+	readonly checked: string;
+	/** Version or date of the document as checked. */
+	readonly documentVersion: string;
+}
+
 interface PolicyRule {
 	/** What the rule is about. */
 	readonly id: string;
 	readonly origin: "policy" | "decision";
+	/** The kinds of substitution the rule applies to. */
+	readonly appliesTo: readonly SubstitutionKind[];
 	/** The rule's own source; for a decision, background reading only. */
 	readonly sources: readonly SourceId[];
-	/** The source whose page holds the quotes (origin "policy" only). */
-	readonly quoteSource?: SourceId;
-	/**
-	 * Verbatim passages from that page (origin "policy" only). Each must
-	 * appear on the page as written; `npm run check:policy` re-checks them.
-	 */
-	readonly quotes?: readonly string[];
-	/** When the passage was checked against the document, "YYYY-MM-DD". */
-	readonly checked?: string;
-	/** Version or date of the document as checked. */
-	readonly documentVersion?: string;
+	/** The quoted passages (origin "policy" only). */
+	readonly citations?: readonly Citation[];
 }
 
 export const RULES = [
 	{
 		id: "participation",
 		origin: "policy",
+		appliesTo: ["free", "limited"],
 		sources: ["rfGuidelines", "rfGuidelinesPdf", "rfGuidelinesShortPdf"],
-		quoteSource: "rfGuidelines",
-		quotes: [
-			"Alla barn och ungdomar inom idrottsrörelsen ska ha rätt till ett allsidigt och lekfullt idrottande.",
+		citations: [
+			{
+				source: "rfGuidelines",
+				quotes: [
+					"Alla barn och ungdomar inom idrottsrörelsen ska ha rätt till ett allsidigt och lekfullt idrottande.",
+				],
+				checked: "2026-09-28",
+				documentVersion: "RF-sidan, uppdaterad 2026-01-07",
+			},
 		],
-		checked: "2026-09-28",
-		documentVersion: "RF-sidan, uppdaterad 2026-01-07",
 	},
 	{
 		id: "versatility",
 		origin: "policy",
+		appliesTo: ["free", "limited"],
 		sources: ["rfGuidelines", "rfGuidelinesPdf", "rfSelection"],
-		quoteSource: "rfGuidelines",
-		quotes: [
-			"Oavsett träningsmängd och typ av idrott så ska verksamheten karaktäriseras av allsidighet och variation",
+		citations: [
+			{
+				source: "rfGuidelines",
+				quotes: [
+					"Oavsett träningsmängd och typ av idrott så ska verksamheten karaktäriseras av allsidighet och variation",
+				],
+				checked: "2026-09-28",
+				documentVersion: "RF-sidan, uppdaterad 2026-01-07",
+			},
 		],
-		checked: "2026-09-28",
-		documentVersion: "RF-sidan, uppdaterad 2026-01-07",
 	},
 	{
 		id: "matchFormats",
 		origin: "policy",
+		appliesTo: ["free", "limited"],
 		sources: ["svffYouth", "svffPlayFormats", "skaneRulesPdf"],
-		quoteSource: "svffYouth",
-		quotes: [
-			"Fotboll för 8-9 åringar spelas 5 mot 5.",
-			"Fotboll för 10-12 åringar spelas 7 mot 7.",
+		citations: [
+			{
+				source: "svffYouth",
+				quotes: [
+					"Fotboll för 8-9 åringar spelas 5 mot 5.",
+					"Fotboll för 10-12 åringar spelas 7 mot 7.",
+				],
+				checked: "2026-09-28",
+				documentVersion:
+					"SvFF-sidan (utan datum); Skånebollen 2025-04-07: nationella spelformer gäller i Skåne från säsongen 2026",
+			},
 		],
-		checked: "2026-09-28",
-		documentVersion:
-			"SvFF-sidan (utan datum); Skånebollen 2025-04-07: nationella spelformer gäller i Skåne från säsongen 2026",
 	},
 	{
 		id: "matchLengths",
 		origin: "policy",
+		appliesTo: ["free", "limited"],
 		sources: ["svffPlayFormats", "svffYouth", "skaneRulesPdf"],
-		quoteSource: "svffPlayFormats",
-		quotes: [
-			"Speltid: 3 x 10 minuter, sammandrag. 3 x 15 minuter, enskild match.",
-			"Speltid: 3 x 20 minuter vid enskild match. 3 x 15 minuter vid sammandrag (2-3 matcher)",
-			"Speltid: 3 x 25 minuter.",
-			"Speltid: 15 år: 2 x 40 minuter. 16 år och uppåt: 2 x 45 minuter.",
+		citations: [
+			{
+				source: "svffPlayFormats",
+				quotes: [
+					"Speltid: 3 x 10 minuter, sammandrag. 3 x 15 minuter, enskild match.",
+					"Speltid: 3 x 20 minuter vid enskild match. 3 x 15 minuter vid sammandrag (2-3 matcher)",
+					"Speltid: 3 x 25 minuter.",
+					"Speltid: 15 år: 2 x 40 minuter. 16 år och uppåt: 2 x 45 minuter.",
+				],
+				checked: "2026-09-28",
+				documentVersion: "SvFF-sidan Spelformer (utan datum)",
+			},
 		],
-		checked: "2026-09-28",
-		documentVersion: "SvFF-sidan Spelformer (utan datum)",
 	},
 	{
 		id: "freeSubstitutions",
 		origin: "policy",
-		sources: ["svffPlayFormats", "skaneRulesPdf"],
-		quoteSource: "svffPlayFormats",
-		quotes: ["Byten: Fria byten"],
-		checked: "2026-09-28",
-		documentVersion: "SvFF-sidan Spelformer (utan datum)",
+		appliesTo: ["free"],
+		sources: ["svffYouthCompetitionRules", "svffPlayFormats", "skaneRulesPdf"],
+		citations: [
+			{
+				source: "svffPlayFormats",
+				quotes: ["Byten: Fria byten"],
+				checked: "2026-09-28",
+				documentVersion: "SvFF-sidan Spelformer (utan datum)",
+			},
+			{
+				source: "svffYouthCompetitionRules",
+				quotes: [
+					"I barn- och ungdomsfotboll används avbytare. Samtliga avbytare ska, såvida inte annat framgår av SvFF:s tävlingsföreskrifter, bytas in under match och utbytt spelare får återinträda i spelet. Byte av avbytare sker genom flygande byten.",
+				],
+				checked: "2026-10-09",
+				documentVersion:
+					"Beslutad 2018-11-20, gäller från 2019-01-01 (SDF:s egna serier från 2020-01-01), 5 § Avbytare",
+			},
+		],
+	},
+	{
+		id: "limitedSubstitutions",
+		origin: "policy",
+		appliesTo: ["limited"],
+		sources: ["svffCompetitionRules"],
+		citations: [
+			{
+				source: "svffCompetitionRules",
+				quotes: [
+					"I förbundsserierna (undantaget P16, F17, P17, F19 och P19) samt vid kval till dessa serier, får högst fem ersättare bytas in under match. Under pågående spel (halvtidsvilan således undantagen) får laget vid högst tre tillfällen genomföra spelarbyten. Spelare som byts ut får inte återinträda i spelet.",
+					"I distriktsserierna fastställer SDF dels om ersättare eller avbytare används vad avser spelformen 11 mot 11 dels vilket antal ersättare eller avbytare, dock högst sju, som får antecknas på spelarförteckningen.",
+					"Används ersättare i distriktsserierna får som mest fem bytas in under match, om inte SDF tillåter fler byten. Spelare som byts ut får inte återinträda i spelet.",
+				],
+				checked: "2026-10-09",
+				documentVersion:
+					"Tävlingsbestämmelser 2026, version 2 (2026-03-24), 4 kap. 5 §",
+			},
+		],
+	},
+	{
+		id: "fairOverTime",
+		origin: "decision",
+		appliesTo: ["limited"],
+		sources: ["rfGuidelines", "svffCompetitionRules"],
 	},
 	{
 		id: "equalPlaytime",
 		origin: "decision",
+		appliesTo: ["free"],
 		sources: ["rfGuidelines", "rfGuidelinesPdf"],
 	},
 	{
 		id: "twoLines",
 		origin: "decision",
+		appliesTo: ["free", "limited"],
 		sources: ["rfGuidelines", "svffPlayerDevelopment"],
 	},
 	{
 		id: "neighbouringLines",
 		origin: "decision",
+		appliesTo: ["free", "limited"],
 		sources: ["svffPlayerDevelopment"],
 	},
 	{
 		id: "loadInARow",
 		origin: "decision",
+		appliesTo: ["free"],
 		sources: ["rfGuidelines", "svffPlayerDevelopment"],
 	},
 	{
 		id: "restTime",
 		origin: "decision",
+		appliesTo: ["free"],
 		sources: ["rfGuidelines", "svffPlayFormats"],
 	},
 	{
 		id: "swapTiming",
 		origin: "decision",
+		appliesTo: ["free"],
 		sources: ["svffPlayFormats"],
 	},
 ] as const satisfies readonly PolicyRule[];

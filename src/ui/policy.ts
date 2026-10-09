@@ -47,20 +47,26 @@ export function createPolicyView(): void {
 					: TEXT.policy.ownDecision,
 			),
 		);
+		card.append(el("span", "pill", TEXT.policy.appliesTo(rule.appliesTo)));
 		card.append(el("p", undefined, text.text));
 		if (rule.origin === "policy") {
-			for (const passage of rule.quotes) {
-				const quote = el("blockquote", "policy-quote", passage);
-				quote.setAttribute("aria-label", TEXT.policy.quote);
-				card.append(quote);
+			for (const citation of rule.citations) {
+				for (const passage of citation.quotes) {
+					const quote = el("blockquote", "policy-quote", passage);
+					quote.setAttribute("aria-label", TEXT.policy.quote);
+					card.append(quote);
+				}
+				card.append(
+					el(
+						"p",
+						"hint",
+						TEXT.policy.checked(
+							citation.checked,
+							`${SOURCES[citation.source].title}, ${citation.documentVersion}`,
+						),
+					),
+				);
 			}
-			card.append(
-				el(
-					"p",
-					"hint",
-					TEXT.policy.checked(rule.checked, rule.documentVersion),
-				),
-			);
 		}
 		const list = el("ul", "policy-links");
 		for (const id of rule.sources) {
