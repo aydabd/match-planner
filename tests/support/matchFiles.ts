@@ -133,3 +133,27 @@ export function playerIdMapFor(
 		files.flatMap((f) => f.squad.players.map((p) => p.name)),
 	);
 }
+
+/** `file` with one substitution, id "swap-1", ten seconds in: a back is replaced. */
+export function withSwap(file: MatchFile): MatchFile {
+	const copy = structuredClone(file);
+	const lineup = copy.timeline[1];
+	if (lineup?.type !== "lineup") throw new Error("no kickoff lineup");
+	const [outId] = lineup.zones.back ?? [];
+	const inId = copy.squad.players.find(
+		(p) => !copy.squad.startingIds.includes(p.id),
+	)?.id;
+	if (!outId || !inId) throw new Error("no swap possible");
+	copy.timeline.splice(2, 0, {
+		type: "substitution",
+		id: "swap-1",
+		at: 10,
+		plannedAt: 10,
+		period: 1,
+		inId,
+		zoneId: "back",
+		moves: [],
+		outId,
+	});
+	return copy;
+}

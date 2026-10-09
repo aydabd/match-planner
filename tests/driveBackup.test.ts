@@ -36,7 +36,7 @@ import {
 	switchTeam,
 } from "../src/ui/teamStorage.js";
 import { FakeDrive } from "./support/fakeDrive.js";
-import { makeMatchFile } from "./support/matchFiles.js";
+import { makeMatchFile, withSwap } from "./support/matchFiles.js";
 import { MemoryStorage } from "./support/memoryStorage.js";
 
 const ROOT = "root-1";
@@ -649,6 +649,79 @@ describe("Drive - two phones writing at once", () => {
 			expect(loadPlayerNotes().players[0]?.availability[0]?.reason).toBe(
 				"injury",
 			);
+		});
+	});
+});
+
+describe("Drive - the coach's notes on deviations (#171)", () => {
+	const LIMITED = {
+		kind: "limited",
+		substitutesIn: 5,
+		occasions: 3,
+		reEntry: false,
+	} as const;
+	const explain = (eventId: string, text: string) => ({
+		matchId: "m1",
+		eventId,
+		note: text,
+		writtenAt: "2026-09-05T13:00:00.000Z",
+	});
+	const notesOn = (d: Device) =>
+		d.run(() => loadMatchFiles()[0]?.deviationNotes.map((n) => n.note));
+
+	it("brings a note written after the first backup to the other phone, and both phones' notes together", async () => {
+		const drive = new FakeDrive();
+		const a = device();
+		const b = device();
+		const match = withSwap(makeMatchFile({ matchId: "m1" }));
+		match.setup.substitutions = LIMITED;
+		const firstSwap = match.timeline[2];
+		if (firstSwap?.type !== "substitution") throw new Error("no swap");
+		match.timeline.splice(3, 0, { ...firstSwap, id: "swap-2" });
+		await a.run(async () => {
+			keepMatchFiles([match]);
+			await backupOf(drive).backup(ROOT, PASSWORD);
+		});
+		await b.run(() => restored(drive));
+
+		await a.run(async () => {
+			keepMatchFiles([
+				{ ...match, deviationNotes: [explain("swap-1", "Från A")] },
+			]);
+			await backupOf(drive).backup(ROOT, PASSWORD);
+		});
+		await b.run(async () => {
+			keepMatchFiles([
+				{ ...match, deviationNotes: [explain("swap-2", "Från B")] },
+			]);
+			await backupOf(drive).backup(ROOT, PASSWORD);
+		});
+		await a.run(() => restored(drive));
+
+		expect(await notesOn(a)).toEqual(["Från A", "Från B"]);
+		expect(await notesOn(b)).toEqual(["Från A", "Från B"]);
+	});
+
+	it("does not read a match with free swaps again", async () => {
+		const drive = new FakeDrive();
+		const a = device();
+		await a.run(async () => {
+			keepMatchFiles([makeMatchFile({ matchId: "m1" })]);
+			await backupOf(drive).backup(ROOT, PASSWORD);
+			const matchIds = [...drive.files]
+				.filter(([, f]) => f.name.startsWith("match-"))
+				.map(([id]) => id);
+			const client = drive.client();
+			const read: string[] = [];
+			await createDriveBackup({
+				...client,
+				downloadJson: (id) => {
+					read.push(id);
+					return client.downloadJson(id);
+				},
+			}).restore(ROOT, PASSWORD);
+			expect(matchIds).toHaveLength(1);
+			expect(read).not.toContain(matchIds[0]);
 		});
 	});
 });

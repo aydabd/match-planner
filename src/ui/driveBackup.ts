@@ -17,6 +17,7 @@ import {
 	matchesToBackUp,
 	type TeamFolder,
 } from "../core/driveSync.js";
+import { mergeMatchFiles } from "../core/history.js";
 import type { MergeCounts, PlacementChoice } from "../core/importTeam.js";
 import type { MatchFile } from "../core/matchFile.js";
 import { isAcceptableNewPassword } from "../core/passwords.js";
@@ -33,7 +34,7 @@ import { applyTeamData } from "./applyTeamData.js";
 import { deviceId } from "./deviceStorage.js";
 import { loadDraft } from "./draftStorage.js";
 import type { DriveClient } from "./driveClient.js";
-import { loadMatchFiles } from "./matchFileStorage.js";
+import { keepMatchFiles, loadMatchFiles } from "./matchFileStorage.js";
 import { loadPlayerNotes } from "./playerNotesStorage.js";
 import { activeTeamIsEmpty } from "./teamEmpty.js";
 import {
@@ -283,8 +284,31 @@ export function createDriveBackup(client: DriveClient): DriveBackup {
 			);
 		}
 
+		// A match with limited swaps can get the coach's notes on its
+		// deviations after it was first backed up (#171): bring this device's
+		// copy and Drive's together, both ways.
+		let notesSynced = false;
+		for (const [name, local] of localByName) {
+			if (local.setup.substitutions.kind !== "limited") continue;
+			const entry = listing.matches.find((e) => e.name === name);
+			if (!entry) continue;
+			const payload = await ownPayload(password, entry, teamId);
+			if (payload?.kind !== "match") continue;
+			const [merged] = mergeMatchFiles([local], [payload.match]).files;
+			if (!merged) continue;
+			if (JSON.stringify(merged) !== JSON.stringify(payload.match)) {
+				await client.updateFile(
+					entry.fileId,
+					await seal(password, { ...payload, match: merged }),
+				);
+				notesSynced = true;
+			}
+			if (JSON.stringify(merged) !== JSON.stringify(local))
+				keepMatchFiles([payload.match]);
+		}
+
 		const device = deviceId();
-		let stateSaved = false;
+		let stateSaved = notesSynced;
 		const roster = loadDraft();
 		if (roster.players.length > 0) {
 			const name = await driveFileName("squad", teamId, device);
@@ -357,7 +381,11 @@ export function createDriveBackup(client: DriveClient): DriveBackup {
 
 		let ignored = 0;
 		const localNames = new Set<string>();
+		// Matches with limited swaps are read again even when this device has
+		// them, so notes on their deviations written elsewhere arrive (#171);
+		// keeping them merges the notes.
 		for (const match of loadMatchFiles()) {
+			if (match.setup.substitutions.kind === "limited") continue;
 			localNames.add(await driveFileName("match", teamId, match.audit.matchId));
 		}
 		const matches: MatchFile[] = [];

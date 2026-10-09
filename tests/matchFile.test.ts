@@ -5,6 +5,7 @@ import {
 	type MatchFileProblem,
 	matchFileName,
 	matchFileToJson,
+	mergeDeviationNotes,
 	newMatchFile,
 	parseMatchFile,
 	startersOf,
@@ -564,5 +565,38 @@ describe("matchFileName", () => {
 	it("falls back to the day the file was made", () => {
 		const file = makeMatchFile({ date: "", opponent: "" });
 		expect(matchFileName(file)).toBe("match-2026-09-05.json");
+	});
+});
+
+describe("mergeDeviationNotes", () => {
+	const note = (eventId: string, text: string, writtenAt: string) => ({
+		matchId: "m",
+		eventId,
+		note: text,
+		writtenAt,
+	});
+
+	it("keeps every swap's note, the latest one, whatever the order", () => {
+		const a = [
+			note("s1", "Gammal", "2026-09-05T10:00:00Z"),
+			note("s2", "B", "2026-09-05T10:00:00Z"),
+		];
+		const b = [
+			note("s1", "Ny", "2026-09-05T11:00:00Z"),
+			note("s3", "C", "2026-09-05T09:00:00Z"),
+		];
+		const merged = mergeDeviationNotes(a, b);
+		expect(merged.map((n) => [n.eventId, n.note])).toEqual([
+			["s1", "Ny"],
+			["s2", "B"],
+			["s3", "C"],
+		]);
+		expect(mergeDeviationNotes(b, a)).toEqual(merged);
+	});
+
+	it("chooses the same note from two written at the same time", () => {
+		const a = [note("s1", "A", "2026-09-05T10:00:00Z")];
+		const b = [note("s1", "B", "2026-09-05T10:00:00Z")];
+		expect(mergeDeviationNotes(a, b)).toEqual(mergeDeviationNotes(b, a));
 	});
 });

@@ -326,3 +326,26 @@ describe("matchesForPlayer - which matches a player was in the squad for", () =>
 		);
 	});
 });
+
+describe("mergeMatchFiles: the coach's notes on deviations", () => {
+	it("keeps the notes from both copies of a match", () => {
+		const base = makeMatchFile({ matchId: "m1" });
+		const note = (eventId: string, text: string) => ({
+			matchId: "m1",
+			eventId,
+			note: text,
+			writtenAt: "2026-09-05T13:00:00.000Z",
+		});
+		const here = { ...base, deviationNotes: [note("s1", "Skada")] };
+		const there = { ...base, deviationNotes: [note("s2", "Domaren sa ja")] };
+		const { files, newMatches, alreadyKnown } = mergeMatchFiles(
+			[here],
+			[there],
+		);
+		expect([newMatches, alreadyKnown]).toEqual([0, 1]);
+		expect(files[0]?.deviationNotes.map((n) => n.eventId)).toEqual([
+			"s1",
+			"s2",
+		]);
+	});
+});

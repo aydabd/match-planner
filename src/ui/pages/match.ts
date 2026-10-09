@@ -1,6 +1,7 @@
 import "../style.css";
 import { loadDraft } from "../draftStorage.js";
 import { createMatchView } from "../match.js";
+import { loadMatchSetup } from "../matchSetupStorage.js";
 import { initPage } from "../page.js";
 import { clearSession, loadSession } from "../sessionStorage.js";
 
@@ -29,7 +30,8 @@ if (hasSession || startsNewMatch) {
 	// The squad was just saved as the draft on Start (see src/main.ts); a
 	// resumed session (if one exists) always wins over starting fresh, so
 	// reloading /match/?start=1 never restarts an in-progress match.
-	if (!match.resume() && startsNewMatch) match.start(loadDraft());
+	if (!match.resume() && startsNewMatch)
+		void match.start(loadDraft(), loadMatchSetup());
 } else {
 	if (matchSection) matchSection.hidden = true;
 	if (emptyState) {

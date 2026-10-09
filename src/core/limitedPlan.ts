@@ -202,6 +202,23 @@ function comingOnOrder(
 	return [...planned, ...bench.filter((id) => !planned.includes(id))];
 }
 
+/**
+ * Everyone who has been on the pitch or in goal so far: in a lineup, or
+ * brought on. Without re-entry none of them may come on again.
+ */
+export function everOnPitch(timeline: readonly TimelineEvent[]): Set<string> {
+	const ids = new Set<string>();
+	for (const event of timeline) {
+		if (event.type === "lineup") {
+			for (const id of Object.values(event.zones).flat()) ids.add(id);
+			if (event.keeperId !== null) ids.add(event.keeperId);
+		} else if (event.type === "substitution") {
+			ids.add(event.inId);
+		}
+	}
+	return ids;
+}
+
 /** The breaks still ahead (seconds since kickoff); free occasions. */
 function breaksAhead(setup: PlanSetup, live: LiveState): number[] {
 	const breaks: number[] = [];
@@ -355,18 +372,7 @@ export function replan(
 	const { rules } = setup;
 	const end = setup.periods * setup.periodSeconds;
 	const usage = substitutionUsage(live.timeline, rules);
-	const everOn = new Set(
-		live.timeline.flatMap((e) =>
-			e.type === "lineup"
-				? [
-						...Object.values(e.zones).flat(),
-						...(e.keeperId ? [e.keeperId] : []),
-					]
-				: e.type === "substitution"
-					? [e.inId]
-					: [],
-		),
-	);
+	const everOn = everOnPitch(live.timeline);
 	const fresh = ranked(
 		live.bench.filter((id) => !everOn.has(id)),
 		live.ahead,
@@ -385,10 +391,13 @@ export function replan(
 	const warnings: PlanWarning[] = [];
 	const onPitch = seats.length + (live.keeperId === null ? 0 : 1);
 	const full = outfieldCount(setup.format) + (live.keeperId === null ? 0 : 1);
-	if (onPitch < full) warnings.push({ code: "shortHanded", onPitch });
-	if (fresh.length > 0 && substitutesLeft === 0)
+	const shortHanded = onPitch < full;
+	if (shortHanded) warnings.push({ code: "shortHanded", onPitch });
+	// Worth saying when someone is waiting to come on, or a seat is empty.
+	const wanted = fresh.length > 0 || shortHanded;
+	if (wanted && substitutesLeft === 0)
 		warnings.push({ code: "noSubstitutesLeft" });
-	else if (fresh.length > 0 && occasionsLeft === 0 && breaks.length === 0)
+	else if (wanted && occasionsLeft === 0 && breaks.length === 0)
 		warnings.push({ code: "noOccasionsLeft" });
 
 	const count = Math.min(fresh.length, substitutesLeft);

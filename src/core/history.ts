@@ -1,5 +1,9 @@
 import { LIMITS } from "./limits.js";
-import { type MatchFile, matchFileToJson } from "./matchFile.js";
+import {
+	type MatchFile,
+	matchFileToJson,
+	mergeDeviationNotes,
+} from "./matchFile.js";
 import type { PlayerIdMap } from "./playerIdentity.js";
 import { playerId } from "./playerIdentity.js";
 import { secondsPlayed } from "./timeline.js";
@@ -90,7 +94,8 @@ function chronological(files: readonly MatchFile[]): MatchFile[] {
 
 /**
  * Add match files to the ones already kept. A file for a match that is
- * already there is not counted again. The result is in a stable order, so
+ * already there is not counted again; the coach's notes on its deviations
+ * from both copies are kept. The result is in a stable order, so
  * adding files in any order gives the same list.
  */
 export function mergeMatchFiles(
@@ -104,7 +109,15 @@ export function mergeMatchFiles(
 		const existing = byId.get(file.audit.matchId);
 		if (existing) {
 			alreadyKnown++;
-			byId.set(file.audit.matchId, newer(existing, file));
+			// The coach's notes on deviations may have been written on either
+			// copy (#171): keep them all.
+			byId.set(file.audit.matchId, {
+				...newer(existing, file),
+				deviationNotes: mergeDeviationNotes(
+					existing.deviationNotes,
+					file.deviationNotes,
+				),
+			});
 		} else {
 			newMatches++;
 			byId.set(file.audit.matchId, file);

@@ -53,6 +53,7 @@ describe("the proposal for the next match", () => {
 		});
 		const records: TeamRecords = {
 			matchSummaries: async () => [row("alva", 3000), row("Bo", 1000)],
+			saveDeviationNote: async () => false,
 		};
 		expect(await aheadOfSquad("t", draft(names), records)).toEqual({
 			p1: 1000,

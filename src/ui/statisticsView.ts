@@ -1,12 +1,16 @@
 import type { PlayerHistory, SeasonHistory } from "../core/history.js";
 import { LIMITS } from "../core/limits.js";
+import { standing } from "../core/standing.js";
 import {
 	monthlyMinutes,
 	recentStartFrequency,
 } from "../core/visualizations.js";
 import { byId, card, table } from "./domHelpers.js";
+import { loadDraft } from "./draftStorage.js";
 import { loadSeasonData } from "./historyData.js";
 import { lineName } from "./reportText.js";
+import { deviceTeamRecords } from "./teamRecords.js";
+import { activeTeamId } from "./teamStorage.js";
 import { TEXT } from "./text.js";
 
 /** The lines in the order a coach reads them: goal, then back to attack. */
@@ -195,6 +199,34 @@ export function createStatisticsView(): { refresh: () => void } {
 			players.append(list);
 		}
 		results.append(players);
+
+		const team = loadDraft();
+		if (team.substitutions.kind === "limited") {
+			const summaries = await deviceTeamRecords.matchSummaries(
+				activeTeamId(),
+				team.fairness,
+			);
+			if (thisRender !== latestRender) return;
+			const names = new Map(history.players.map((p) => [p.key, p.name]));
+			const over = card(TEXT.history.standingTitle(team.fairness));
+			const help = document.createElement("p");
+			help.className = "hint";
+			help.textContent = TEXT.history.standingHelp;
+			over.append(
+				help,
+				table(
+					["Spelare", "Matcher", "Startat", "Minuter", "Mot snittet"],
+					standing(summaries, team.fairness).map((p) => [
+						names.get(p.playerId) ?? p.playerId,
+						String(p.matches),
+						String(p.started),
+						TEXT.history.minutes(p.seconds),
+						TEXT.history.aheadOfAverage(p.aheadSeconds),
+					]),
+				),
+			);
+			results.append(over);
+		}
 
 		const lines = LINE_ORDER.filter((id) =>
 			history.players.some((p) => (p.zoneSeconds[id] ?? 0) > 0),

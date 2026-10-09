@@ -374,6 +374,16 @@ export const RULES = [
 
 export type RuleId = (typeof RULES)[number]["id"];
 
+/** Whether the rule `id` applies to matches with `kind` of substitutions. */
+export function applies(id: RuleId, kind: SubstitutionKind): boolean {
+	const rule = RULES.find((r) => r.id === id);
+	return (
+		(rule?.appliesTo as readonly SubstitutionKind[] | undefined)?.includes(
+			kind,
+		) ?? false
+	);
+}
+
 /** The policy documents grouped by publisher, for the page and the README. */
 export function sourcesByPublisher(): {
 	publisher: string;

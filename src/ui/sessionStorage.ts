@@ -1,5 +1,7 @@
 import { getFormat } from "../core/formations.js";
+import type { Occasion, PlanWarning } from "../core/limitedPlan.js";
 import type { MatchClock, MatchPlan } from "../core/matchClock.js";
+import type { DeviationRule } from "../core/report.js";
 import type { MatchDetails } from "../core/storage.js";
 import {
 	parseSubstitutionRules,
@@ -30,6 +32,24 @@ export interface PendingSwap {
 }
 
 /**
+ * What a match with limited swaps carries beyond a free one (#171): the
+ * plan for what is left of it, and what it was planned from.
+ */
+export interface LimitedSession {
+	/** Players in the squad who sit out today; they are on neither pitch nor bench. */
+	sittingOut: string[];
+	/** Seconds each player was ahead of the team average before the match. */
+	ahead: Record<string, number>;
+	/** The swaps still planned, earliest first. */
+	occasions: Occasion[];
+	warnings: PlanWarning[];
+	/** The rules the last swap went past, shown until the next swap. */
+	notice: DeviationRule[] | null;
+	/** The kickoff lineup, so a reset starts the same match again. */
+	kickoff: MutableAssignment;
+}
+
+/**
  * Everything needed to resume a match exactly where it was left off after
  * a page reload. Kept deliberately flat and small: it is written to browser
  * storage (via appStorage) every second while the clock runs, so it must
@@ -49,6 +69,8 @@ export interface MatchSession {
 	match: MatchDetails;
 	/** The substitution rules for this match (#171). */
 	substitutions: SubstitutionRules;
+	/** Set exactly when the rules are limited. */
+	limited: LimitedSession | null;
 	playerNames: Record<string, string>;
 	schedulerPlayers: SchedulerState["players"];
 	schedulerOrder: string[];
@@ -69,6 +91,25 @@ export function saveSession(session: MatchSession): void {
 	writeItem(
 		teamScoped(STORAGE_KEYS.session, activeTeamId()),
 		JSON.stringify(session),
+	);
+}
+
+/** Limited rules come with their plan, and free rules without one. */
+function isLimitedSession(s: Record<string, unknown>): boolean {
+	const rules = parseSubstitutionRules(s.substitutions);
+	if (rules === null) return false;
+	const { limited } = s;
+	if (rules.kind === "free") return limited === null;
+	return (
+		isRecord(limited) &&
+		Array.isArray(limited.sittingOut) &&
+		isRecord(limited.ahead) &&
+		Array.isArray(limited.occasions) &&
+		Array.isArray(limited.warnings) &&
+		(limited.notice === null || Array.isArray(limited.notice)) &&
+		isRecord(limited.kickoff) &&
+		isRecord(limited.kickoff.zones) &&
+		Array.isArray(limited.kickoff.bench)
 	);
 }
 
@@ -109,7 +150,7 @@ function isResumable(s: Record<string, unknown>): boolean {
 		isCount(clock.periodElapsed) &&
 		isCount(clock.rotationElapsed) &&
 		isRecord(s.match) &&
-		parseSubstitutionRules(s.substitutions) !== null &&
+		isLimitedSession(s) &&
 		isRecord(s.playerNames) &&
 		isRecord(s.schedulerPlayers) &&
 		Array.isArray(s.schedulerOrder) &&

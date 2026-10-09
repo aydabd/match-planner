@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { keepMatchFiles } from "../src/ui/matchFileStorage.js";
+import { keepMatchFiles, loadMatchFiles } from "../src/ui/matchFileStorage.js";
 import { deviceTeamRecords } from "../src/ui/teamRecords.js";
 import { activeTeamId, createTeam, switchTeam } from "../src/ui/teamStorage.js";
-import { makeMatchFile } from "./support/matchFiles.js";
+import { makeMatchFile, withSwap } from "./support/matchFiles.js";
 import { useMemoryStorage } from "./support/memoryStorage.js";
 
 describe("deviceTeamRecords.matchSummaries", () => {
@@ -45,5 +45,59 @@ describe("deviceTeamRecords.matchSummaries", () => {
 				count: 8,
 			}),
 		).toEqual([]);
+	});
+});
+
+describe("deviceTeamRecords.saveDeviationNote", () => {
+	useMemoryStorage();
+
+	it("keeps the note with its match and replaces an earlier one", async () => {
+		keepMatchFiles([withSwap(makeMatchFile({ matchId: "m1" }))]);
+		const teamId = activeTeamId();
+		const note = {
+			matchId: "m1",
+			eventId: "swap-1",
+			note: "Skada",
+			writtenAt: "2026-09-05T13:00:00.000Z",
+		};
+		expect(await deviceTeamRecords.saveDeviationNote(teamId, note)).toBe(true);
+		expect(
+			await deviceTeamRecords.saveDeviationNote(teamId, {
+				...note,
+				note: "Skada, domaren godkände",
+				writtenAt: "2026-09-05T14:00:00.000Z",
+			}),
+		).toBe(true);
+		expect(loadMatchFiles(teamId)[0]?.deviationNotes).toEqual([
+			{
+				...note,
+				note: "Skada, domaren godkände",
+				writtenAt: "2026-09-05T14:00:00.000Z",
+			},
+		]);
+	});
+
+	it("refuses a note on a swap the match does not have", async () => {
+		keepMatchFiles([makeMatchFile({ matchId: "m1" })]);
+		expect(
+			await deviceTeamRecords.saveDeviationNote(activeTeamId(), {
+				matchId: "m1",
+				eventId: "swap-9",
+				note: "x",
+				writtenAt: "2026-09-05T13:00:00.000Z",
+			}),
+		).toBe(false);
+		expect(loadMatchFiles()).toHaveLength(1);
+	});
+
+	it("says so when the match is not kept", async () => {
+		expect(
+			await deviceTeamRecords.saveDeviationNote(activeTeamId(), {
+				matchId: "nope",
+				eventId: "x",
+				note: "x",
+				writtenAt: "2026-09-05T13:00:00.000Z",
+			}),
+		).toBe(false);
 	});
 });
