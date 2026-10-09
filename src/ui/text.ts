@@ -435,7 +435,7 @@ export const TEXT = {
 			},
 			fairOverTime: {
 				title: "Rättvist över tid",
-				text: "Med begränsade byten kan inte alla spela lika mycket i varje match. Därför räknar appen speltiden över en period som du väljer, till exempel de senaste matcherna eller hela säsongen. De som har spelat minst börjar, och de som har spelat mest får ibland sitta över. Det är ett eget val som bygger på tanken att alla ska få vara med, inte ett krav i något dokument.",
+				text: "Med begränsade byten kan inte alla spela lika mycket i varje match. Därför räknar appen speltiden över en period som du väljer, till exempel de senaste matcherna eller hela säsongen. De som har spelat minst börjar, och de som har spelat mest får ibland sitta över. En match där en spelare har stått i mål räknas inte för den spelaren, eftersom målvaktens tid inte är något bytena jämnar ut. Det är ett eget val som bygger på tanken att alla ska få vara med, inte ett krav i något dokument.",
 			},
 			equalPlaytime: {
 				title: "Så lika speltid som möjligt",

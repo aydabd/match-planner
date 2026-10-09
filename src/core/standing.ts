@@ -2,7 +2,7 @@ import { whenOf } from "./history.js";
 import type { MatchFile } from "./matchFile.js";
 import { type PlayerIdMap, playerId } from "./playerIdentity.js";
 import type { FairnessPeriod } from "./substitutionRules.js";
-import { secondsPlayed } from "./timeline.js";
+import { GOAL, secondsPlayed } from "./timeline.js";
 
 /**
  * Where each player stands over a period the coach chooses (#171, rule
@@ -24,6 +24,8 @@ export interface PlayerMatchSummary {
 	started: boolean;
 	/** Seconds on the pitch or in goal. */
 	seconds: number;
+	/** Of those, seconds in goal. */
+	goalSeconds: number;
 }
 
 /**
@@ -48,9 +50,11 @@ export function summariesOf(
 			date: whenOf(file).slice(0, 10),
 			started: false,
 			seconds: 0,
+			goalSeconds: 0,
 		};
 		summary.started ||= starters.has(player.id);
 		summary.seconds += played[player.id]?.total ?? 0;
+		summary.goalSeconds += played[player.id]?.byZone[GOAL] ?? 0;
 		byPlayer.set(id, summary);
 	}
 	return [...byPlayer.values()];
@@ -112,6 +116,12 @@ export interface PlayerStanding {
  * Each player's standing over `period`, the player furthest behind first
  * (ties by fewer starts, then by id, so the order never depends on input
  * order). Only players with at least one match in the period are listed.
+ *
+ * A match in which a player stood in goal does not count for them, as a
+ * missed match does not: a keeper's time is fixed by design, not something
+ * the swaps even out, and counting it would put every outfield player
+ * behind the average (the match report leaves keepers out the same way).
+ * A player who only kept goal is not listed.
  */
 export function standing(
 	summaries: readonly PlayerMatchSummary[],
@@ -119,6 +129,7 @@ export function standing(
 ): PlayerStanding[] {
 	const totals = new Map<string, Omit<PlayerStanding, "aheadSeconds">>();
 	for (const s of inPeriod(summaries, period)) {
+		if (s.goalSeconds > 0) continue;
 		const t = totals.get(s.playerId) ?? {
 			playerId: s.playerId,
 			matches: 0,

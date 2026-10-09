@@ -15,6 +15,7 @@ const row = (
 	playerId: string,
 	seconds: number,
 	started = false,
+	goalSeconds = 0,
 ): PlayerMatchSummary => ({
 	teamId: "team",
 	matchId,
@@ -22,6 +23,7 @@ const row = (
 	date,
 	started,
 	seconds,
+	goalSeconds,
 });
 
 describe("summariesOf", () => {
@@ -39,8 +41,10 @@ describe("summariesOf", () => {
 				matchId: file.audit.matchId,
 				date: "2026-09-05",
 				seconds: person?.totalSeconds,
+				goalSeconds: person?.zoneSeconds.goal ?? 0,
 				started: person?.started === 1,
 			});
+			expect(s.goalSeconds).toBeLessThanOrEqual(s.seconds);
 		}
 	});
 
@@ -143,6 +147,40 @@ describe("standing", () => {
 		expect(
 			standing([...rows].reverse(), period).map((p) => p.playerId),
 		).toEqual(order);
+	});
+
+	it("does not count time in goal: with one keeper every match, equal outfield players stand at 0", () => {
+		const rows = ["m1", "m2", "m3"].flatMap((m, i) => {
+			const date = `2026-09-0${i + 1}`;
+			return [
+				row(m, date, "keeper", 4800, true, 4800),
+				row(m, date, "a", 2400, true),
+				row(m, date, "b", 2400),
+			];
+		});
+		expect(
+			standing(rows, period).map((p) => [p.playerId, p.aheadSeconds]),
+		).toEqual([
+			// Level with each other: the one who has started less comes first.
+			["b", 0],
+			["a", 0],
+		]);
+	});
+
+	it("compares a player who sometimes kept goal on the other matches only", () => {
+		const rows = [
+			row("m1", "2026-09-01", "a", 3000, true, 1200),
+			row("m1", "2026-09-01", "b", 2000),
+			row("m2", "2026-09-08", "a", 2000),
+			row("m2", "2026-09-08", "b", 2000),
+		];
+		const result = standing(rows, period);
+		expect(result.find((p) => p.playerId === "a")).toMatchObject({
+			matches: 1,
+			seconds: 2000,
+			aheadSeconds: 0,
+		});
+		expect(result.find((p) => p.playerId === "b")?.matches).toBe(2);
 	});
 
 	it("is empty without matches", () => {
