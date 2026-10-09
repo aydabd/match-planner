@@ -105,3 +105,124 @@ test.describe("Substitution rules on the setup screen", () => {
 		await expect(setup.teamRules).toContainText("Fria byten.");
 	});
 });
+
+/** Six seats in 7v7 and two to bring on: nobody sits out. */
+const EIGHT = SQUAD.slice(0, 8);
+
+test.describe("A match with ersättare", () => {
+	test("is played to the plan, a swap off the rules goes through, and the coach explains it in the report", async ({
+		setup,
+		match,
+		report,
+		history,
+		page,
+	}) => {
+		await setup.open();
+		await setup.addPlayers(EIGHT);
+		await setup.chooseTeamRules("Ersättare");
+		// 3 x 20 minutes: the even moment for two substitutes is 30:00.
+		await expect(setup.proposal).toContainText("30:00 (period 2, 10:00)");
+		await expect(setup.proposal).toContainText("Greta in för Alva");
+		await setup.startMatch();
+
+		await expect(match.formatLabel).toContainText("begränsade byten");
+		await expect(match.limitedStatus).toHaveText(
+			"Byten kvar 5/5 · Tillfällen kvar 3/3",
+		);
+		await expect(match.plannedSwaps).toHaveCount(1);
+		await expect(match.pitchPlayers).toHaveCount(6);
+		await expect(match.pitchPlayer("Alva")).toBeVisible();
+		await expect(match.benchPlayers).toHaveText(["Greta", "Hugo"]);
+
+		await match.startClock();
+		await match.play(20);
+		await match.nextPeriodButton.click();
+		// The heads-up comes before the occasion at 30:00.
+		await match.play(9.5);
+		await expect(match.swapRows).toHaveCount(2);
+		await match.confirmSwap("Greta");
+		await match.confirmSwap("Hugo");
+		await expect(match.limitedStatus).toHaveText(
+			"Byten kvar 3/5 · Tillfällen kvar 2/3",
+		);
+		await expect(match.benchPlayers).toHaveText(["Alva", "Bo"]);
+
+		// No temporary swaps without re-entry: only a swap for good.
+		await match.pitchPlayer("Greta").click();
+		await match.benchPlayer("Alva").click();
+		await expect(
+			match.swapPanel.getByRole("button", { name: "1 min" }),
+		).toHaveCount(0);
+		await match.swapPanel
+			.getByRole("button", { name: "Byt", exact: true })
+			.click();
+		// Alva was replaced, so coming back breaks the rule; it is done anyway.
+		await expect(match.limitedStatus).toContainText(
+			"Bytet är gjort, men det bryter mot reglerna: en utbytt spelare kom in igen.",
+		);
+		await expect(match.pitchPlayer("Alva")).toBeVisible();
+
+		await match.play(2);
+		await match.endMatch();
+		await expect(report.root).toBeVisible();
+		await expect(report.deviations).toHaveCount(1);
+		await expect(report.deviations.first()).toContainText(
+			"Alva in för Greta – en utbytt spelare kom in igen.",
+		);
+		const explanation = report.deviations
+			.first()
+			.getByLabel("Förklaring till bytet Alva in för Greta");
+		await explanation.fill("Greta skadade sig och ingen annan fanns kvar.");
+		await report.deviations
+			.first()
+			.getByRole("button", { name: "Spara förklaring" })
+			.click();
+		await expect(report.deviations.first()).toContainText(
+			"Förklaringen är sparad med matchen.",
+		);
+
+		// The explanation is kept with the match file.
+		await page.reload();
+		await expect(
+			report.deviations
+				.first()
+				.getByLabel("Förklaring till bytet Alva in för Greta"),
+		).toHaveValue("Greta skadade sig och ingen annan fanns kvar.");
+		// The report does not judge playtime per match with limited swaps.
+		await expect(report.summary).toHaveCount(0);
+
+		// Statistics show where each player stands over the team's period.
+		await history.goto();
+		const standing = page
+			.locator("section.card")
+			.filter({ hasText: "Speltid de senaste 8 matcherna" });
+		await expect(standing.getByRole("row")).toHaveCount(EIGHT.length + 1);
+		await expect(standing).toContainText("Mot snittet");
+	});
+
+	test("covers an injury while the rules allow it, then warns the team plays short", async ({
+		setup,
+		match,
+	}) => {
+		await setup.open();
+		await setup.addPlayers(EIGHT);
+		await setup.chooseTeamRules("Egna regler");
+		await setup.teamRules.getByLabel("Högst antal inbytta spelare").fill("1");
+		await setup.teamRules.getByLabel("Högst antal inbytta spelare").blur();
+		await expect(setup.teamRules).toContainText("Högst 1 inbytta");
+		await setup.startMatch();
+
+		await match.startClock();
+		await match.play(5);
+		await match.takeOutForRestOfMatch("Cleo");
+		await expect(match.pitchPlayer("Greta")).toBeVisible();
+		await expect(match.limitedStatus).toContainText("Byten kvar 0/1");
+
+		await match.takeOutForRestOfMatch("Dino");
+		await expect(match.pitchPlayers).toHaveCount(5);
+		await expect(match.limitedStatus).toContainText(
+			"Inga byten kvar – laget spelar med 5.",
+		);
+		await expect(match.plannedSwaps).toHaveCount(0);
+	});
+});

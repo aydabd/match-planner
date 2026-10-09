@@ -9,7 +9,12 @@ import {
 	SUBSTITUTION_KINDS,
 	type SubstitutionKind,
 } from "../core/policy.js";
-import type { Feedback, PlayerStatus } from "../core/report.js";
+import type {
+	DeviationRule,
+	Feedback,
+	PlayerStatus,
+	SubstitutionUsage,
+} from "../core/report.js";
 import type { SchedulingProblem } from "../core/scheduler.js";
 import type { SquadFileProblem } from "../core/storage.js";
 import type {
@@ -461,6 +466,24 @@ export const TEXT = {
 
 	report: {
 		subtitle: (parts: readonly string[]) => parts.join(" · "),
+		// Deviations from limited substitution rules (#171)
+		deviationsSummary: (rules: SubstitutionRules, count: number) =>
+			`${TEXT.rules.summary(rules)} ${count === 1 ? "Ett byte gick" : `${count} byten gick`} utöver reglerna. Bytena gjordes ändå; skriv gärna varför. Förklaringen sparas med matchen.`,
+		deviation: (
+			at: number,
+			period: number,
+			inName: string,
+			outName: string,
+			rules: readonly DeviationRule[],
+		) =>
+			`${clock(at)} (period ${period}): ${inName} in för ${outName} – ${rules.map((r) => TEXT.match.deviationRule(r)).join(", ")}.`,
+		deviationNoteLabel: (inName: string, outName: string) =>
+			`Förklaring till bytet ${inName} in för ${outName}`,
+		saveDeviationNote: "Spara förklaring",
+		deviationNoteSaved: "Förklaringen är sparad med matchen.",
+		deviationNoteEmpty: "Skriv en förklaring först.",
+		deviationNoteNotKept:
+			"Matchen finns inte sparad på den här enheten, så förklaringen kan inte sparas här.",
 		unnamedMatch: "Match",
 		listItem: (when: string, opponent: string) => `${when} · ${opponent}`,
 		periodColumn: (period: number) => `Period ${period}`,
@@ -538,6 +561,16 @@ export const TEXT = {
 	},
 
 	history: {
+		/** Standing over the team's fairness period (#171). */
+		standingTitle: (period: FairnessPeriod) =>
+			`Speltid ${TEXT.rules.period(period)}`,
+		standingHelp:
+			"Laget har begränsade byten, så speltiden jämnas ut över tid. Den som ligger under snittet startar först i nästa match.",
+		aheadOfAverage(seconds: number): string {
+			const minutes = Math.round(seconds / 60);
+			if (minutes === 0) return "som snittet";
+			return minutes > 0 ? `+${minutes} min` : `${minutes} min`;
+		},
 		empty: "Inga matcher än. Spela en match eller läs in matchfiler.",
 		importResult: (fresh: number, known: number) =>
 			`${fresh} ${fresh === 1 ? "ny match" : "nya matcher"} lästes in${known > 0 ? `, ${known} fanns redan` : ""}.`,
@@ -970,6 +1003,50 @@ export const TEXT = {
 		outForMatch: "Ute resten av matchen",
 		untilNextSwap: "Till nästa byte",
 		minutes: (minutes: number) => `${minutes} min`,
+
+		// Limited swaps (#171)
+		limitedLabel: (format: string) => `${format}, begränsade byten`,
+		swapNowLimited: "Byt",
+		forGood: ". Bytet gäller resten av matchen.",
+		sittingOut: "sitter över",
+		limitsLeft(rules: SubstitutionRules, usage: SubstitutionUsage): string {
+			if (rules.kind === "free") return "";
+			const substitutes = `Byten kvar ${Math.max(0, rules.substitutesIn - usage.substitutesIn)}/${rules.substitutesIn}`;
+			const occasions =
+				rules.occasions === null
+					? "Tillfällen: ingen gräns"
+					: `Tillfällen kvar ${Math.max(0, rules.occasions - usage.occasions)}/${rules.occasions}`;
+			return `${substitutes} · ${occasions}`;
+		},
+		plannedSwaps: "Planerade byten",
+		noMoreSwaps: "Inga fler byten planeras.",
+		/** What the coach should know now: "Inga byten kvar – laget spelar med 10." */
+		limitedWarnings(warnings: readonly PlanWarning[]): string {
+			const short = warnings.find((w) => w.code === "shortHanded");
+			const none = warnings.find(
+				(w) => w.code === "noSubstitutesLeft" || w.code === "noOccasionsLeft",
+			);
+			if (short?.code === "shortHanded" && none) {
+				const what =
+					none.code === "noSubstitutesLeft"
+						? "Inga byten kvar"
+						: "Inga bytestillfällen kvar";
+				return `${what} – laget spelar med ${short.onPitch}.`;
+			}
+			return warnings.map((w) => TEXT.rules.warning(w)).join(" ");
+		},
+		deviationRule(rule: DeviationRule): string {
+			switch (rule) {
+				case "substitutesIn":
+					return "fler inbytta än reglerna tillåter";
+				case "occasions":
+					return "fler bytestillfällen än reglerna tillåter";
+				case "reEntry":
+					return "en utbytt spelare kom in igen";
+			}
+		},
+		deviationNotice: (rules: readonly DeviationRule[]) =>
+			`Bytet är gjort, men det bryter mot reglerna: ${rules.map((r) => TEXT.match.deviationRule(r)).join(", ")}. Förklara det i matchrapporten.`,
 		cancel: "Avbryt",
 
 		// Out of the match

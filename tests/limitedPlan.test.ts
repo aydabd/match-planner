@@ -369,6 +369,27 @@ describe("replan: the rest of the match within what is left", () => {
 		).toEqual({ occasions: [], warnings: [{ code: "noOccasionsLeft" }] });
 	});
 
+	it("says no substitutes are left when the team plays short and none may come on", () => {
+		const timeline = [
+			...live().timeline,
+			swap("s1", 300, "x", "a"),
+			swap("s2", 300, "y", "b"),
+		];
+		expect(
+			replan(
+				s,
+				live({
+					timeline,
+					zones: { ...zones, back: ["x"] },
+					bench: [],
+				}),
+			).warnings,
+		).toEqual([
+			{ code: "shortHanded", onPitch: 6 },
+			{ code: "noSubstitutesLeft" },
+		]);
+	});
+
 	it("says the team plays one short after an injury with no cover", () => {
 		const { warnings } = replan(
 			s,

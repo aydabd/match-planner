@@ -46,6 +46,10 @@ export class MatchPage {
 	/** Screen-reader announcement of the swap warning (visually hidden). */
 	readonly swapAnnouncement: Locator;
 	readonly outOfMatch: Locator;
+	/** With limited swaps: what is left, warnings and a deviation just made. */
+	readonly limitedStatus: Locator;
+	/** With limited swaps: the swaps still planned. */
+	readonly plannedSwaps: Locator;
 
 	private readonly pitch: Locator;
 	private readonly bench: Locator;
@@ -88,6 +92,8 @@ export class MatchPage {
 		this.swapRows = this.root.locator(".swap-item");
 		this.swapAnnouncement = this.root.locator("#swapAnnouncer");
 		this.outOfMatch = this.root.getByRole("alert");
+		this.limitedStatus = this.root.locator("#limitedStatus");
+		this.plannedSwaps = this.root.locator(".planned-occasions > li");
 
 		this.showReportButton = this.root.getByRole("button", {
 			name: "Visa matchrapport",

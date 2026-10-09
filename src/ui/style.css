@@ -1536,3 +1536,49 @@ button:disabled {
 	margin: 4px 0 0;
 	padding-left: 18px;
 }
+.limited-status {
+	margin: 0 0 8px;
+	font-weight: 600;
+}
+.limited-status[hidden],
+#tempSwapHint[hidden],
+#undoBtn[hidden] {
+	display: none;
+}
+.limited-status.has-warning {
+	color: var(--red-text);
+}
+.planned-occasions {
+	margin: 0;
+	padding-left: 20px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.planned-occasions ul {
+	margin: 4px 0 0;
+	padding-left: 18px;
+}
+#reportDeviationsSection[hidden] {
+	display: none;
+}
+.report-deviations {
+	margin: 0;
+	padding-left: 20px;
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+.report-deviation {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 8px;
+}
+.report-deviation p {
+	margin: 0;
+}
+.report-deviation .field,
+.report-deviation textarea {
+	width: 100%;
+}

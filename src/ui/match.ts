@@ -1,4 +1,10 @@
 import { getFormat } from "../core/formations.js";
+import {
+	everOnPitch,
+	type LimitedRules,
+	type Occasion,
+	replan,
+} from "../core/limitedPlan.js";
 import { LIMITS } from "../core/limits.js";
 import {
 	assignKeeper,
@@ -21,6 +27,7 @@ import {
 	matchSecond,
 	NEW_CLOCK,
 	periodStatus,
+	type RotationStatus,
 	rotationStatus,
 	startNextPeriod,
 	swapDueAt,
@@ -32,7 +39,13 @@ import {
 	newMatchFile,
 	parseMatchFile,
 } from "../core/matchFile.js";
-import { buildReport, type StoredReport } from "../core/report.js";
+import { applies } from "../core/policy.js";
+import {
+	buildReport,
+	type DeviationRule,
+	type StoredReport,
+	substitutionUsage,
+} from "../core/report.js";
 import {
 	applyElapsed,
 	createSchedulerState,
@@ -64,9 +77,12 @@ import type {
 import { loadCoachName } from "./coachName.js";
 import { confirmWithSecondTap } from "./confirmButton.js";
 import { keepMatchFiles } from "./matchFileStorage.js";
+import { aheadOfSquad, proposalFor, rulesForMatch } from "./matchProposal.js";
+import type { MatchSetupChoices } from "./matchSetupStorage.js";
 import { saveReport } from "./reportStorage.js";
 import {
 	clearSession,
+	type LimitedSession,
 	loadSession,
 	type MatchSession,
 	type MutableAssignment,
@@ -74,6 +90,7 @@ import {
 	saveSession,
 	type TempSwap,
 } from "./sessionStorage.js";
+import { activeTeamId } from "./teamStorage.js";
 import { TEXT } from "./text.js";
 
 interface Els {
@@ -115,6 +132,8 @@ interface Els {
 	endMatchBtn: HTMLButtonElement;
 	clockNotice: HTMLElement;
 	reportBtn: HTMLButtonElement;
+	limitedStatus: HTMLElement;
+	tempSwapHint: HTMLElement;
 }
 
 function getEls(): Els {
@@ -159,6 +178,8 @@ function getEls(): Els {
 		endMatchBtn: byId("endMatchBtn"),
 		clockNotice: byId("clockNotice"),
 		reportBtn: byId("reportBtn"),
+		limitedStatus: byId("limitedStatus"),
+		tempSwapHint: byId("tempSwapHint"),
 	};
 }
 
@@ -195,6 +216,8 @@ interface LiveMatch {
 	match: MatchDetails;
 	/** The substitution rules for this match, copied from the team (#171). */
 	substitutions: SubstitutionRules;
+	/** The plan for what is left, exactly when the swaps are limited. */
+	limited: LimitedSession | null;
 	/** Players marked as goalkeeper in the squad, offered first as keeper. */
 	goalkeepers: string[];
 	/** Who is in goal next period, as chosen during a break. */
@@ -216,7 +239,7 @@ interface LiveMatch {
 
 export interface MatchView {
 	/** Start a new match with this squad. */
-	start: (roster: RosterFile) => void;
+	start: (roster: RosterFile, setup: MatchSetupChoices) => Promise<void>;
 	/** Resume the saved match, if there is one. Returns false otherwise. */
 	resume: () => boolean;
 }
@@ -236,6 +259,183 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		return live?.playerNames.get(id) ?? id;
 	}
 
+	// ---------------- limited swaps (#171) ----------------
+
+	/** The match's rules when its swaps are limited, otherwise null. */
+	function limitedRules(): LimitedRules | null {
+		return live?.limited && live.substitutions.kind === "limited"
+			? live.substitutions
+			: null;
+	}
+
+	/** Plan what is left of a match with limited swaps, from where it stands now. */
+	function replanLimited(): void {
+		const rules = limitedRules();
+		if (!live?.limited || !rules) return;
+		const state = live.schedulerState;
+		const result = replan(
+			{
+				format: live.format,
+				periods: live.plan.periods,
+				periodSeconds: live.plan.periodSeconds,
+				rules,
+			},
+			{
+				now: now(),
+				atBreak: live.clock.phase === "periodBreak",
+				zones: live.currentAssignment.zones,
+				keeperId: state.keeperId,
+				bench: live.currentAssignment.bench.filter(
+					(id) => !state.players[id]?.unavailable,
+				),
+				played: Object.fromEntries(
+					state.order.map((id) => [id, state.players[id]?.totalSeconds ?? 0]),
+				),
+				timeline: live.timeline,
+				ahead: live.limited.ahead,
+			},
+		);
+		live.limited.occasions = result.occasions;
+		live.limited.warnings = result.warnings;
+	}
+
+	/** The next planned occasion during play, if any. */
+	function nextInPlayOccasion(): Occasion | undefined {
+		return live?.limited?.occasions.find((o) => !o.atBreak);
+	}
+
+	/**
+	 * Record one player coming on for another as a substitution; with
+	 * limited swaps every player brought on is one. Returns the rules the
+	 * swap went past, which the coach is told about.
+	 */
+	function recordSwap(
+		inId: string,
+		outId: string,
+		zoneId: string,
+		plannedAt: number,
+	): DeviationRule[] {
+		if (!live) return [];
+		const id = newId();
+		live.timeline.push({
+			type: "substitution",
+			id,
+			at: now(),
+			plannedAt,
+			period: live.clock.period,
+			inId,
+			zoneId,
+			moves: [],
+			outId,
+		});
+		return (
+			substitutionUsage(live.timeline, live.substitutions).deviations.find(
+				(d) => d.eventId === id,
+			)?.rules ?? []
+		);
+	}
+
+	/** Swap status for the clock: the swap timer, or the next planned occasion. */
+	function swapStatus(current: LiveMatch): RotationStatus {
+		if (!current.limited) return rotationStatus(current.clock, current.plan);
+		const at = current.pendingSwap?.plannedAt ?? nextInPlayOccasion()?.at;
+		const progress = Math.min(
+			1,
+			current.clock.periodElapsed / current.plan.periodSeconds,
+		);
+		if (at === undefined)
+			return { due: false, progress, remainingSeconds: 0, lateSeconds: 0 };
+		const t = now();
+		return {
+			due: t >= at,
+			progress,
+			remainingSeconds: Math.max(0, at - t),
+			lateSeconds: Math.max(0, t - at),
+		};
+	}
+
+	/** Counters, the coach's warnings and a deviation just made, above the next swap. */
+	function renderLimitedStatus(): void {
+		const rules = limitedRules();
+		els.limitedStatus.hidden = !rules;
+		if (!live?.limited || !rules) return;
+		const usage = substitutionUsage(live.timeline, rules);
+		const lines = [
+			TEXT.match.limitsLeft(rules, usage),
+			TEXT.match.limitedWarnings(live.limited.warnings),
+			live.limited.notice
+				? TEXT.match.deviationNotice(live.limited.notice)
+				: "",
+		].filter(Boolean);
+		const text = lines.join(" ");
+		if (els.limitedStatus.textContent !== text)
+			els.limitedStatus.textContent = text;
+		els.limitedStatus.classList.toggle(
+			"has-warning",
+			live.limited.warnings.length > 0 || live.limited.notice !== null,
+		);
+	}
+
+	/** With limited swaps and nothing due: what is left and the swaps still planned. */
+	function renderLimitedPlan(): void {
+		if (!live?.limited) return;
+		const nodes: HTMLElement[] = [];
+		const title = document.createElement("h3");
+		title.textContent = TEXT.match.plannedSwaps;
+		nodes.push(title);
+		if (live.limited.occasions.length === 0) {
+			const none = document.createElement("p");
+			none.className = "preview-none";
+			none.textContent = TEXT.match.noMoreSwaps;
+			nodes.push(none);
+		} else {
+			const list = document.createElement("ol");
+			list.className = "planned-occasions";
+			for (const occasion of live.limited.occasions) {
+				const item = document.createElement("li");
+				item.textContent = TEXT.rules.occasionWhen(
+					occasion.at,
+					occasion.atBreak,
+					live.plan.periodSeconds,
+				);
+				const swaps = document.createElement("ul");
+				for (const swap of occasion.swaps) {
+					const li = document.createElement("li");
+					li.textContent = TEXT.match.substitution(
+						nameOf(swap.inId),
+						nameOf(swap.outId),
+					);
+					swaps.append(li);
+				}
+				item.append(swaps);
+				list.append(item);
+			}
+			nodes.push(list);
+		}
+		const key = JSON.stringify(live.limited.occasions);
+		if (els.previewBody.dataset.plan === key) return;
+		els.previewBody.dataset.plan = key;
+		els.previewBody.replaceChildren(...nodes);
+	}
+
+	/** The planned swaps of the break the match is in, made before the next period. */
+	function makeBreakSwaps(): void {
+		if (!live?.limited) return;
+		const at = now();
+		const occasion = live.limited.occasions.find(
+			(o) => o.atBreak && o.at === at,
+		);
+		const assignment = live.currentAssignment;
+		for (const swap of occasion?.swaps ?? []) {
+			const seat = assignment.zones[swap.zoneId]?.indexOf(swap.outId) ?? -1;
+			const benchSeat = assignment.bench.indexOf(swap.inId);
+			if (seat === -1 || benchSeat === -1) continue;
+			swapWithBench(assignment, swap.zoneId, seat, benchSeat, null);
+			recordSwap(swap.inId, swap.outId, swap.zoneId, at);
+		}
+		noteLineup();
+	}
+
 	function persist(): void {
 		if (!live) return;
 		const session: MatchSession = {
@@ -248,6 +448,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			clock: live.clock,
 			match: live.match,
 			substitutions: live.substitutions,
+			limited: live.limited,
 			playerNames: Object.fromEntries(live.playerNames.entries()),
 			schedulerPlayers: live.schedulerState.players,
 			schedulerOrder: live.schedulerState.order,
@@ -541,17 +742,21 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 				render();
 				return;
 			}
+			const limited = live.limited !== null;
 			els.swapPanel.appendChild(
 				sentence([
 					{ bold: nameOf(inId) },
 					TEXT.match.goesInFor,
 					{ bold: nameOf(outId) },
-					TEXT.match.howLong,
+					limited ? TEXT.match.forGood : TEXT.match.howLong,
 				]),
 			);
 			const row = document.createElement("div");
 			row.className = "row";
-			LIMITS.tempSwapSeconds.forEach((secs) => {
+			// With limited swaps a swap is for the rest of the match: no
+			// temporary swaps (a replaced player could not come back anyway).
+			const durations = limited ? [] : LIMITS.tempSwapSeconds;
+			durations.forEach((secs) => {
 				const b = document.createElement("button");
 				b.type = "button";
 				b.className = "btn-chip";
@@ -562,7 +767,9 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			const untilNext = document.createElement("button");
 			untilNext.type = "button";
 			untilNext.className = "btn-chip";
-			untilNext.textContent = TEXT.match.untilNextSwap;
+			untilNext.textContent = limited
+				? TEXT.match.swapNowLimited
+				: TEXT.match.untilNextSwap;
 			untilNext.addEventListener("click", () => commitTempSwap(null));
 			row.appendChild(untilNext);
 			const cancelBtn = document.createElement("button");
@@ -610,6 +817,14 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 				// Rows outlive a single render now, so resolve the match at click time.
 				if (!live) return;
 				setUnavailable(live.schedulerState, id, false);
+				if (live.limited) {
+					// With limited swaps nothing rebuilds the lineup: back on the bench.
+					const assignment = live.currentAssignment;
+					const onPitch = Object.values(assignment.zones).flat().includes(id);
+					if (!onPitch && !assignment.bench.includes(id))
+						assignment.bench.push(id);
+					replanLimited();
+				}
 				render();
 			});
 			row.appendChild(span);
@@ -655,7 +870,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 	 */
 	function renderSwapWarning(): void {
 		if (!live?.pendingSwap) return;
-		const { remainingSeconds, due } = rotationStatus(live.clock, live.plan);
+		const { remainingSeconds, due } = swapStatus(live);
 		const chains = pendingChains();
 		const rowsKey = JSON.stringify(chains);
 
@@ -742,11 +957,17 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			live.pendingSwap !== null,
 		);
 		if (live.pendingSwap) {
+			delete els.previewBody.dataset.plan;
 			renderSwapWarning();
 			return;
 		}
 		delete els.previewBody.dataset.rows;
 		delete els.swapAnnouncer.dataset.key;
+		if (live.limited) {
+			renderLimitedPlan();
+			return;
+		}
+		delete els.previewBody.dataset.plan;
 		// Keep the full-lineup disclosure open across clock ticks.
 		const wasOpen =
 			els.previewBody.querySelector<HTMLDetailsElement>(".next-lineup")?.open ??
@@ -854,6 +1075,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			const p = currentLive.schedulerState.players[id];
 			if (!p) return;
 			const inGoal = id === currentLive.schedulerState.keeperId;
+			const sittingOut = currentLive.limited?.sittingOut.includes(id) ?? false;
 			const status = p.unavailable
 				? "out"
 				: onPitch.has(id) || inGoal
@@ -864,10 +1086,14 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			const nameEl = document.createElement("span");
 			nameEl.className = `pt-name ${status}`;
 			nameEl.textContent = nameOf(id);
-			if (status === "on-pitch") {
+			if (status === "on-pitch" || sittingOut) {
 				const tag = document.createElement("span");
 				tag.className = "pt-status";
-				tag.textContent = inGoal ? TEXT.match.inGoal : TEXT.match.onPitch;
+				tag.textContent = sittingOut
+					? TEXT.match.sittingOut
+					: inGoal
+						? TEXT.match.inGoal
+						: TEXT.match.onPitch;
 				nameEl.appendChild(tag);
 			}
 			const timeEl = document.createElement("span");
@@ -892,9 +1118,15 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		const rotationText = String(live.rotationIndex + 1);
 		if (els.rotationLabel.textContent !== rotationText)
 			els.rotationLabel.textContent = rotationText;
-		els.fairnessLabel.textContent = TEXT.match.fairness(
-			formatTime(fairnessSpread(live.schedulerState)),
-		);
+		els.fairnessLabel.textContent = applies(
+			"equalPlaytime",
+			live.substitutions.kind,
+		)
+			? TEXT.match.fairness(formatTime(fairnessSpread(live.schedulerState)))
+			: "";
+		els.undoBtn.hidden = live.limited !== null;
+		els.tempSwapHint.hidden = live.limited !== null;
+		renderLimitedStatus();
 		renderPitch();
 		renderBreakKeeper();
 		renderBench();
@@ -929,6 +1161,8 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 	function commitTempSwap(durationSeconds: number | null): void {
 		if (!live?.selected || live.pendingBenchIdx === null) return;
 		const { zoneId, idx } = live.selected;
+		const outId = live.currentAssignment.zones[zoneId]?.[idx];
+		const inId = live.currentAssignment.bench[live.pendingBenchIdx];
 		const swap = swapWithBench(
 			live.currentAssignment,
 			zoneId,
@@ -938,30 +1172,100 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		);
 		if (swap === undefined) return;
 		if (swap) live.tempSwaps.push(swap);
+		if (live.limited && inId !== undefined && outId !== undefined) {
+			// A swap off the plan is made at once; the rest is planned again.
+			const broken = recordSwap(
+				inId,
+				outId,
+				zoneId,
+				live.pendingSwap?.plannedAt ?? now(),
+			);
+			live.limited.notice = broken.length > 0 ? broken : null;
+			live.pendingSwap = null;
+		}
 		live.selected = null;
 		live.pendingBenchIdx = null;
 		noteLineup();
+		replanLimited();
 		render();
 	}
 
 	function markUnavailable(zoneId: string, idx: number): void {
 		if (!live) return;
 		const playerId = live.currentAssignment.zones[zoneId]?.[idx];
-		takeOutForMatch(live.schedulerState, live.currentAssignment, zoneId, idx);
-		if (playerId !== undefined) {
-			live.timeline.push({
-				type: "outForMatch",
-				at: now(),
-				period: live.clock.period,
-				playerId,
-			});
+		if (live.limited) {
+			takeOutWithinRules(zoneId, idx);
+		} else {
+			takeOutForMatch(live.schedulerState, live.currentAssignment, zoneId, idx);
+			if (playerId !== undefined) {
+				live.timeline.push({
+					type: "outForMatch",
+					at: now(),
+					period: live.clock.period,
+					playerId,
+				});
+			}
 		}
 		// The planned swap may include the player; plan it again.
 		live.pendingSwap = null;
 		noteLineup();
 		live.selected = null;
 		live.pendingBenchIdx = null;
+		replanLimited();
 		render();
+	}
+
+	/**
+	 * Take a player out for the rest of a match with limited swaps. The
+	 * least-played bench player who may come on covers, but only if the
+	 * rules still allow one more substitute (and, during play, one more
+	 * occasion); otherwise the team plays one short and the coach is told.
+	 */
+	function takeOutWithinRules(zoneId: string, idx: number): void {
+		const rules = limitedRules();
+		const zone = live?.currentAssignment.zones[zoneId];
+		const playerId = zone?.[idx];
+		if (!live || !rules || !zone || playerId === undefined) return;
+		const state = live.schedulerState;
+		setUnavailable(state, playerId, true);
+		live.timeline.push({
+			type: "outForMatch",
+			at: now(),
+			period: live.clock.period,
+			playerId,
+		});
+		const usage = substitutionUsage(live.timeline, rules);
+		const occasionLeft =
+			live.clock.phase !== "playing" ||
+			rules.occasions === null ||
+			usage.occasions < rules.occasions;
+		const been = everOnPitch(live.timeline);
+		const cover =
+			usage.substitutesIn < rules.substitutesIn && occasionLeft
+				? live.currentAssignment.bench
+						.filter(
+							(id) =>
+								!state.players[id]?.unavailable &&
+								(rules.reEntry || !been.has(id)),
+						)
+						.sort(
+							(a, b) =>
+								(state.players[a]?.totalSeconds ?? 0) -
+								(state.players[b]?.totalSeconds ?? 0),
+						)[0]
+				: undefined;
+		if (cover === undefined) {
+			zone.splice(idx, 1);
+			return;
+		}
+		zone[idx] = cover;
+		live.currentAssignment.bench = live.currentAssignment.bench.filter(
+			(id) => id !== cover,
+		);
+		// Before kickoff it is a change to the lineup, not a substitution.
+		if (live.clock.phase !== "beforeKickoff")
+			recordSwap(cover, playerId, zoneId, now());
+		if (live.limited) live.limited.notice = null;
 	}
 
 	// ---------------- clock ----------------
@@ -1129,11 +1433,17 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 	function refreshClock(): void {
 		if (!live) return;
 		const { clock, plan } = live;
-		const rotation = rotationStatus(clock, plan);
+		const rotation = swapStatus(live);
 		const period = periodStatus(clock, plan);
 		const due = clock.phase === "playing" && rotation.due;
+		const noPlan =
+			live.limited !== null &&
+			live.pendingSwap === null &&
+			nextInPlayOccasion() === undefined;
 
-		els.timerDisplay.textContent = formatTime(clock.rotationElapsed);
+		els.timerDisplay.textContent = live.limited
+			? formatTime(rotation.remainingSeconds)
+			: formatTime(clock.rotationElapsed);
 		els.timerDisplay.classList.toggle("done", due);
 		els.clockCard.classList.toggle("is-due", due);
 		els.timerProgress.style.width = `${rotation.progress * 100}%`;
@@ -1147,7 +1457,9 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 								formatTime(rotation.lateSeconds),
 								rotation.lateSeconds > 0,
 							)
-						: TEXT.match.timeLeft(formatTime(rotation.remainingSeconds));
+						: noPlan
+							? TEXT.match.noMoreSwaps
+							: TEXT.match.timeLeft(formatTime(rotation.remainingSeconds));
 
 		// Inside a live region: only write when the text changes.
 		const periodText = TEXT.match.periodOf(period.period, period.periods);
@@ -1279,6 +1591,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		});
 		live.pendingSwap = null;
 		if (!options.beforeNextLineup) noteLineup();
+		replanLimited();
 		return true;
 	}
 
@@ -1288,6 +1601,20 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 	 */
 	function prepareSwapWarning(): void {
 		if (!live || live.pendingSwap || live.clock.phase !== "playing") return;
+		if (live.limited) {
+			// The next planned occasion, from the heads-up on.
+			const occasion = nextInPlayOccasion();
+			if (!occasion || occasion.at - now() > LIMITS.headsUpSeconds) return;
+			const next = cloneAssignment(live.currentAssignment);
+			for (const swap of occasion.swaps) {
+				const seat = next.zones[swap.zoneId]?.indexOf(swap.outId) ?? -1;
+				const benchSeat = next.bench.indexOf(swap.inId);
+				if (seat === -1 || benchSeat === -1) continue;
+				swapWithBench(next, swap.zoneId, seat, benchSeat, null);
+			}
+			live.pendingSwap = { plannedAt: occasion.at, next };
+			return;
+		}
 		const { remainingSeconds } = rotationStatus(live.clock, live.plan);
 		if (remainingSeconds > LIMITS.headsUpSeconds) return;
 		live.pendingSwap = {
@@ -1328,6 +1655,8 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		live.pendingSwap = null;
 		live.clock = lineupChanged(live.clock);
 		noteLineup();
+		if (live.limited) live.limited.notice = null;
+		replanLimited();
 	}
 
 	function advanceRotation(): void {
@@ -1361,17 +1690,28 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			chosen &&
 			chosen !== live.schedulerState.keeperId
 		) {
-			// The next lineup is built after this, so just choose the keeper.
-			switchKeeper(chosen, { beforeNextLineup: true });
+			// With free swaps the next lineup is built after this, so just
+			// choose the keeper; with limited swaps the lineup stays.
+			switchKeeper(chosen, { beforeNextLineup: live.limited === null });
 		}
 		live.nextKeeperId = null;
+		// The break's swaps are made before the period starts: they are not
+		// an occasion during play (rule "limitedSubstitutions").
+		if (live.limited) makeBreakSwaps();
 		live.clock = startNextPeriod(live.clock, live.plan);
 		live.timeline.push({
 			type: "periodStart",
 			at: now(),
 			period: live.clock.period,
 		});
-		putNextLineupOn();
+		if (live.limited) {
+			live.rotationIndex += 1;
+			live.clock = lineupChanged(live.clock);
+			live.pendingSwap = null;
+			replanLimited();
+		} else {
+			putNextLineupOn();
+		}
 		startClock();
 		refreshClock();
 		render();
@@ -1473,6 +1813,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 					playerId: id,
 				});
 				live.pendingSwap = null;
+				replanLimited();
 				els.lateArrivalPanel.classList.remove("show");
 				render();
 			});
@@ -1494,9 +1835,11 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 				live.timeline = [];
 				restCache = null;
 				live.pendingSwap = null;
-				live.currentAssignment = cloneAssignment(
-					generateRotationSafe(live.schedulerState),
-				);
+				live.currentAssignment = live.limited
+					? cloneAssignment(live.limited.kickoff)
+					: cloneAssignment(generateRotationSafe(live.schedulerState));
+				if (live.limited) live.limited.notice = null;
+				replanLimited();
 				live.tempSwaps = [];
 				live.selected = null;
 				live.pendingBenchIdx = null;
@@ -1509,17 +1852,30 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 	function loadLive(next: LiveMatch): void {
 		live = next;
 		restCache = null;
-		els.formatLabel.textContent = TEXT.match.formatLabel(
-			live.format.label,
-			Math.round(live.schedulerState.rotationSeconds / 60),
-		);
+		els.formatLabel.textContent = live.limited
+			? TEXT.match.limitedLabel(live.format.label)
+			: TEXT.match.formatLabel(
+					live.format.label,
+					Math.round(live.schedulerState.rotationSeconds / 60),
+				);
 		els.lateArrivalPanel.classList.remove("show");
 		refreshClock();
 		render();
 	}
 
-	function start(roster: RosterFile): void {
+	async function start(
+		roster: RosterFile,
+		setup: MatchSetupChoices,
+	): Promise<void> {
 		const format = getFormat(roster.formatId);
+		const substitutions = rulesForMatch(roster, setup);
+		// With limited swaps the match starts from the proposal the coach saw
+		// on the setup screen, worked out again from the same records.
+		const ahead =
+			substitutions.kind === "limited"
+				? await aheadOfSquad(activeTeamId(), roster)
+				: {};
+		const plan = proposalFor(roster, setup, ahead);
 		const playerNames = new Map(
 			roster.players.map((p) => [p.id, p.name] as const),
 		);
@@ -1542,7 +1898,15 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			},
 			clock: NEW_CLOCK,
 			match: roster.match,
-			substitutions: structuredClone(roster.substitutions),
+			substitutions: structuredClone(substitutions),
+			limited: plan && {
+				sittingOut: plan.sittingOut.map((p) => p.playerId),
+				ahead,
+				occasions: plan.occasions,
+				warnings: plan.warnings,
+				notice: null,
+				kickoff: { zones: plan.zones, bench: plan.bench },
+			},
 			goalkeepers: roster.players.filter((p) => p.goalkeeper).map((p) => p.id),
 			timeline: [],
 			pendingSwap: null,
@@ -1550,7 +1914,9 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			running: false,
 			lastTickMs: Date.now(),
 			timerHandle: null,
-			currentAssignment: cloneAssignment(generateRotationSafe(schedulerState)),
+			currentAssignment: plan
+				? cloneAssignment({ zones: plan.zones, bench: plan.bench })
+				: cloneAssignment(generateRotationSafe(schedulerState)),
 			tempSwaps: [],
 			selected: null,
 			pendingBenchIdx: null,
@@ -1579,6 +1945,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			clock: session.clock,
 			match: session.match,
 			substitutions: session.substitutions,
+			limited: session.limited,
 			goalkeepers: session.goalkeepers ?? [],
 			timeline: session.timeline ?? [],
 			pendingSwap: session.pendingSwap ?? null,

@@ -107,7 +107,7 @@
           </div>
           <div class="bench-list" id="benchList"></div>
           <div class="swap-panel" id="swapPanel" aria-live="polite"></div>
-          <p class="hint"><strong>Tillfälligt byte:</strong> tryck på en spelare på planen, sedan på en bänkspelare, och välj hur länge. Vid allvarlig skada väljer du <strong>Ute resten av matchen</strong>.</p>
+          <p class="hint" id="tempSwapHint"><strong>Tillfälligt byte:</strong> tryck på en spelare på planen, sedan på en bänkspelare, och välj hur länge. Vid allvarlig skada väljer du <strong>Ute resten av matchen</strong>.</p>
         </section>
 
         </div>
@@ -116,6 +116,7 @@
           <h2 id="nextTitle">Nästa byte</h2>
           <!-- Announces the swap warning once, not the countdown every second -->
           <p class="visually-hidden" id="swapAnnouncer" role="status" aria-live="polite" aria-atomic="true"></p>
+          <p class="limited-status" id="limitedStatus" role="status" hidden></p>
           <div id="previewBody"></div>
         </section>
 

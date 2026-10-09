@@ -143,6 +143,29 @@ export function newMatchFile(fields: {
 }
 
 /**
+ * Two copies' notes on the same match, as one list: every swap that has a
+ * note in either keeps one, the latest written (then the one that sorts
+ * last, so the result never depends on the order).
+ */
+export function mergeDeviationNotes(
+	a: readonly DeviationNote[],
+	b: readonly DeviationNote[],
+): DeviationNote[] {
+	const byEvent = new Map<string, DeviationNote>();
+	for (const note of [...a, ...b]) {
+		const kept = byEvent.get(note.eventId);
+		const later =
+			!kept ||
+			note.writtenAt > kept.writtenAt ||
+			(note.writtenAt === kept.writtenAt && note.note > kept.note);
+		if (later) byEvent.set(note.eventId, { ...note });
+	}
+	return [...byEvent.values()].sort((x, y) =>
+		x.eventId.localeCompare(y.eventId),
+	);
+}
+
+/**
  * The match file with the coach's note on the swap `eventId`, replacing an
  * earlier note on it. A blank note removes it. The timeline is not touched.
  */

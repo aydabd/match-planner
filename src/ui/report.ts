@@ -1,3 +1,4 @@
+import { LIMITS } from "../core/limits.js";
 import { formatTime } from "../core/match.js";
 import { matchFileName, matchFileToJson } from "../core/matchFile.js";
 import type { StoredReport } from "../core/report.js";
@@ -9,6 +10,8 @@ import {
 	restSummary,
 	zoneBreakdown,
 } from "./reportText.js";
+import { deviceTeamRecords } from "./teamRecords.js";
+import { activeTeamId } from "./teamStorage.js";
 import { TEXT } from "./text.js";
 
 function byId(id: string): HTMLElement {
@@ -178,6 +181,85 @@ export function createReportView(): ReportView {
 				TEXT.report.lateFlag(report.swaps[i]?.delaySeconds ?? 0)
 					? "is-late"
 					: "",
+		);
+		showDeviations(stored);
+	}
+
+	/**
+	 * Swaps that went past the match's substitution rules (#171), each with
+	 * a field for the coach's explanation. The explanation is kept with the
+	 * match file, keyed by the swap's id, so it travels with exports and
+	 * Drive backups; the report itself is not changed.
+	 */
+	function showDeviations(stored: StoredReport): void {
+		const { deviations, rules } = stored.report.substitutions;
+		const nameOf = (id: string) =>
+			stored.report.players.find((p) => p.id === id)?.name ?? id;
+		byId("reportDeviationsSection").hidden = deviations.length === 0;
+		byId("reportDeviationsSummary").textContent = TEXT.report.deviationsSummary(
+			rules,
+			deviations.length,
+		);
+		const notes =
+			loadMatchFiles().find((f) => f.audit.matchId === stored.matchId)
+				?.deviationNotes ?? [];
+		const list = byId("reportDeviations");
+		list.replaceChildren(
+			...deviations.map((d) => {
+				const item = document.createElement("li");
+				item.className = "report-deviation";
+				const what = document.createElement("p");
+				what.textContent = TEXT.report.deviation(
+					d.at,
+					d.period,
+					nameOf(d.inId),
+					nameOf(d.outId),
+					d.rules,
+				);
+				const area = document.createElement("textarea");
+				area.id = `deviationNote-${d.eventId}`;
+				area.maxLength = LIMITS.deviationNoteLength;
+				area.rows = 2;
+				area.value = notes.find((n) => n.eventId === d.eventId)?.note ?? "";
+				const label = document.createElement("label");
+				label.className = "field-label";
+				label.htmlFor = area.id;
+				label.textContent = TEXT.report.deviationNoteLabel(
+					nameOf(d.inId),
+					nameOf(d.outId),
+				);
+				const save = document.createElement("button");
+				save.type = "button";
+				save.className = "btn btn-secondary";
+				save.textContent = TEXT.report.saveDeviationNote;
+				const message = document.createElement("p");
+				message.className = "hint";
+				message.setAttribute("role", "status");
+				save.addEventListener("click", async () => {
+					const note = area.value.trim();
+					if (note === "") {
+						message.textContent = TEXT.report.deviationNoteEmpty;
+						return;
+					}
+					const saved = await deviceTeamRecords.saveDeviationNote(
+						activeTeamId(),
+						{
+							matchId: stored.matchId,
+							eventId: d.eventId,
+							note,
+							writtenAt: new Date().toISOString(),
+						},
+					);
+					message.textContent = saved
+						? TEXT.report.deviationNoteSaved
+						: TEXT.report.deviationNoteNotKept;
+				});
+				const fieldEl = document.createElement("div");
+				fieldEl.className = "field";
+				fieldEl.append(label, area);
+				item.append(what, fieldEl, save, message);
+				return item;
+			}),
 		);
 	}
 

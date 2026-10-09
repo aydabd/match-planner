@@ -24,6 +24,7 @@ function session(overrides: Partial<MatchSession> = {}): MatchSession {
 		},
 		match: { opponent: "IFK Lund", venue: "", date: "" },
 		substitutions: { kind: "free" },
+		limited: null,
 		playerNames: { p1: "Alva" },
 		schedulerPlayers: {
 			p1: {
@@ -68,6 +69,33 @@ describe("match session storage", () => {
 	it("restores a saved match exactly", () => {
 		saveSession(session());
 		expect(loadSession()).toEqual(session());
+	});
+
+	it("restores a match with limited swaps and its plan", () => {
+		const limited = session({
+			substitutions: {
+				kind: "limited",
+				substitutesIn: 5,
+				occasions: 3,
+				reEntry: false,
+			},
+			limited: {
+				sittingOut: ["p9"],
+				ahead: { p9: 600 },
+				occasions: [
+					{
+						at: 1200,
+						atBreak: true,
+						swaps: [{ outId: "p1", inId: "p8", zoneId: "mid" }],
+					},
+				],
+				warnings: [],
+				notice: null,
+				kickoff: { zones: { mid: ["p1"] }, bench: ["p8"] },
+			},
+		});
+		saveSession(limited);
+		expect(loadSession()).toEqual(limited);
 	});
 
 	it("treats a match saved without a load in a row as rested", () => {
@@ -133,6 +161,23 @@ describe("match session storage", () => {
 		[
 			"a session without substitution rules",
 			JSON.stringify({ ...session(), substitutions: undefined }),
+		],
+		[
+			"limited rules without their plan",
+			JSON.stringify(
+				session({
+					substitutions: {
+						kind: "limited",
+						substitutesIn: 5,
+						occasions: 3,
+						reEntry: false,
+					},
+				}),
+			),
+		],
+		[
+			"free rules with a plan for limited ones",
+			JSON.stringify({ ...session(), limited: { sittingOut: [] } }),
 		],
 		[
 			"a session with unknown substitution rules",

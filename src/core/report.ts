@@ -1,4 +1,4 @@
-import { POLICY } from "./policy.js";
+import { applies, POLICY } from "./policy.js";
 import type { MatchDetails } from "./storage.js";
 import {
 	parseSubstitutionRules,
@@ -311,7 +311,13 @@ export function buildReport(input: ReportInput): MatchReport {
 		swaps,
 		swapSummary,
 		playtime: { averageSeconds, spreadSeconds },
-		feedback: feedbackFor(swapSummary, compared, averageSeconds, spreadSeconds),
+		feedback: feedbackFor(
+			swapSummary,
+			compared,
+			averageSeconds,
+			spreadSeconds,
+			input.rules,
+		),
 		substitutions: {
 			rules: input.rules,
 			...substitutionUsage(timeline, input.rules),
@@ -324,8 +330,12 @@ function feedbackFor(
 	compared: readonly PlayerReport[],
 	averageSeconds: number,
 	spreadSeconds: number,
+	rules: SubstitutionRules,
 ): Feedback[] {
 	const feedback: Feedback[] = [];
+	// Swap timing and even playtime in every match assume free swaps; with
+	// limited swaps fairness is measured over time instead ("fairOverTime").
+	if (!applies("swapTiming", rules.kind)) return feedback;
 
 	// Which periods ran late, worst first. When only one of several periods
 	// did, say which; when the swaps were late throughout, say so overall.
@@ -359,6 +369,7 @@ function feedbackFor(
 		});
 	}
 
+	if (!applies("equalPlaytime", rules.kind)) return feedback;
 	const below = compared
 		.map((p) => ({ id: p.id, gap: averageSeconds - p.totalSeconds }))
 		.filter((p) => p.gap >= POLICY.playtimeGapSeconds)

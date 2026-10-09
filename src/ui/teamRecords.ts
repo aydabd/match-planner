@@ -1,3 +1,9 @@
+import {
+	type DeviationNote,
+	matchFileToJson,
+	parseMatchFile,
+	withDeviationNote,
+} from "../core/matchFile.js";
 import { buildPlayerIdMap } from "../core/playerIdentity.js";
 import {
 	inPeriod,
@@ -5,7 +11,7 @@ import {
 	summariesOf,
 } from "../core/standing.js";
 import type { FairnessPeriod } from "../core/substitutionRules.js";
-import { loadMatchFiles } from "./matchFileStorage.js";
+import { loadMatchFiles, replaceMatchFile } from "./matchFileStorage.js";
 
 /**
  * The records the substitution-rules screens read and write (#171), behind
@@ -20,6 +26,11 @@ export interface TeamRecords {
 		teamId: string,
 		period: FairnessPeriod,
 	): Promise<PlayerMatchSummary[]>;
+	/**
+	 * Keep the coach's explanation of a deviation with its match. Returns
+	 * false when the match is not kept.
+	 */
+	saveDeviationNote(teamId: string, note: DeviationNote): Promise<boolean>;
 }
 
 export const deviceTeamRecords: TeamRecords = {
@@ -32,5 +43,24 @@ export const deviceTeamRecords: TeamRecords = {
 			files.flatMap((f) => summariesOf(f, teamId, map)),
 			period,
 		);
+	},
+	async saveDeviationNote(teamId, note) {
+		const file = loadMatchFiles(teamId).find(
+			(f) => f.audit.matchId === note.matchId,
+		);
+		if (!file) return false;
+		const updated = withDeviationNote(
+			file,
+			note.eventId,
+			note.note,
+			note.writtenAt,
+		);
+		// Only a file that would load again is kept.
+		try {
+			parseMatchFile(JSON.parse(matchFileToJson(updated)));
+		} catch {
+			return false;
+		}
+		return replaceMatchFile(teamId, updated);
 	},
 };

@@ -7,12 +7,15 @@ export class ReportPage {
 	readonly playtimeRows: Locator;
 	readonly swapRows: Locator;
 	readonly backButton: Locator;
+	/** Swaps that went past the match's substitution rules (#171). */
+	readonly deviations: Locator;
 
 	constructor(private readonly page: Page) {
 		this.root = page.locator("#reportView");
 		this.summary = this.root.locator("#reportFeedback li");
 		this.playtimeRows = this.root.locator("#reportPlaytime tbody tr");
 		this.swapRows = this.root.locator("#reportSwaps tbody tr");
+		this.deviations = this.root.locator("#reportDeviations > li");
 		// A button on the in-match overlay (still opened from the match menu);
 		// a link on the standalone /report/ page (a real navigation, see #93).
 		this.backButton = this.root
