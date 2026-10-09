@@ -11,6 +11,8 @@ export const STORAGE_KEYS = {
 	draft: "matchplanner:draft:v1",
 	/** The match in progress, so a reload resumes it. */
 	session: "matchplanner:session:v1",
+	/** The next match's own substitution rules and the coach's changes to its proposal (#171). */
+	matchSetup: "matchplanner:matchSetup:v1",
 	/** The coach's name, recorded in files they save. */
 	coachName: "matchplanner:coach:v1",
 	/** Reports of the last finished matches, newest first. */
@@ -45,6 +47,7 @@ export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
 const TEAM_SCOPED_KEYS: readonly StorageKey[] = [
 	STORAGE_KEYS.draft,
 	STORAGE_KEYS.session,
+	STORAGE_KEYS.matchSetup,
 	STORAGE_KEYS.reports,
 	STORAGE_KEYS.matches,
 	STORAGE_KEYS.playerNotes,

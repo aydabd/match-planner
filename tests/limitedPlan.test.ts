@@ -114,6 +114,42 @@ describe("planMatch: who plays and who starts", () => {
 	});
 });
 
+describe("planMatch: the coach's changes to the proposal", () => {
+	const s = setup("7v7:2-3-1", { substitutesIn: 2 });
+	const players = squad(9);
+	const ahead = { p1: -600, p9: 600 };
+
+	it("starts, benches and sits out who the coach says, and fills in around them", () => {
+		const plan = planMatch(s, {
+			players,
+			keeperId: null,
+			ahead,
+			choices: { p9: "start", p1: "sitOut", p2: "bench" },
+		});
+		expect(onPitch(plan)).toContain("p9");
+		expect(onPitch(plan)).not.toContain("p2");
+		expect(plan.bench).toContain("p2");
+		expect(plan.sittingOut.map((p) => p.playerId)).toContain("p1");
+		expect(onPitch(plan)).toHaveLength(6);
+		expectWithinRules(s, plan);
+	});
+
+	it("moves a choice that does not fit to the next place down", () => {
+		const everyoneStarts = Object.fromEntries(
+			players.map((id) => [id, "start" as const]),
+		);
+		const plan = planMatch(s, {
+			players,
+			keeperId: null,
+			ahead,
+			choices: everyoneStarts,
+		});
+		expect(onPitch(plan)).toHaveLength(6);
+		expect(plan.bench).toHaveLength(2);
+		expect(plan.sittingOut).toHaveLength(1);
+	});
+});
+
 describe("planMatch: when the swaps are made", () => {
 	it("makes every swap in the half-time break when that is the even moment", () => {
 		const s = setup("11v11:4-4-2");

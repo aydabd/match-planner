@@ -56,6 +56,9 @@ export type PlanWarning =
 	/** Fewer players than the formation on the pitch, keeper included. */
 	| { code: "shortHanded"; onPitch: number };
 
+/** What the coach decided for a player, over the proposal. */
+export type PlayerChoice = "start" | "bench" | "sitOut";
+
 export interface SittingOut {
 	playerId: string;
 	/** Seconds ahead of the team average over the coach's period. */
@@ -128,6 +131,9 @@ function fillLines(
 /**
  * The plan before kickoff: lineup, who sits out today, and the swaps.
  * `players` are the available players in squad order, the keeper included.
+ * The coach's `choices` come first; the plan fills in around them, and a
+ * choice that does not fit (more starters than seats, more players to
+ * bring on than allowed) goes to the next place down.
  */
 export function planMatch(
 	setup: PlanSetup,
@@ -135,6 +141,7 @@ export function planMatch(
 		players: readonly string[];
 		keeperId: string | null;
 		ahead: Readonly<Record<string, number>>;
+		choices?: Readonly<Record<string, PlayerChoice>>;
 	},
 ): LimitedPlan {
 	const seats = outfieldCount(setup.format);
@@ -142,11 +149,24 @@ export function planMatch(
 		squad.players.filter((id) => id !== squad.keeperId),
 		squad.ahead,
 	);
-	const playing = outfield.slice(0, seats + setup.rules.substitutesIn);
-	const starters = playing.slice(0, seats);
-	const bench = playing.slice(seats);
-	const sittingOut = outfield
-		.slice(playing.length)
+	const choice = (id: string) => squad.choices?.[id];
+	const open = outfield.filter((id) => choice(id) === undefined);
+	const startersWanted = [
+		...outfield.filter((id) => choice(id) === "start"),
+		...open,
+		...outfield.filter((id) => choice(id) === "bench"),
+	];
+	const starters = startersWanted.slice(0, seats);
+	const benchWanted = [
+		...outfield.filter((id) => choice(id) === "bench"),
+		...outfield.filter((id) => choice(id) === "start"),
+		...open,
+	].filter((id) => !starters.includes(id));
+	const bench = benchWanted.slice(0, setup.rules.substitutesIn);
+	const sittingOut = ranked(
+		outfield.filter((id) => !starters.includes(id) && !bench.includes(id)),
+		squad.ahead,
+	)
 		.map((playerId) => ({
 			playerId,
 			aheadSeconds: aheadOf(squad.ahead, playerId),
