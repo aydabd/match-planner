@@ -4,6 +4,7 @@ import {
 	buildReport,
 	isStoredReport,
 	type StoredReport,
+	substitutionUsage,
 	totalRestSeconds,
 	withReport,
 } from "../src/core/report.js";
@@ -82,6 +83,7 @@ const report = (
 		timeline: [...timeline(delays), ...extra],
 		players: PLAYERS,
 		endedAt: 1200,
+		rules: { kind: "free" },
 	});
 
 describe("playtime in the report", () => {
@@ -128,6 +130,7 @@ describe("playtime in the report", () => {
 			timeline: cut,
 			players: PLAYERS,
 			endedAt: 420,
+			rules: { kind: "free" },
 		});
 		expect(r.periods).toBe(1);
 		expect(r.players.find((p) => p.id === "c")?.totalSeconds).toBe(120);
@@ -182,6 +185,7 @@ describe("feedback", () => {
 			timeline: timeline({ first: 5, second: 5 }),
 			players: PLAYERS.filter((p) => p.id !== "c" && p.id !== "d"),
 			endedAt: 1200,
+			rules: { kind: "free" },
 		});
 		expect(even.feedback).toContainEqual({
 			code: "swapsOnTime",
@@ -231,6 +235,7 @@ describe("feedback", () => {
 				{ id: "k", name: "K" },
 			],
 			endedAt: 1200,
+			rules: { kind: "free" },
 		});
 		expect(r.feedback).toContainEqual({
 			code: "evenPlaytime",
@@ -264,6 +269,7 @@ describe("feedback", () => {
 				{ id: "c", name: "C" },
 			],
 			endedAt: 1500,
+			rules: { kind: "free" },
 		});
 		expect(r.playtime).toEqual({ averageSeconds: 1000, spreadSeconds: 300 });
 		expect(r.feedback).toContainEqual({
@@ -281,6 +287,7 @@ describe("feedback", () => {
 			],
 			players: PLAYERS.slice(0, 1),
 			endedAt: 600,
+			rules: { kind: "free" },
 		});
 		expect(r.feedback[0]).toEqual({ code: "noSwaps" });
 	});
@@ -308,6 +315,35 @@ describe("kept reports", () => {
 		["a broken timestamp", { ...stored("m1"), savedAt: "yesterday" }],
 		["another version", { ...stored("m1"), schemaVersion: 2 }],
 		["no report", { ...stored("m1"), report: null }],
+		[
+			"no substitution rules",
+			{
+				...stored("m1"),
+				report: { ...report(), substitutions: undefined },
+			},
+		],
+		[
+			"a deviation breaking an unknown rule",
+			{
+				...stored("m1"),
+				report: {
+					...report(),
+					substitutions: {
+						...report().substitutions,
+						deviations: [
+							{
+								eventId: "s",
+								at: 1,
+								period: 1,
+								inId: "a",
+								outId: "b",
+								rules: ["tooFast"],
+							},
+						],
+					},
+				},
+			},
+		],
 		[
 			"a player without minutes",
 			{
@@ -397,6 +433,7 @@ describe("rest times in the report", () => {
 			timeline: restTimeline,
 			players: PLAYERS,
 			endedAt: 1500,
+			rules: { kind: "free" },
 		});
 
 	it("lists every rest with its length", () => {
@@ -439,5 +476,146 @@ describe("rest times in the report", () => {
 			if (p.status !== "played") continue;
 			expect(p.totalSeconds + totalRestSeconds(p.rests)).toBe(1500);
 		}
+	});
+});
+
+describe("substitutionUsage: limited swaps counted from the timeline", () => {
+	const RULES = {
+		kind: "limited",
+		substitutesIn: 2,
+		occasions: 2,
+		reEntry: false,
+	} as const;
+	const kickoff: TimelineEvent[] = [
+		{ type: "periodStart", at: 0, period: 1 },
+		{
+			type: "lineup",
+			at: 0,
+			zones: { back: ["a"], fwd: ["b"] },
+			keeperId: "k",
+		},
+	];
+	const swap = (
+		id: string,
+		at: number,
+		inId: string,
+		outId: string,
+		plannedAt = at,
+	): TimelineEvent => ({
+		type: "substitution",
+		id,
+		at,
+		plannedAt,
+		period: 1,
+		inId,
+		zoneId: "back",
+		moves: [],
+		outId,
+	});
+
+	it("is within the rules exactly at the limits", () => {
+		const usage = substitutionUsage(
+			[...kickoff, swap("s1", 100, "c", "a"), swap("s2", 200, "d", "b")],
+			RULES,
+		);
+		expect(usage).toEqual({ substitutesIn: 2, occasions: 2, deviations: [] });
+	});
+
+	it("lists a substitute and an occasion one past the limits", () => {
+		const usage = substitutionUsage(
+			[
+				...kickoff,
+				swap("s1", 100, "c", "a"),
+				swap("s2", 200, "d", "b"),
+				swap("s3", 300, "e", "c"),
+			],
+			RULES,
+		);
+		expect(usage.substitutesIn).toBe(3);
+		expect(usage.occasions).toBe(3);
+		expect(usage.deviations).toEqual([
+			{
+				eventId: "s3",
+				at: 300,
+				period: 1,
+				inId: "e",
+				outId: "c",
+				rules: ["substitutesIn", "occasions"],
+			},
+		]);
+	});
+
+	it("counts swaps due at the same moment as one occasion, however far apart they are made", () => {
+		const usage = substitutionUsage(
+			[
+				...kickoff,
+				swap("s1", 600, "c", "a", 600),
+				swap("s2", 615, "d", "b", 600),
+			],
+			{ ...RULES, occasions: 1 },
+		);
+		expect(usage).toMatchObject({ occasions: 1, deviations: [] });
+	});
+
+	it("does not count a swap in a break as an occasion, but counts its player", () => {
+		const usage = substitutionUsage(
+			[
+				...kickoff,
+				{ type: "periodEnd", at: 1200, period: 1 },
+				swap("s1", 1200, "c", "a"),
+				{ type: "periodStart", at: 1200, period: 2 },
+			],
+			{ ...RULES, occasions: 1, substitutesIn: 1 },
+		);
+		expect(usage).toEqual({ substitutesIn: 1, occasions: 0, deviations: [] });
+	});
+
+	it("lists a replaced player coming back when re-entry is not allowed", () => {
+		const timeline = [
+			...kickoff,
+			swap("s1", 100, "c", "a"),
+			{
+				type: "lineup",
+				at: 100,
+				zones: { back: ["c"], fwd: ["b"] },
+				keeperId: "k",
+			},
+			swap("s2", 100, "a", "c"),
+		] as TimelineEvent[];
+		const usage = substitutionUsage(timeline, RULES);
+		expect(usage.substitutesIn).toBe(1);
+		expect(usage.deviations).toEqual([
+			expect.objectContaining({ eventId: "s2", rules: ["reEntry"] }),
+		]);
+		expect(
+			substitutionUsage(timeline, { ...RULES, reEntry: true }).deviations,
+		).toEqual([]);
+	});
+
+	it("has no limits with free swaps, and no limit on occasions when there is none", () => {
+		const many = [
+			...kickoff,
+			...["c", "d", "e"].map((id, i) => swap(`s${i}`, 100 * (i + 1), id, "a")),
+		];
+		expect(substitutionUsage(many, { kind: "free" }).deviations).toEqual([]);
+		expect(
+			substitutionUsage(many, { ...RULES, substitutesIn: 3, occasions: null })
+				.deviations,
+		).toEqual([]);
+	});
+
+	it("is part of the match report", () => {
+		const r = buildReport({
+			timeline: [...kickoff, swap("s1", 100, "c", "a")],
+			players: PLAYERS,
+			endedAt: 600,
+			rules: RULES,
+		});
+		expect(r.substitutions).toEqual({
+			rules: RULES,
+			substitutesIn: 1,
+			occasions: 1,
+			deviations: [],
+		});
 	});
 });
