@@ -7,9 +7,12 @@ import {
 import { readItem, STORAGE_KEYS, teamScoped, writeItem } from "./appStorage.js";
 import { activeTeamId } from "./teamStorage.js";
 
-/** The kept match files, oldest first. A damaged entry is left out. */
-export function loadMatchFiles(): MatchFile[] {
-	const raw = readItem(teamScoped(STORAGE_KEYS.matches, activeTeamId()));
+/**
+ * The kept match files of `teamId` (the active team unless given), oldest
+ * first. A damaged entry is left out.
+ */
+export function loadMatchFiles(teamId: string = activeTeamId()): MatchFile[] {
+	const raw = readItem(teamScoped(STORAGE_KEYS.matches, teamId));
 	if (!raw) return [];
 	try {
 		const parsed: unknown = JSON.parse(raw);
