@@ -3,6 +3,18 @@
 All notable changes to this project are documented here, automatically, by
 [release-please](https://github.com/googleapis/release-please).
 
+## [0.27.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.26.0...matchplanner-v0.27.0) (2026-10-09)
+
+
+### Features
+
+* compute each player's standing over a chosen period ([#176](https://github.com/aydabd/match-planner/issues/176)) ([1fab2a2](https://github.com/aydabd/match-planner/commit/1fab2a293bc19fd95450078ab34e2d15cd5c5c51))
+* plan matches with limited swaps and find rule deviations ([#177](https://github.com/aydabd/match-planner/issues/177)) ([860f1f3](https://github.com/aydabd/match-planner/commit/860f1f31fddb9c3905d9964e99b168121fea167a))
+* play matches with limited swaps and explain deviations ([#179](https://github.com/aydabd/match-planner/issues/179)) ([f0baf43](https://github.com/aydabd/match-planner/commit/f0baf43ffad11595df8a697e94cc4e41b9ecdc7e))
+* say which substitution rules apply where, quoting SvFF's rules ([#174](https://github.com/aydabd/match-planner/issues/174)) ([2a577e7](https://github.com/aydabd/match-planner/commit/2a577e73a0b2961164ee8b2abb8332f0cc34f386))
+* set substitution rules and see the proposal before a match ([#178](https://github.com/aydabd/match-planner/issues/178)) ([719e545](https://github.com/aydabd/match-planner/commit/719e545573bf4cd03978639a9f81c02fcf049eef))
+* store substitution rules for the team and each match ([#175](https://github.com/aydabd/match-planner/issues/175)) ([f6f39bc](https://github.com/aydabd/match-planner/commit/f6f39bca588fdf48b0404c27598c661594e1de3a))
+
 ## [0.26.0](https://github.com/aydabd/match-planner/compare/matchplanner-v0.25.0...matchplanner-v0.26.0) (2026-10-07)
 
 
