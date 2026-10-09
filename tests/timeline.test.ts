@@ -103,6 +103,7 @@ describe("swapDelays", () => {
 		const timeline: TimelineEvent[] = [
 			{
 				type: "substitution",
+				id: "swap-1",
 				at: 630,
 				plannedAt: 600,
 				period: 1,
@@ -113,6 +114,7 @@ describe("swapDelays", () => {
 			},
 			{
 				type: "substitution",
+				id: "swap-2",
 				at: 590,
 				plannedAt: 600,
 				period: 1,

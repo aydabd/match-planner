@@ -24,6 +24,16 @@ const validPlayers = [
 	{ id: "p2", name: "Christos" },
 ];
 
+/** Every required field of a squad file except team size, swaps and players. */
+const BASE = {
+	schemaVersion: 3,
+	periods: 3,
+	periodSeconds: 1200,
+	region: "national",
+	substitutions: { kind: "free" },
+	fairness: { kind: "recentMatches", count: 8 },
+};
+
 describe("newRoster / rosterToJson / parseRosterFile round trip", () => {
 	it("round-trips a roster through JSON without loss", () => {
 		const roster = newRoster({
@@ -62,18 +72,30 @@ describe("parseRosterFile - rejects malformed or hostile input", () => {
 		).toThrow(StorageError);
 	});
 
-	it("rejects a version 3 file with an unknown region", () => {
+	it("rejects a file with an unknown region", () => {
 		expect(
 			problemOf({
-				schemaVersion: 3,
+				...BASE,
 				formatId: "7v7",
 				rotationSeconds: 600,
-				periods: 3,
-				periodSeconds: 1200,
 				region: "narnia",
 				players: validPlayers,
 			}),
 		).toBe("region");
+	});
+
+	it("refuses a file from before the current version instead of guessing", () => {
+		for (const schemaVersion of [1, 2]) {
+			expect(
+				problemOf({
+					...BASE,
+					schemaVersion,
+					formatId: "7v7",
+					rotationSeconds: 600,
+					players: validPlayers,
+				}),
+			).toBe("schemaVersion");
+		}
 	});
 
 	it.each([
@@ -84,7 +106,7 @@ describe("parseRosterFile - rejects malformed or hostile input", () => {
 		"accepts the format %s (custom formations too) and stores it as %s",
 		(formatId, stored) => {
 			const roster = parseRosterFile({
-				schemaVersion: 1,
+				...BASE,
 				formatId,
 				rotationSeconds: 600,
 				players: validPlayers,
@@ -96,7 +118,7 @@ describe("parseRosterFile - rejects malformed or hostile input", () => {
 	it("rejects an unregistered formatId", () => {
 		expect(
 			problemOf({
-				schemaVersion: 1,
+				...BASE,
 				formatId: "13v13",
 				rotationSeconds: 600,
 				players: validPlayers,
@@ -107,7 +129,7 @@ describe("parseRosterFile - rejects malformed or hostile input", () => {
 	it("rejects a formation that does not fit the team size", () => {
 		expect(
 			problemOf({
-				schemaVersion: 1,
+				...BASE,
 				formatId: "7v7:2-3-2",
 				rotationSeconds: 600,
 				players: validPlayers,
@@ -122,7 +144,7 @@ describe("parseRosterFile - rejects malformed or hostile input", () => {
 	])("rejects minutes between swaps %s", (_, rotationSeconds) => {
 		expect(() =>
 			parseRosterFile({
-				schemaVersion: 1,
+				...BASE,
 				formatId: "7v7",
 				rotationSeconds,
 				players: validPlayers,
@@ -134,7 +156,7 @@ describe("parseRosterFile - rejects malformed or hostile input", () => {
 		"accepts %i seconds between swaps",
 		(seconds) => {
 			const roster = parseRosterFile({
-				schemaVersion: 1,
+				...BASE,
 				formatId: "7v7",
 				rotationSeconds: seconds,
 				players: validPlayers,
@@ -146,7 +168,7 @@ describe("parseRosterFile - rejects malformed or hostile input", () => {
 	it("rejects a non-positive rotationSeconds", () => {
 		expect(() =>
 			parseRosterFile({
-				schemaVersion: 1,
+				...BASE,
 				formatId: "7v7",
 				rotationSeconds: 0,
 				players: validPlayers,
@@ -154,7 +176,7 @@ describe("parseRosterFile - rejects malformed or hostile input", () => {
 		).toThrow(StorageError);
 		expect(() =>
 			parseRosterFile({
-				schemaVersion: 1,
+				...BASE,
 				formatId: "7v7",
 				rotationSeconds: -5,
 				players: validPlayers,
@@ -164,7 +186,7 @@ describe("parseRosterFile - rejects malformed or hostile input", () => {
 
 	it("accepts an empty squad only when asked to (the setup draft)", () => {
 		const empty = {
-			schemaVersion: 1,
+			...BASE,
 			formatId: "7v7",
 			rotationSeconds: 600,
 			players: [],
@@ -178,7 +200,7 @@ describe("parseRosterFile - rejects malformed or hostile input", () => {
 	it("rejects an empty squad", () => {
 		expect(
 			problemOf({
-				schemaVersion: 1,
+				...BASE,
 				formatId: "7v7",
 				rotationSeconds: 600,
 				players: [],
@@ -189,7 +211,7 @@ describe("parseRosterFile - rejects malformed or hostile input", () => {
 	it("rejects duplicate player ids", () => {
 		expect(
 			problemOf({
-				schemaVersion: 1,
+				...BASE,
 				formatId: "7v7",
 				rotationSeconds: 600,
 				players: [
@@ -203,7 +225,7 @@ describe("parseRosterFile - rejects malformed or hostile input", () => {
 	it("rejects a player missing a name or id", () => {
 		expect(() =>
 			parseRosterFile({
-				schemaVersion: 1,
+				...BASE,
 				formatId: "7v7",
 				rotationSeconds: 600,
 				players: [{ id: "p1" }],
@@ -211,7 +233,7 @@ describe("parseRosterFile - rejects malformed or hostile input", () => {
 		).toThrow(StorageError);
 		expect(() =>
 			parseRosterFile({
-				schemaVersion: 1,
+				...BASE,
 				formatId: "7v7",
 				rotationSeconds: 600,
 				players: [{ name: "A" }],
@@ -221,7 +243,7 @@ describe("parseRosterFile - rejects malformed or hostile input", () => {
 
 	it("does not execute or interpret script-like content in a name - it stays an inert string", () => {
 		const hostile = {
-			schemaVersion: 1,
+			...BASE,
 			formatId: "7v7",
 			rotationSeconds: 600,
 			players: [{ id: "p1", name: "<script>alert(1)</script>" }],
@@ -235,7 +257,7 @@ describe("parseRosterFile - rejects malformed or hostile input", () => {
 	it("truncates absurdly long names instead of rejecting them outright", () => {
 		const longName = "A".repeat(500);
 		const parsed = parseRosterFile({
-			schemaVersion: 1,
+			...BASE,
 			formatId: "7v7",
 			rotationSeconds: 600,
 			players: [{ id: "p1", name: longName }],
@@ -301,6 +323,13 @@ describe("squad file version 3", () => {
 			periods: 3,
 			periodSeconds: 1500,
 			region: "national",
+			substitutions: {
+				kind: "limited",
+				substitutesIn: 5,
+				occasions: 3,
+				reEntry: false,
+			},
+			fairness: { kind: "season", year: 2026 },
 			match: {
 				opponent: "IFK Lund",
 				venue: "Klostergården",
@@ -313,43 +342,8 @@ describe("squad file version 3", () => {
 		};
 	}
 
-	it("keeps the whole team setup, goalkeepers, region and audit", () => {
+	it("keeps the whole team setup, goalkeepers, region, rules and audit", () => {
 		expect(parseRosterFile(file())).toEqual(file());
-	});
-
-	it("reads a version 1 file with the team size's match length, no keepers and region national", () => {
-		expect(
-			parseRosterFile({
-				schemaVersion: 1,
-				formatId: "11v11:4-4-2",
-				rotationSeconds: 600,
-				players: [{ id: "p1", name: "Alva" }],
-			}),
-		).toEqual({
-			schemaVersion: 3,
-			formatId: "11v11:4-4-2",
-			rotationSeconds: 600,
-			periods: 2,
-			periodSeconds: 2400,
-			region: "national",
-			match: { opponent: "", venue: "", date: "" },
-			players: [{ id: "p1", name: "Alva", goalkeeper: false }],
-			startingKeeperId: null,
-		});
-	});
-
-	it("reads a version 2 file (no region yet) as region national", () => {
-		const v2 = {
-			schemaVersion: 2,
-			formatId: "9v9:3-3-2",
-			rotationSeconds: 480,
-			periods: 3,
-			periodSeconds: 1500,
-			match: { opponent: "", venue: "", date: "" },
-			players: PLAYERS,
-			startingKeeperId: "p1",
-		};
-		expect(parseRosterFile(v2).region).toBe("national");
 	});
 
 	it("does not require match details or an audit record", () => {
@@ -395,6 +389,18 @@ describe("squad file version 3", () => {
 			{ startingKeeperId: "p2" },
 			"startingKeeper",
 		],
+		["no substitution rules", { substitutions: undefined }, "substitutions"],
+		[
+			"an unknown kind of substitution rules",
+			{ substitutions: { kind: "flying" } },
+			"substitutions",
+		],
+		["no fairness period", { fairness: undefined }, "fairness"],
+		[
+			"a fairness period that ends before it starts",
+			{ fairness: { kind: "range", from: "2026-10-01", to: "2026-09-01" } },
+			"fairness",
+		],
 		[
 			"a goalkeeper flag that is not true or false",
 			{ players: [{ id: "p1", name: "Alva", goalkeeper: "yes" }] },
@@ -433,6 +439,8 @@ describe("newRoster", () => {
 			periods: 3,
 			periodSeconds: 900,
 			region: "national",
+			substitutions: { kind: "free" },
+			fairness: { kind: "recentMatches", count: 8 },
 			match: { opponent: "", venue: "", date: "" },
 			players: [],
 			startingKeeperId: null,

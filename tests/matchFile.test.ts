@@ -8,6 +8,7 @@ import {
 	newMatchFile,
 	parseMatchFile,
 	startersOf,
+	withDeviationNote,
 } from "../src/core/matchFile.js";
 import { makeMatchFile } from "./support/matchFiles.js";
 
@@ -237,6 +238,7 @@ describe("every kind of event in a match file", () => {
 			{ type: "lateArrival", at: 590, period: 1, playerId: b },
 			{
 				type: "substitution",
+				id: "swap-1",
 				at: 592,
 				plannedAt: 580,
 				period: 1,
@@ -330,6 +332,25 @@ describe("every kind of event in a match file", () => {
 			},
 		],
 		[
+			"a substitution without an id",
+			(f: Doc) => {
+				delete f.timeline[firstOf(f, "substitution")].id;
+			},
+		],
+		[
+			"a substitution whose id is too long",
+			(f: Doc) => {
+				f.timeline[firstOf(f, "substitution")].id = "x".repeat(101);
+			},
+		],
+		[
+			"two substitutions with the same id",
+			(f: Doc) => {
+				const swap = f.timeline[firstOf(f, "substitution")];
+				f.timeline.splice(firstOf(f, "substitution") + 1, 0, { ...swap });
+			},
+		],
+		[
 			"an event without a time",
 			(f: Doc) => {
 				delete f.timeline[0].at;
@@ -383,6 +404,118 @@ function firstOf(file: Doc, type: string): number {
 	return file.timeline.findIndex((e: Doc) => e.type === type);
 }
 
+describe("the rules and the coach's deviation notes in a match file", () => {
+	/** A valid file with one substitution, "swap-1", to write notes about. */
+	function withSwap(): MatchFile {
+		const file = makeMatchFile({ seed: 4 });
+		const lineup = file.timeline[1];
+		if (lineup?.type !== "lineup") throw new Error("no kickoff lineup");
+		const [outId] = lineup.zones.back ?? [];
+		const inId = file.squad.players.find(
+			(p) => !file.squad.startingIds.includes(p.id),
+		)?.id;
+		if (!outId || !inId) throw new Error("no swap possible");
+		file.timeline.splice(2, 0, {
+			type: "substitution",
+			id: "swap-1",
+			at: 10,
+			plannedAt: 10,
+			period: 1,
+			inId,
+			zoneId: "back",
+			moves: [],
+			outId,
+		});
+		return file;
+	}
+
+	const note = (file: MatchFile, fields: Doc = {}) => ({
+		matchId: file.audit.matchId,
+		eventId: "swap-1",
+		note: "Skadad, fick bytas trots att bytena var slut.",
+		writtenAt: "2026-09-05T13:00:00.000Z",
+		...fields,
+	});
+
+	it("keeps the rules that applied and a note on a swap", () => {
+		const file = withSwap();
+		file.setup.substitutions = {
+			kind: "limited",
+			substitutesIn: 5,
+			occasions: 3,
+			reEntry: false,
+		};
+		file.deviationNotes = [note(file)];
+		expect(parseMatchFile(JSON.parse(matchFileToJson(file)))).toEqual(file);
+	});
+
+	it.each([
+		["no rules", (f: Doc) => delete f.setup.substitutions],
+		[
+			"rules with too many substitutes",
+			(f: Doc) => {
+				f.setup.substitutions = {
+					kind: "limited",
+					substitutesIn: 8,
+					occasions: 3,
+					reEntry: false,
+				};
+			},
+		],
+	])("refuses a setup with %s", (_, edit) => {
+		const file = JSON.parse(matchFileToJson(withSwap())) as Doc;
+		edit(file);
+		expect(problemOf(file)).toEqual({ code: "setup" });
+	});
+
+	it.each([
+		["no list of notes", (f: Doc) => delete f.deviationNotes],
+		["a note on another match", () => [{ matchId: "other" }]],
+		["a note on an event that is not a swap", () => [{ eventId: "nope" }]],
+		["an empty note", () => [{ note: "   " }]],
+		["a note that is too long", () => [{ note: "x".repeat(501) }]],
+		["a note without a time", () => [{ writtenAt: "later" }]],
+		["two notes on one swap", () => [{}, {}]],
+	])("refuses %s", (_, change) => {
+		const file = withSwap();
+		const doc = JSON.parse(matchFileToJson(file)) as Doc;
+		const notes = change(doc);
+		if (Array.isArray(notes))
+			doc.deviationNotes = notes.map((fields: Doc) => note(file, fields));
+		expect(problemOf(doc)).toEqual({ code: "deviationNotes" });
+	});
+
+	it("adds, replaces and removes a note without touching the timeline", () => {
+		const file = withSwap();
+		const first = withDeviationNote(
+			file,
+			"swap-1",
+			"  Skada  ",
+			"2026-09-05T13:00:00Z",
+		);
+		expect(first.deviationNotes).toEqual([
+			{
+				matchId: file.audit.matchId,
+				eventId: "swap-1",
+				note: "Skada",
+				writtenAt: "2026-09-05T13:00:00Z",
+			},
+		]);
+		const second = withDeviationNote(
+			first,
+			"swap-1",
+			"Ny",
+			"2026-09-05T14:00:00Z",
+		);
+		expect(second.deviationNotes.map((n) => n.note)).toEqual(["Ny"]);
+		expect(
+			withDeviationNote(second, "swap-1", " ", "x").deviationNotes,
+		).toEqual([]);
+		expect(second.timeline).toEqual(file.timeline);
+		expect(file.deviationNotes).toEqual([]);
+	});
+});
+
 describe("newMatchFile", () => {
 	it("builds a file that passes the same checks as an imported one", () => {
 		const made = makeMatchFile({ seed: 8 });
@@ -398,13 +531,27 @@ describe("newMatchFile", () => {
 		expect(parseMatchFile(JSON.parse(matchFileToJson(file)))).toEqual(made);
 	});
 
-	it("keeps its own copy of the timeline and the players", () => {
+	it("keeps its own copy of the timeline, the players, the rules and the notes", () => {
 		const made = makeMatchFile({ seed: 8 });
-		const file = newMatchFile({ ...made, players: made.squad.players });
+		const note = {
+			matchId: made.audit.matchId,
+			eventId: "swap-1",
+			note: "Skada",
+			writtenAt: "2026-09-05T13:00:00.000Z",
+		};
+		const file = newMatchFile({
+			...made,
+			players: made.squad.players,
+			deviationNotes: [note],
+		});
 		made.timeline.length = 0;
 		made.squad.players.length = 0;
+		made.setup.substitutions = { kind: "limited" } as never;
+		note.note = "Ändrad";
 		expect(file.timeline.length).toBeGreaterThan(0);
 		expect(file.squad.players.length).toBeGreaterThan(0);
+		expect(file.setup.substitutions).toEqual({ kind: "free" });
+		expect(file.deviationNotes[0]?.note).toBe("Skada");
 	});
 });
 

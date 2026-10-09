@@ -44,6 +44,7 @@ import {
 	setUnavailable,
 } from "../core/scheduler.js";
 import type { MatchDetails, RosterFile } from "../core/storage.js";
+import type { SubstitutionRules } from "../core/substitutionRules.js";
 import {
 	applyChain,
 	type SubstitutionChain,
@@ -167,8 +168,11 @@ export interface MatchCallbacks {
 	onShowReport: (report: StoredReport) => void;
 }
 
-/** A new id for a match; unique across devices so match files never clash. */
-function newMatchId(): string {
+/**
+ * A new id for a match or a substitution; unique across devices so match
+ * files and the notes that refer to their events never clash.
+ */
+function newId(): string {
 	return (
 		globalThis.crypto?.randomUUID?.() ??
 		`m-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
@@ -189,6 +193,8 @@ interface LiveMatch {
 	plan: MatchPlan;
 	clock: MatchClock;
 	match: MatchDetails;
+	/** The substitution rules for this match, copied from the team (#171). */
+	substitutions: SubstitutionRules;
 	/** Players marked as goalkeeper in the squad, offered first as keeper. */
 	goalkeepers: string[];
 	/** Who is in goal next period, as chosen during a break. */
@@ -241,6 +247,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			plan: live.plan,
 			clock: live.clock,
 			match: live.match,
+			substitutions: live.substitutions,
 			playerNames: Object.fromEntries(live.playerNames.entries()),
 			schedulerPlayers: live.schedulerState.players,
 			schedulerOrder: live.schedulerState.order,
@@ -1069,6 +1076,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 				periods: plan.periods,
 				periodSeconds: plan.periodSeconds,
 				rotationSeconds: plan.rotationSeconds,
+				substitutions: live.substitutions,
 			},
 			players: live.schedulerState.order.map((id) => ({
 				id,
@@ -1298,6 +1306,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		applyChain(live.currentAssignment, chain);
 		live.timeline.push({
 			type: "substitution",
+			id: newId(),
 			at: now(),
 			plannedAt: live.pendingSwap.plannedAt,
 			period: live.clock.period,
@@ -1477,7 +1486,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 				els.matchMenu.open = false;
 				clearSession();
 				stopTimer();
-				live.matchId = newMatchId();
+				live.matchId = newId();
 				resetPlayers(live.schedulerState);
 				live.rotationIndex = 0;
 				live.clock = NEW_CLOCK;
@@ -1520,7 +1529,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			roster.startingKeeperId,
 		);
 		loadLive({
-			matchId: newMatchId(),
+			matchId: newId(),
 			schedulerState,
 			playerNames,
 			format,
@@ -1532,6 +1541,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			},
 			clock: NEW_CLOCK,
 			match: roster.match,
+			substitutions: structuredClone(roster.substitutions),
 			goalkeepers: roster.players.filter((p) => p.goalkeeper).map((p) => p.id),
 			timeline: [],
 			pendingSwap: null,
@@ -1559,7 +1569,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 		};
 		const playerNames = new Map(Object.entries(session.playerNames));
 		loadLive({
-			matchId: session.matchId ?? newMatchId(),
+			matchId: session.matchId ?? newId(),
 			schedulerState,
 			playerNames,
 			format,
@@ -1567,6 +1577,7 @@ export function createMatchView(callbacks: MatchCallbacks): MatchView {
 			plan: session.plan,
 			clock: session.clock,
 			match: session.match,
+			substitutions: session.substitutions,
 			goalkeepers: session.goalkeepers ?? [],
 			timeline: session.timeline ?? [],
 			pendingSwap: session.pendingSwap ?? null,
